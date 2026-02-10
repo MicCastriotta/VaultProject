@@ -10,8 +10,8 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { cryptoService } from '../services/cryptoService';
 import { databaseService } from '../services/databaseService';
 import { biometricService } from '../services/biometricService';
-import { RateLimiter, securityLog } from '../services/securityUtils';
-import { useRef } from 'react';
+import { RateLimiter, AutoLockTimer, securityLog } from '../services/securityUtils';
+import { useRef, useCallback } from 'react';
 
 const AuthContext = createContext();
 
@@ -32,6 +32,100 @@ export function AuthProvider({ children }) {
     const [biometricEnabled, setBiometricEnabled] = useState(false);
     const [biometricAvailable, setBiometricAvailable] = useState(false);
     const [showBiometricSetup, setShowBiometricSetup] = useState(false);
+
+    // Auto-lock: timeout in ms (default 5 minuti, 0 = disabilitato)
+    const [autoLockTimeout, setAutoLockTimeout] = useState(300000);
+    const autoLockTimer = useRef(null);
+    const backgroundSince = useRef(null); // Timestamp di quando l'app è andata in background
+
+    // Funzione di lock stabile (non ricreata ad ogni render)
+    const performAutoLock = useCallback(() => {
+        securityLog('Auto-lock triggered after inactivity');
+        cryptoService.lock();
+        setIsUnlocked(false);
+        setIntegrityError(null);
+    }, []);
+
+    // Gestione auto-lock: avvia/ferma timer e listener su interazione utente
+    useEffect(() => {
+        // Pulisci timer precedente se esiste
+        if (autoLockTimer.current) {
+            autoLockTimer.current.stop();
+            autoLockTimer.current = null;
+        }
+        backgroundSince.current = null;
+
+        // Attiva solo se sbloccato e timeout > 0
+        if (!isUnlocked || autoLockTimeout <= 0) {
+            return;
+        }
+
+        // Crea nuovo timer
+        const timer = new AutoLockTimer(autoLockTimeout, performAutoLock);
+        autoLockTimer.current = timer;
+        timer.reset();
+
+        // Eventi che indicano attività dell'utente
+        const activityEvents = [
+            'mousedown', 'mousemove', 'keydown',
+            'scroll', 'touchstart', 'pointerdown', 'click'
+        ];
+
+        const handleActivity = () => {
+            if (autoLockTimer.current?.isActive) {
+                autoLockTimer.current.reset();
+            }
+        };
+
+        // Visibilità della pagina: approccio basato su timestamp
+        // Funziona anche su iOS/Android dove i timer JS vengono sospesi in background
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                // App va in background → salva il timestamp
+                backgroundSince.current = Date.now();
+                // Ferma il timer (tanto verrebbe sospeso dal browser)
+                if (autoLockTimer.current) {
+                    autoLockTimer.current.stop();
+                }
+            } else {
+                // App torna in foreground → controlla quanto tempo è passato
+                if (backgroundSince.current) {
+                    const elapsed = Date.now() - backgroundSince.current;
+                    const bgTimeout = Math.min(autoLockTimeout, 60000); // max 60s in background
+
+                    if (elapsed >= bgTimeout) {
+                        // Tempo scaduto in background → lock immediato
+                        securityLog('Auto-lock triggered (app was in background)', {
+                            elapsedMs: elapsed,
+                            bgTimeoutMs: bgTimeout
+                        });
+                        performAutoLock();
+                        return;
+                    }
+                }
+                backgroundSince.current = null;
+
+                // Non ancora scaduto → riavvia il timer normale
+                if (autoLockTimer.current) {
+                    autoLockTimer.current.reset();
+                }
+            }
+        };
+
+        activityEvents.forEach(event => {
+            window.addEventListener(event, handleActivity, { passive: true });
+        });
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Cleanup
+        return () => {
+            timer.stop();
+            activityEvents.forEach(event => {
+                window.removeEventListener(event, handleActivity);
+            });
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [isUnlocked, autoLockTimeout, performAutoLock]);
 
     useEffect(() => {
         checkUserExists();
@@ -281,6 +375,9 @@ export function AuthProvider({ children }) {
      * Logout: lock del sistema
      */
     function logout() {
+        if (autoLockTimer.current) {
+            autoLockTimer.current.stop();
+        }
         cryptoService.lock();
         setIsUnlocked(false);
         setIntegrityError(null);
@@ -398,6 +495,8 @@ export function AuthProvider({ children }) {
         biometricEnabled,
         biometricAvailable,
         showBiometricSetup,
+        autoLockTimeout,
+        setAutoLockTimeout,
         setupMasterPassword,
         login,
         loginWithBiometric,

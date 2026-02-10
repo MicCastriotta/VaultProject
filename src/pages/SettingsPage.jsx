@@ -28,7 +28,7 @@ import { useTranslation } from 'react-i18next';
 
 export function SettingsPage() {
     const navigate = useNavigate();
-    const { logout, refreshHMAC } = useAuth();
+    const { logout, refreshHMAC, autoLockTimeout, setAutoLockTimeout } = useAuth();
     const { t } = useTranslation();
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
@@ -428,6 +428,43 @@ export function SettingsPage() {
                     </div>
                 </div>
                 <BiometricSettingsSection />
+
+                {/* Auto-Lock Section */}
+                <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div className="p-4 border-b bg-gray-50">
+                        <h2 className="font-semibold text-gray-800 flex items-center gap-2">
+                            <Shield size={20} />
+                            Auto-Lock
+                        </h2>
+                    </div>
+                    <div className="p-4 space-y-3">
+                        <p className="text-sm text-gray-600">
+                            Automatically lock the app after a period of inactivity. The app also locks faster when you switch to another tab or app.
+                        </p>
+                        <select
+                            value={autoLockTimeout}
+                            onChange={(e) => setAutoLockTimeout(Number(e.target.value))}
+                            className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-gray-800"
+                        >
+                            <option value={60000}>1 minute</option>
+                            <option value={120000}>2 minutes</option>
+                            <option value={300000}>5 minutes (default)</option>
+                            <option value={600000}>10 minutes</option>
+                            <option value={900000}>15 minutes</option>
+                            <option value={1800000}>30 minutes</option>
+                            <option value={0}>Never (not recommended)</option>
+                        </select>
+                        {autoLockTimeout === 0 && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
+                                <AlertTriangle size={18} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+                                <p className="text-sm text-yellow-800">
+                                    Disabling auto-lock is not recommended. Anyone with access to your device could see your passwords.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
                 {/* Export Section */}
                 <div className="bg-white rounded-lg shadow-sm overflow-hidden">
                     <div className="p-4 border-b bg-gray-50">

@@ -76,11 +76,40 @@ export function ProfileFormPage() {
     }
 
     function generateRandomPassword() {
-        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-        let password = '';
-        for (let i = 0; i < 16; i++) {
-            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        const lower = 'abcdefghijklmnopqrstuvwxyz';
+        const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const digits = '0123456789';
+        const symbols = '!@#$%^&*?_~-';
+        const allChars = lower + upper + digits + symbols;
+
+        const length = 10;
+
+        // Genera password con crypto.getRandomValues (CSPRNG)
+        const randomValues = new Uint32Array(length);
+        crypto.getRandomValues(randomValues);
+
+        let password = Array.from(randomValues, (val) => allChars[val % allChars.length]).join('');
+
+        // Garantisci almeno 1 char per ogni categoria
+        // Sostituisci le prime 4 posizioni con un char random da ogni gruppo
+        const guarantee = [lower, upper, digits, symbols];
+        const guaranteeValues = new Uint32Array(guarantee.length);
+        crypto.getRandomValues(guaranteeValues);
+
+        const chars = password.split('');
+        guarantee.forEach((group, i) => {
+            chars[i] = group[guaranteeValues[i] % group.length];
+        });
+
+        // Shuffle con Fisher-Yates (crypto-random)
+        const shuffleValues = new Uint32Array(chars.length);
+        crypto.getRandomValues(shuffleValues);
+        for (let i = chars.length - 1; i > 0; i--) {
+            const j = shuffleValues[i] % (i + 1);
+            [chars[i], chars[j]] = [chars[j], chars[i]];
         }
+
+        password = chars.join('');
         setFormData(prev => ({ ...prev, password }));
     }
 
@@ -332,7 +361,7 @@ export function ProfileFormPage() {
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"
                                         placeholder="Enter Base32 secret key..."
                                     />
-                                    
+
                                     <button
                                         type="button"
                                         onClick={() => setShowQRScanner(true)}
@@ -351,8 +380,8 @@ export function ProfileFormPage() {
                                     </div>
 
                                     {/* OTP Code Display */}
-                                    <OTPDisplay 
-                                        secret={formData.secretKey} 
+                                    <OTPDisplay
+                                        secret={formData.secretKey}
                                         title={formData.title || 'Account'}
                                     />
                                 </div>

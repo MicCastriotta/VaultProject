@@ -225,11 +225,11 @@ Funzionalità da implementare:
 - [ ] Ordinamento (A-Z, data, categoria)
 - [ ] Export/Import completo da altri profili
 - [ ] Condivisione profili cifrati
-- [ ] Generatore OTP (TOTP)
-- [ ] Statistiche (profili per categoria)
-- [ ] Backup automatico
+- [x] Generatore OTP (TOTP)
+- [x] Backup automatico
 - [ ] Tema dark
-- [ ] Multi-lingua
+- [x] Multi-lingua
+- [ ] Logging centralizzato
 
 
 

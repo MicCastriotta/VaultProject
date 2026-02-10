@@ -214,29 +214,118 @@ class DatabaseService {
 
     /**
      * Importa dati (da backup)
+     * Validazione rigorosa della struttura prima di importare.
      */
     async importData(data) {
-        // Verifica versione
-        if (data.version !== 1) {
-            throw new Error('Unsupported backup version');
+        // ===== VALIDAZIONE STRUTTURA =====
+
+        if (!data || typeof data !== 'object') {
+            throw new Error('Invalid backup: not a valid JSON object');
         }
+
+        // Verifica versione
+        if (data.version !== 1 && data.version !== 2) {
+            throw new Error('Unsupported backup version: ' + data.version);
+        }
+
+        // Valida crypto config
+        if (!data.crypto || typeof data.crypto !== 'object') {
+            throw new Error('Invalid backup: missing crypto configuration');
+        }
+
+        const requiredCryptoFields = ['version', 'kdf', 'iterations', 'salt', 'iv', 'encryptedDEK'];
+        for (const field of requiredCryptoFields) {
+            if (data.crypto[field] === undefined || data.crypto[field] === null) {
+                throw new Error(`Invalid backup: missing crypto field "${field}"`);
+            }
+        }
+
+        // Verifica che salt, iv, encryptedDEK siano stringhe base64 valide
+        const base64Fields = ['salt', 'iv', 'encryptedDEK'];
+        const base64Regex = /^[A-Za-z0-9+/]+=*$/;
+        for (const field of base64Fields) {
+            const value = data.crypto[field];
+            if (typeof value !== 'string' || !base64Regex.test(value)) {
+                throw new Error(`Invalid backup: crypto field "${field}" is not valid base64`);
+            }
+        }
+
+        if (typeof data.crypto.iterations !== 'number' || data.crypto.iterations < 1) {
+            throw new Error('Invalid backup: iterations must be a positive number');
+        }
+
+        // Valida profiles (opzionale, può essere vuoto)
+        if (data.profiles !== undefined && data.profiles !== null) {
+            if (!Array.isArray(data.profiles)) {
+                throw new Error('Invalid backup: profiles must be an array');
+            }
+
+            const requiredProfileFields = ['iv', 'data', 'category'];
+            const allowedCategories = ['WEB', 'CARD'];
+
+            for (let i = 0; i < data.profiles.length; i++) {
+                const profile = data.profiles[i];
+
+                if (!profile || typeof profile !== 'object') {
+                    throw new Error(`Invalid backup: profile at index ${i} is not a valid object`);
+                }
+
+                for (const field of requiredProfileFields) {
+                    if (profile[field] === undefined || profile[field] === null) {
+                        throw new Error(`Invalid backup: profile at index ${i} missing field "${field}"`);
+                    }
+                }
+
+                // iv e data devono essere stringhe base64
+                for (const field of ['iv', 'data']) {
+                    if (typeof profile[field] !== 'string' || !base64Regex.test(profile[field])) {
+                        throw new Error(`Invalid backup: profile at index ${i} field "${field}" is not valid base64`);
+                    }
+                }
+
+                if (!allowedCategories.includes(profile.category)) {
+                    throw new Error(`Invalid backup: profile at index ${i} has invalid category "${profile.category}"`);
+                }
+            }
+        }
+
+        // ===== IMPORT (struttura validata) =====
 
         // Pulisci DB
         await this.deleteAllData();
 
-        // Importa config
-        if (data.crypto) {
-            await db.config.put(data.crypto);
-        }
+        // Importa config — solo i campi attesi, niente extra
+        const cleanCrypto = {
+            id: 'crypto',
+            version: data.crypto.version,
+            kdf: data.crypto.kdf,
+            iterations: data.crypto.iterations,
+            salt: data.crypto.salt,
+            iv: data.crypto.iv,
+            encryptedDEK: data.crypto.encryptedDEK,
+            createdAt: data.crypto.createdAt || new Date().toISOString()
+        };
+        await db.config.put(cleanCrypto);
 
-        // Importa profiles
+        // Importa profiles — solo i campi attesi
+        let profilesImported = 0;
         if (data.profiles && data.profiles.length > 0) {
-            await db.profiles.bulkAdd(data.profiles);
+            const cleanProfiles = data.profiles.map(p => ({
+                // Non importare l'id originale: lascia che Dexie generi nuovi auto-increment
+                iv: p.iv,
+                data: p.data,
+                category: p.category,
+                version: p.version || 1,
+                createdAt: p.createdAt || new Date().toISOString(),
+                updatedAt: p.updatedAt || new Date().toISOString()
+            }));
+            await db.profiles.bulkAdd(cleanProfiles);
+            profilesImported = cleanProfiles.length;
         }
 
         return {
-            configImported: !!data.crypto,
-            profilesImported: data.profiles?.length || 0
+            configImported: true,
+            profilesImported
         };
     }
 
