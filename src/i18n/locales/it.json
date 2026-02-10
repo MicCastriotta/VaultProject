@@ -1,0 +1,136 @@
+{
+  "common": {
+    "cancel": "Annulla",
+    "confirm": "Conferma",
+    "delete": "Elimina",
+    "save": "Salva",
+    "back": "Indietro",
+    "loading": "Caricamento...",
+    "error": "Errore",
+    "success": "Successo",
+    "warning": "Attenzione",
+    "close": "Chiudi"
+  },
+  "auth": {
+    "login": "Accedi",
+    "signup": "Registrati",
+    "logout": "Esci",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Conferma Password",
+    "masterPassword": "Password Principale",
+    "rememberMe": "Ricordami",
+    "forgotPassword": "Password dimenticata?",
+    "noAccount": "Non hai un account?",
+    "hasAccount": "Hai già un account?",
+    "createAccount": "Crea Account",
+    "loginSuccess": "Accesso effettuato!",
+    "signupSuccess": "Account creato con successo!",
+    "invalidCredentials": "Email o password non valida",
+    "passwordMismatch": "Le password non corrispondono",
+    "welcome": "Benvenuto!",
+    "submit": "Invia",
+    "or": "oppure",
+    "authenticating": "Autenticazione...",
+    "unlockBiometric": "Sblocca con Biometria",
+    "passwordRequired": "La password è obbligatoria",
+    "wrongPassword": "Password errata"
+  },
+  "settings": {
+    "title": "Impostazioni",
+    "language": "Lingua",
+    "selectLanguage": "Seleziona Lingua",
+    "sync": {
+      "title": "Sincronizzazione Google Drive",
+      "enable": "Abilita Sincronizzazione",
+      "disable": "Disconnetti",
+      "syncNow": "Sincronizza Ora",
+      "enableSuccess": "Sincronizzazione Google Drive abilitata!",
+      "disableSuccess": "Sincronizzazione Google Drive disabilitata",
+      "syncSuccess": "Sincronizzazione completata!",
+      "syncError": "Sincronizzazione fallita",
+      "status": {
+        "enabled": "Abilitata",
+        "disabled": "Disabilitata",
+        "syncing": "Sincronizzazione in corso...",
+        "online": "Online",
+        "offline": "Offline"
+      },
+      "lastSync": "Ultima sincronizzazione",
+      "account": "Account"
+    },
+    "export": {
+      "title": "Esporta Database",
+      "description": "Scarica un backup crittografato di tutti i tuoi profili. Il file conterrà tutti i tuoi dati in formato crittografato.",
+      "button": "Esporta Database",
+      "exporting": "Esportazione...",
+      "success": "Backup condiviso con successo!",
+      "error": "Esportazione fallita"
+    },
+    "import": {
+      "title": "Importa Database",
+      "warning": "Attenzione: L'importazione sostituirà tutti i dati attuali. Assicurati di esportare prima se vuoi conservare i profili attuali.",
+      "button": "Scegli File da Importare",
+      "importing": "Importazione...",
+      "success": "Database importato con successo!",
+      "error": "Importazione fallita",
+      "invalidFile": "File di backup non valido"
+    },
+    "deleteAll": {
+      "title": "Elimina Tutti i Dati",
+      "description": "Elimina permanentemente tutti i profili e reimposta l'app. Questa azione non può essere annullata.",
+      "button": "Elimina Tutti i Dati",
+      "confirmTitle": "Conferma Eliminazione",
+      "confirmMessage": "Sei sicuro di voler eliminare tutti i dati? Questo rimuoverà permanentemente tutti i profili e resetterà l'app. Questa azione non può essere annullata.",
+      "success": "Tutti i dati eliminati con successo"
+    },
+    "security": {
+      "title": "Nota sulla Sicurezza",
+      "description": "Il tuo file di backup esportato è crittografato con la tua password principale. Conserva la password in modo sicuro - è necessaria per importare i dati su qualsiasi dispositivo."
+    },
+    "biometric": {
+      "title": "Autenticazione Biometrica",
+      "description": "Usa l'impronta digitale o il riconoscimento facciale per sbloccare l'app",
+      "enable": "Abilita Biometrica",
+      "disable": "Disabilita Biometrica",
+      "setup": "Configura Biometrica",
+      "enabled": "Abilitata",
+      "notAvailable": "Autenticazione biometrica non disponibile su questo dispositivo"
+    }
+  },
+  "profiles": {
+    "title": "Profili",
+    "addNew": "Aggiungi Nuovo Profilo",
+    "search": "Cerca profili...",
+    "noProfiles": "Nessun profilo ancora",
+    "noProfilesDescription": "Aggiungi il tuo primo profilo per iniziare",
+    "edit": "Modifica",
+    "delete": "Elimina",
+    "deleteConfirm": "Sei sicuro di voler eliminare questo profilo?",
+    "deleteSuccess": "Profilo eliminato con successo",
+    "fields": {
+      "name": "Nome",
+      "username": "Nome utente",
+      "email": "Email",
+      "password": "Password",
+      "website": "Sito web",
+      "notes": "Note",
+      "category": "Categoria",
+      "totpSecret": "Segreto TOTP",
+      "totpCode": "Codice 2FA"
+    }
+  },
+  "profileForm": {
+    "newProfile": "Nuovo Profilo",
+    "editProfile": "Modifica Profilo",
+    "saveSuccess": "Profilo salvato con successo!",
+    "saveError": "Errore nel salvataggio del profilo",
+    "requiredField": "Questo campo è obbligatorio"
+  },
+  "messages": {
+    "copied": "Copiato negli appunti!",
+    "copyError": "Copia fallita",
+    "networkError": "Errore di rete. Controlla la tua connessione.",
+    "unknownError": "Si è verificato un errore sconosciuto"
+  }
+}

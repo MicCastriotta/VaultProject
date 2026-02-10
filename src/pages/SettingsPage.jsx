@@ -23,10 +23,13 @@ import {
 import { syncService } from '../services/syncService';
 import { SyncConflictDialog } from '../components/SyncConflictDialog';
 import { BiometricSettingsSection } from '../components/BiometricSettingsSection';
+import { LanguageSelector } from '../components/LanguageSelector';
+import { useTranslation } from 'react-i18next';
 
 export function SettingsPage() {
     const navigate = useNavigate();
     const { logout, refreshHMAC } = useAuth();
+    const { t } = useTranslation();
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
@@ -310,7 +313,7 @@ export function SettingsPage() {
                 >
                     <ArrowLeft size={24} />
                 </button>
-                <h1 className="text-xl font-bold">Settings</h1>
+                <h1 className="text-xl font-bold">{t('settings.title')}</h1>
             </div>
 
             {/* Message */}
@@ -331,12 +334,15 @@ export function SettingsPage() {
             {/* Settings Content */}
             <div className="p-4 space-y-4">
 
+                {/* Language Selector */}
+                <LanguageSelector />
+
                 {/* NUOVA SEZIONE: Google Drive Sync */}
                 <div className="bg-white rounded-lg shadow-sm overflow-hidden">
                     <div className="p-4 border-b bg-gray-50">
                         <h2 className="font-semibold text-gray-800 flex items-center gap-2">
                             <Cloud size={20} />
-                            Google Drive Sync
+                            {t('settings.sync.title')}
                         </h2>
                     </div>
                     <div className="p-4">

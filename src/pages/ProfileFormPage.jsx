@@ -12,6 +12,7 @@ import { ArrowLeft, Save, User, CreditCard, RefreshCw, QrCode, Trash2 } from 'lu
 import { syncService } from '../services/syncService';
 import { OTPDisplay } from '../components/OTPDisplay';
 import { QRScanner } from '../components/QRScanner';
+import { validators } from '../services/securityUtils';
 
 export function ProfileFormPage() {
     const navigate = useNavigate();
@@ -103,15 +104,43 @@ export function ProfileFormPage() {
         setIsSaving(true);
 
         try {
-            // 1. Prepara dati da salvare
-            const profileData = {
-                ...formData,
+            //// 1. Prepara dati da salvare
+            //const profileData = {
+            //    ...formData,
+            //    category,
+            //    lastModified: new Date().toISOString()
+            //};
+
+            //// 2. Cifra
+            //const encrypted = await cryptoService.encryptData(profileData);
+
+            const sanitizedData = {
+                title: validators.title(formData.title),
                 category,
                 lastModified: new Date().toISOString()
             };
 
-            // 2. Cifra
-            const encrypted = await cryptoService.encryptData(profileData);
+            // Sanitizza campi comuni WEB
+            if (category === 'WEB') {
+                sanitizedData.username = validators.username(formData.username || '');
+                sanitizedData.password = formData.password || ''; // Password non va sanitizzata
+                sanitizedData.website = validators.url(formData.website || '');
+                sanitizedData.secretKey = validators.text(formData.secretKey || '', 100);
+                sanitizedData.note = validators.notes(formData.note || '');
+            }
+
+            // Sanitizza campi CARD
+            if (category === 'CARD') {
+                sanitizedData.numberCard = validators.cardNumber(formData.numberCard || '');
+                sanitizedData.owner = validators.text(formData.owner || '', 100);
+                sanitizedData.deadline = validators.text(formData.deadline || '', 5);
+                sanitizedData.cvv = validators.cvv(formData.cvv || '');
+                sanitizedData.pin = validators.text(formData.pin || '', 6);
+                sanitizedData.note = validators.notes(formData.note || '');
+            }
+
+            // 2. Cifra i dati sanitizzati
+            const encrypted = await cryptoService.encryptData(sanitizedData);
 
             // 3. Salva nel DB
             const profileToSave = {
