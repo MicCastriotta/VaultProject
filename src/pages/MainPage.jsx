@@ -136,6 +136,15 @@ export function MainPage() {
                             <button
                                 onClick={() => {
                                     setShowMenu(false);
+                                    navigate('/health');
+                                }}
+                                className="w-full text-left px-4 py-3 hover:bg-gray-100 rounded-lg"
+                            >
+                                Password Health
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowMenu(false);
                                     navigate('/settings');
                                 }}
                                 className="w-full text-left px-4 py-3 hover:bg-gray-100 rounded-lg"

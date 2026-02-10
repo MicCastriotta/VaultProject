@@ -11,6 +11,7 @@ import { cryptoService } from '../services/cryptoService';
 import { databaseService } from '../services/databaseService';
 import { biometricService } from '../services/biometricService';
 import { RateLimiter, AutoLockTimer, securityLog } from '../services/securityUtils';
+import { hibpService } from '../services/hibpService';
 import { useRef, useCallback } from 'react';
 
 const AuthContext = createContext();
@@ -379,6 +380,7 @@ export function AuthProvider({ children }) {
             autoLockTimer.current.stop();
         }
         cryptoService.lock();
+        hibpService.clearCache();
         setIsUnlocked(false);
         setIntegrityError(null);
     }
