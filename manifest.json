@@ -1,0 +1,17 @@
+{
+  "name": "SafeProfiles App",
+  "short_name": "SfPApp",
+  "description": "Una Progressive Web App creata con React",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0d6efd",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
