@@ -47,7 +47,7 @@ export function MainPage() {
                     }
                 })
             );
-
+            
             setDecryptedProfiles(decrypted.filter(p => p !== null));
         } catch (error) {
             console.error('Error loading profiles:', error);

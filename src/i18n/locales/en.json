@@ -132,5 +132,59 @@
     "copyError": "Failed to copy",
     "networkError": "Network error. Please check your connection.",
     "unknownError": "An unknown error occurred"
+  },
+  "import": {
+    "menuTitle": "Import Legacy Database",
+    "steps": {
+      "file": "File",
+      "password": "Password",
+      "preview": "Preview",
+      "complete": "Complete"
+    },
+    "step1": {
+      "title": "Select SQLite Database",
+      "description": "Upload the database file (.db, .sqlite) from your old SafeProfiles app",
+      "selectFile": "Click to select database file",
+      "fileSelected": "File selected"
+    },
+    "step2": {
+      "title": "Enter Old App Password",
+      "description": "This is the master password you used in the old mobile app",
+      "warningTitle": "Important!",
+      "warningMessage": "This is the OLD app password, not the current one. It's only used to decrypt the imported data.",
+      "passwordLabel": "Old app password",
+      "passwordPlaceholder": "Enter old app password",
+      "preview": "Preview",
+      "decrypting": "Decrypting..."
+    },
+    "step3": {
+      "title": "Preview Profiles",
+      "description": "These profiles will be imported into your current database",
+      "profilesFound": "profiles found",
+      "profilesSkipped": "invalid profiles (skipped)",
+      "andMore": "and {{count}} more...",
+      "securityNote": "Data will be encrypted with the NEW security schema (AES-GCM + DEK). Never saved in plaintext.",
+      "startImport": "Import Profiles",
+      "importing": "Importing..."
+    },
+    "step4": {
+      "title": "Import Complete!",
+      "description": "Your profiles have been successfully imported",
+      "successfullyImported": "profiles imported successfully",
+      "profilesFailed": "profiles failed",
+      "cleanupTitle": "Cleanup complete",
+      "cleanupMessage": "Memory has been securely wiped. You can delete the old database file.",
+      "finish": "Go to Profiles"
+    },
+    "errors": {
+      "invalidFileType": "Invalid file type. Select a .db, .sqlite or .sqlite3 file",
+      "fileTooLarge": "File too large (max 50MB)",
+      "noFileSelected": "No file selected",
+      "noPassword": "Enter password",
+      "wrongPassword": "Wrong password. Try again.",
+      "emptyDatabase": "Database contains no profiles",
+      "decryptionFailed": "Decryption failed. Check password and file.",
+      "importFailed": "Import failed"
+    }
   }
 }
