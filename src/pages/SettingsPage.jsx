@@ -18,7 +18,8 @@ import {
     XCircle,
     Cloud,
     RefreshCw,
-    LogOut
+    LogOut,
+    Database
 } from 'lucide-react';
 import { syncService } from '../services/syncService';
 import { SyncConflictDialog } from '../components/SyncConflictDialog';
@@ -536,6 +537,29 @@ export function SettingsPage() {
                                 )}
                             </div>
                         </label>
+                    </div>
+                </div>
+
+                {/* Import Legacy Database Section */}
+                <div className="bg-white rounded-lg shadow-sm overflow-hidden border-2 border-blue-200">
+                    <div className="p-4 border-b bg-blue-50">
+                        <h2 className="font-semibold text-gray-800 flex items-center gap-2">
+                            <Database size={20} className="text-blue-600" />
+                            <span>{t('import.menuTitle')}</span>
+                            <span className="ml-auto text-xs bg-blue-600 text-white px-2 py-1 rounded">NEW</span>
+                        </h2>
+                    </div>
+                    <div className="p-4">
+                        <p className="text-sm text-gray-600 mb-4">
+                            {t('import.step1.description')}
+                        </p>
+                        <button
+                            onClick={() => navigate('/import')}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Upload size={20} />
+                            <span>{t('import.menuTitle')}</span>
+                        </button>
                     </div>
                 </div>
 

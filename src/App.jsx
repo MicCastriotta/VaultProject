@@ -15,6 +15,7 @@ import { ProfileDetailPage } from './pages/ProfileDetailPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { PasswordGeneratorPage } from './pages/PasswordGeneratorPage';
 import { PasswordHealthPage } from './pages/PasswordHealthPage';
+import ImportPage from './pages/ImportPage';
 
 function AppRoutes() {
     const {
@@ -71,6 +72,7 @@ function AppRoutes() {
             <Routes>
                 <Route path="/" element={<MainPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/import" element={<ImportPage />} />
                 <Route path="/generator" element={<PasswordGeneratorPage />} />
                 <Route path="/health" element={<PasswordHealthPage />} />
                 <Route path="/profile/new" element={<ProfileFormPage />} />
