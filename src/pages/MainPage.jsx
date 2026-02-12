@@ -214,31 +214,44 @@ export function MainPage() {
                     ) : sortedProfiles.length === 0 ? (
                         <p className="text-gray-400">No profiles yet</p>
                     ) : (
-                        <div className="space-y-4">
-                            {sortedProfiles.map(profile => (
-                                <button
-                                    key={profile.id}
-                                    onClick={() => navigate(`/profile/${profile.id}`)}
-                                    className="w-full flex justify-between items-center p-4 rounded-2xl bg-slate-800/60 border border-slate-700 hover:bg-slate-800 transition"
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 flex items-center justify-center bg-blue-500/10 rounded-lg">
-                                            {profile.category === 'CARD'
-                                                ? <CreditCard size={20} />
-                                                : <User size={20} />
-                                            }
-                                        </div>
+                                <div className="space-y-6">
+                                    {sortedGroupKeys.map(group => (
+                                        <div key={group}>
+                                            <h3 className="text-xs font-semibold text-gray-500 mb-3 px-1">
+                                                {group}
+                                            </h3>
 
-                                        <div className="text-left">
-                                            <p className="font-semibold">{profile.title}</p>
-                                            {profile.note && (
-                                                <p className="text-sm text-gray-400">{profile.note}</p>
-                                            )}
+                                            <div className="space-y-4">
+                                                {groupedProfiles[group].map(profile => (
+                                                    <button
+                                                        key={profile.id}
+                                                        onClick={() => navigate(`/profile/${profile.id}`)}
+                                                        className="w-full flex justify-between items-center p-4 rounded-2xl bg-slate-800/60 border border-slate-700 hover:bg-slate-800 transition"
+                                                    >
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-10 h-10 flex items-center justify-center bg-blue-500/10 rounded-lg">
+                                                                {profile.category === 'CARD'
+                                                                    ? <CreditCard size={20} />
+                                                                    : <User size={20} />
+                                                                }
+                                                            </div>
+
+                                                            <div className="text-left">
+                                                                <p className="font-semibold">{profile.title}</p>
+                                                                {profile.note && (
+                                                                    <p className="text-sm text-gray-400">
+                                                                        {profile.note}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
+                                    ))}
+                                </div>
+
                     )}
                 </div>
 
