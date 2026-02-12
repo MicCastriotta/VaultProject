@@ -89,6 +89,27 @@ export function ProfileDetailPage() {
         }
     }
 
+    function detectCardType(number) {
+        const cleaned = number.replace(/[\s-]/g, '');
+
+        const patterns = {
+            visa: /^4/,
+            mastercard: /^(5[1-5]|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)/,
+            amex: /^3[47]/,
+            discover: /^6(?:011|5)/,
+            diners: /^3(?:0[0-5]|[68])/,
+            jcb: /^35/
+        };
+
+        for (const [type, pattern] of Object.entries(patterns)) {
+            if (pattern.test(cleaned)) {
+                return type;
+            }
+        }
+
+        return null;
+    }
+
     if (isLoading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -215,12 +236,52 @@ export function ProfileDetailPage() {
                 {profile.category === 'CARD' && (
                     <>
                         {profile.numberCard && (
-                            <DetailField
-                                label="Card Number"
-                                value={profile.numberCard}
-                                onCopy={() => handleCopy(profile.numberCard, 'number')}
-                                copied={copiedField === 'number'}
-                            />
+                            <div className="bg-white rounded-lg p-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Card Number
+                                </label>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex-1 font-mono text-sm bg-gray-50 px-3 py-2 rounded border border-gray-200 flex items-center justify-between">
+                                        <span>{profile.numberCard}</span>
+                                        {/* Logo carta */}
+                                        {detectCardType(profile.numberCard) && (
+                                            <div className="ml-2">
+                                                {detectCardType(profile.numberCard) === 'visa' && (
+                                                    <svg className="h-6 w-auto" viewBox="0 0 48 32" fill="none">
+                                                        <rect width="48" height="32" rx="4" fill="#1434CB" />
+                                                        <path d="M17.8 20.4L19.2 11.6H21.5L20.1 20.4H17.8Z" fill="white" />
+                                                        <path d="M28.8 11.8C28.3 11.6 27.5 11.4 26.5 11.4C24.2 11.4 22.6 12.6 22.6 14.3C22.6 15.6 23.8 16.3 24.7 16.7C25.6 17.1 26 17.4 26 17.8C26 18.4 25.2 18.7 24.5 18.7C23.5 18.7 23 18.6 22.2 18.2L21.9 18.1L21.6 20C22.2 20.3 23.3 20.5 24.4 20.5C26.9 20.5 28.4 19.3 28.5 17.5C28.5 16.5 27.9 15.7 26.6 15.1C25.8 14.7 25.3 14.4 25.3 14C25.3 13.6 25.7 13.2 26.6 13.2C27.4 13.2 28 13.3 28.5 13.6L28.7 13.7L29 11.8Z" fill="white" />
+                                                        <path d="M32.8 11.6H31C30.4 11.6 29.9 11.8 29.7 12.4L26.4 20.4H28.9L29.4 19H32.4L32.7 20.4H35L32.8 11.6ZM30.1 17.2L31.2 14.1L31.8 17.2H30.1Z" fill="white" />
+                                                        <path d="M15.9 11.6L13.5 17.8L13.2 16.3C12.7 14.6 11.1 12.7 9.3 11.8L11.4 20.4H13.9L17.4 11.6H15.9Z" fill="white" />
+                                                    </svg>
+                                                )}
+                                                {detectCardType(profile.numberCard) === 'mastercard' && (
+                                                    <svg className="h-6 w-auto" viewBox="0 0 48 32" fill="none">
+                                                        <rect width="48" height="32" rx="4" fill="#EB001B" />
+                                                        <circle cx="18" cy="16" r="9" fill="#F79E1B" />
+                                                        <circle cx="30" cy="16" r="9" fill="#FF5F00" />
+                                                    </svg>
+                                                )}
+                                                {detectCardType(profile.numberCard) === 'amex' && (
+                                                    <svg className="h-6 w-auto" viewBox="0 0 48 32" fill="none">
+                                                        <rect width="48" height="32" rx="4" fill="#006FCF" />
+                                                        <text x="24" y="20" textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">AMEX</text>
+                                                    </svg>
+                                                )}
+                                                {!['visa', 'mastercard', 'amex'].includes(detectCardType(profile.numberCard)) && (
+                                                    <CreditCard size={20} className="text-gray-400" />
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button
+                                        onClick={() => handleCopy(profile.numberCard, 'number')}
+                                        className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                                    >
+                                        {copiedField === 'number' ? <Check size={20} /> : <Copy size={20} />}
+                                    </button>
+                                </div>
+                            </div>
                         )}
 
                         <div className="grid grid-cols-2 gap-4">

@@ -1,34 +1,50 @@
-/**
- * Main Page - Lista Profili
- */
-
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
+import { AppLayout } from '../layouts/AppLayout';
+import { Plus, Search, ArrowUpDown, User, CreditCard, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Search, Menu, User, CreditCard } from 'lucide-react';
+
+const SORT_OPTIONS = {
+    ALPHA_ASC: 'alpha_asc',
+    ALPHA_DESC: 'alpha_desc',
+    DATE_ASC: 'date_asc',
+    DATE_DESC: 'date_desc'
+};
+
+const SORT_LABELS = {
+    [SORT_OPTIONS.ALPHA_ASC]: 'A → Z',
+    [SORT_OPTIONS.ALPHA_DESC]: 'Z → A',
+    [SORT_OPTIONS.DATE_ASC]: 'Oldest First',
+    [SORT_OPTIONS.DATE_DESC]: 'Newest First'
+};
 
 export function MainPage() {
     const navigate = useNavigate();
-    const { logout } = useAuth();
-    const [profiles, setProfiles] = useState([]);
     const [decryptedProfiles, setDecryptedProfiles] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
-    const [showMenu, setShowMenu] = useState(false);
+    const [showSortMenu, setShowSortMenu] = useState(false);
+    const { logout } = useAuth();
+
+    const [sortBy, setSortBy] = useState(() => {
+        return localStorage.getItem('profileSortOrder') || SORT_OPTIONS.ALPHA_ASC;
+    });
 
     useEffect(() => {
         loadProfiles();
     }, []);
 
+    useEffect(() => {
+        localStorage.setItem('profileSortOrder', sortBy);
+    }, [sortBy]);
+
     async function loadProfiles() {
         setIsLoading(true);
         try {
-            // 1. Carica profili cifrati
             const encrypted = await databaseService.getAllProfiles();
 
-            // 2. Decifra tutti
             const decrypted = await Promise.all(
                 encrypted.map(async (p) => {
                     try {
@@ -36,193 +52,208 @@ export function MainPage() {
                             iv: p.iv,
                             data: p.data
                         });
+
                         return {
                             id: p.id,
                             ...data,
                             updatedAt: p.updatedAt
                         };
-                    } catch (err) {
-                        console.error('Decryption error for profile', p.id, err);
+                    } catch {
                         return null;
                     }
                 })
             );
-            
-            setDecryptedProfiles(decrypted.filter(p => p !== null));
+
+            setDecryptedProfiles(decrypted.filter(Boolean));
         } catch (error) {
-            console.error('Error loading profiles:', error);
+            console.error(error);
         } finally {
             setIsLoading(false);
         }
     }
 
-    // Filtra profili
     const filteredProfiles = decryptedProfiles.filter(p => {
         if (!searchTerm) return true;
-        const search = searchTerm.toLowerCase();
+        const s = searchTerm.toLowerCase();
         return (
-            p.title?.toLowerCase().includes(search) ||
-            p.website?.toLowerCase().includes(search) ||
-            p.note?.toLowerCase().includes(search)
+            p.title?.toLowerCase().includes(s) ||
+            p.website?.toLowerCase().includes(s) ||
+            p.note?.toLowerCase().includes(s)
         );
     });
 
-    // Raggruppa per iniziale
-    const groupedProfiles = filteredProfiles.reduce((acc, profile) => {
-        const firstLetter = profile.title?.[0]?.toUpperCase() || '#';
-        if (!acc[firstLetter]) {
-            acc[firstLetter] = [];
+    const sortedProfiles = [...filteredProfiles].sort((a, b) => {
+        switch (sortBy) {
+            case SORT_OPTIONS.ALPHA_ASC:
+                return (a.title || '').localeCompare(b.title || '');
+            case SORT_OPTIONS.ALPHA_DESC:
+                return (b.title || '').localeCompare(a.title || '');
+            case SORT_OPTIONS.DATE_ASC:
+                return new Date(a.updatedAt) - new Date(b.updatedAt);
+            case SORT_OPTIONS.DATE_DESC:
+                return new Date(b.updatedAt) - new Date(a.updatedAt);
+            default:
+                return 0;
         }
-        acc[firstLetter].push(profile);
+    });
+
+    const groupedProfiles = sortedProfiles.reduce((acc, profile) => {
+        let groupKey = '';
+
+        if (
+            sortBy === SORT_OPTIONS.ALPHA_ASC ||
+            sortBy === SORT_OPTIONS.ALPHA_DESC
+        ) {
+            groupKey = profile.title?.[0]?.toUpperCase() || '#';
+        } else {
+            const date = new Date(profile.updatedAt);
+
+            // Raggruppamento per giorno (puoi cambiarlo in mese se vuoi)
+            groupKey = date.toLocaleDateString();
+        }
+
+        if (!acc[groupKey]) {
+            acc[groupKey] = [];
+        }
+
+        acc[groupKey].push(profile);
         return acc;
     }, {});
 
-    const sortedGroups = Object.keys(groupedProfiles).sort();
-
-    function handleLogout() {
-        logout();
-    }
+    const sortedGroupKeys = Object.keys(groupedProfiles).sort((a, b) => {
+        if (
+            sortBy === SORT_OPTIONS.ALPHA_ASC ||
+            sortBy === SORT_OPTIONS.ALPHA_DESC
+        ) {
+            return sortBy === SORT_OPTIONS.ALPHA_ASC
+                ? a.localeCompare(b)
+                : b.localeCompare(a);
+        } else {
+            return sortBy === SORT_OPTIONS.DATE_ASC
+                ? new Date(a) - new Date(b)
+                : new Date(b) - new Date(a);
+        }
+    });
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* Header */}
-            <div className="bg-primary text-white">
-                <div className="px-4 py-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h1 className="text-2xl font-bold">Profiles</h1>
-                        <button
-                            onClick={() => setShowMenu(!showMenu)}
-                            className="p-2 hover:bg-primary-dark rounded-lg transition-colors"
-                        >
-                            <Menu size={24} />
-                        </button>
-                    </div>
+        <AppLayout>
+            <div className="p-6 h-full flex flex-col">
 
-                    {/* Search Bar */}
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/70" size={20} />
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Title\Web Site\Comments"
-                            className="w-full pl-10 pr-4 py-2 bg-primary-dark/50 text-white placeholder-white/70 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/30"
-                        />
+                {/* Header */}
+                <div className="flex justify-between items-center mb-6 relative">
+                    <h1 className="text-2xl font-semibold text-white">Your Vault</h1>
+
+                    <div className="flex items-center gap-2">
+
+                        {/* Logout - solo mobile */}
+                        <button
+                            onClick={logout}
+                            className="md:hidden p-2 hover:bg-red-500/10 text-red-400 rounded-lg transition"
+                        >
+                            <LogOut size={20} />
+                        </button>
+
+                        {/* Sort */}
+                        <button
+                            onClick={() => setShowSortMenu(!showSortMenu)}
+                            className="p-2 hover:bg-slate-800 rounded-lg transition"
+                        >
+                            <ArrowUpDown size={20} />
+                        </button>
+
                     </div>
                 </div>
-            </div>
 
-            {/* Side Menu */}
-            {showMenu && (
-                <>
-                    <div
-                        className="fixed inset-0 bg-black/50 z-40"
-                        onClick={() => setShowMenu(false)}
-                    />
-                    <div className="fixed top-0 left-0 bottom-0 w-64 bg-white z-50 shadow-xl">
-                        <div className="p-4 bg-primary text-white">
-                            <h2 className="text-xl font-bold">SafeProfiles</h2>
-                        </div>
-                        <div className="p-4">
-                            <button
-                                onClick={() => {
-                                    setShowMenu(false);
-                                    navigate('/generator');
-                                }}
-                                className="w-full text-left px-4 py-3 hover:bg-gray-100 rounded-lg"
-                            >
-                                Password Generator
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setShowMenu(false);
-                                    navigate('/health');
-                                }}
-                                className="w-full text-left px-4 py-3 hover:bg-gray-100 rounded-lg"
-                            >
-                                Password Health
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setShowMenu(false);
-                                    navigate('/settings');
-                                }}
-                                className="w-full text-left px-4 py-3 hover:bg-gray-100 rounded-lg"
-                            >
-                                Settings
-                            </button>
-                            <button
-                                onClick={handleLogout}
-                                className="w-full text-left px-4 py-3 hover:bg-gray-100 rounded-lg text-red-600"
-                            >
-                                Logout
-                            </button>
-                        </div>
-                    </div>
-                </>
-            )}
+                {/* Sort Dropdown */}
+                {showSortMenu && (
+                    <>
+                        <div
+                            className="fixed inset-0 z-40"
+                            onClick={() => setShowSortMenu(false)}
+                        />
 
-            {/* Content */}
-            <div className="pb-20">
-                {isLoading ? (
-                    <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-                    </div>
-                ) : filteredProfiles.length === 0 ? (
-                    <div className="text-center py-12 px-4">
-                        <p className="text-gray-500">
-                            {searchTerm ? 'No profiles found' : 'No profiles yet. Create your first one!'}
-                        </p>
-                    </div>
-                ) : (
-                    <div className="space-y-4 p-4">
-                        {sortedGroups.map(letter => (
-                            <div key={letter}>
-                                <h3 className="text-sm font-semibold text-gray-500 mb-2 px-2">
-                                    {letter}
-                                </h3>
-                                <div className="space-y-2">
-                                    {groupedProfiles[letter].map(profile => (
-                                        <button
-                                            key={profile.id}
-                                            onClick={() => navigate(`/profile/${profile.id}`)}
-                                            className="w-full bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow text-left"
-                                        >
-                                            <div className="flex items-start gap-3">
-                                                <div className="w-12 h-12 flex items-center justify-center bg-primary/10 rounded-lg">
-                                                    {profile.category === 'CARD' ? (
-                                                        <CreditCard className="text-primary" size={24} />
-                                                    ) : (
-                                                        <User className="text-primary" size={24} />
-                                                    )}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-medium text-primary truncate">
-                                                        {profile.title}
-                                                    </h4>
-                                                    {profile.note && (
-                                                        <p className="text-sm text-gray-600 truncate mt-1">
-                                                            {profile.note}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
+                        <div className="absolute right-6 mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-50 w-48">
+                            <div className="py-2">
+                                {Object.entries(SORT_LABELS).map(([value, label]) => (
+                                    <button
+                                        key={value}
+                                        onClick={() => {
+                                            setSortBy(value);
+                                            setShowSortMenu(false);
+                                        }}
+                                        className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-800 transition
+              ${sortBy === value ? 'text-blue-400 font-semibold' : 'text-gray-300'}
+            `}
+                                    >
+                                        {label}
+                                        {sortBy === value && <span className="float-right">✓</span>}
+                                    </button>
+                                ))}
                             </div>
-                        ))}
-                    </div>
+                        </div>
+                    </>
                 )}
-            </div>
 
-            {/* FAB - Create Button */}
-            <button
-                onClick={() => navigate('/profile/new')}
-                className="fixed bottom-6 right-6 bg-white hover:bg-gray-50 text-primary rounded-full p-4 shadow-lg hover:shadow-xl transition-shadow"
-            >
-                <Plus size={32} />
-            </button>
-        </div>
+                {/* Search */}
+                <div className="relative mb-6">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Search..."
+                        className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-800/70 border border-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto">
+                    {isLoading ? (
+                        <div className="flex justify-center py-12">
+                            <div className="animate-spin h-10 w-10 border-b-2 border-blue-500 rounded-full" />
+                        </div>
+                    ) : sortedProfiles.length === 0 ? (
+                        <p className="text-gray-400">No profiles yet</p>
+                    ) : (
+                        <div className="space-y-4">
+                            {sortedProfiles.map(profile => (
+                                <button
+                                    key={profile.id}
+                                    onClick={() => navigate(`/profile/${profile.id}`)}
+                                    className="w-full flex justify-between items-center p-4 rounded-2xl bg-slate-800/60 border border-slate-700 hover:bg-slate-800 transition"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 flex items-center justify-center bg-blue-500/10 rounded-lg">
+                                            {profile.category === 'CARD'
+                                                ? <CreditCard size={20} />
+                                                : <User size={20} />
+                                            }
+                                        </div>
+
+                                        <div className="text-left">
+                                            <p className="font-semibold">{profile.title}</p>
+                                            {profile.note && (
+                                                <p className="text-sm text-gray-400">{profile.note}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+
+                {/* FAB */}
+                <button
+                    onClick={() => navigate('/profile/new')}
+                    className="fixed right-6 bg-green-500 text-black p-4 rounded-full shadow-lg hover:opacity-90 transition z-[9999]"
+                    style={{ bottom: '3.5rem' }}
+
+                >
+                    <Plus size={28} />
+                </button>
+
+            </div>
+        </AppLayout>
     );
 }

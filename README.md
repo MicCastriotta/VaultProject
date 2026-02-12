@@ -220,7 +220,7 @@ Funzionalità da implementare:
 
 - [ ] Tutorial iniziale (come Xamarin)
 - [x] Impostazioni (biometric, 2FA, tema)
-- [ ] Password generator avanzato
+- [x] Password generator avanzato
 - [ ] Ricerca migliorata
 - [ ] Ordinamento (A-Z, data, categoria)
 - [ ] Export/Import completo da altri profili

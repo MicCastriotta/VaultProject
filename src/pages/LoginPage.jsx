@@ -70,46 +70,49 @@ export function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
-            {/* Header */}
-            <div className="bg-primary text-white py-8 px-4 text-center">
-                <div className="flex items-center justify-center mb-4">
-                    <Lock className="w-20 h-20" />
-                </div>
-                <h1 className="text-3xl font-bold">SafeProfiles</h1>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 flex items-center justify-center px-4">
-                <div className="max-w-md w-full space-y-6">
-                    <div className="text-center">
-                        <h2 className="text-xl text-gray-700">Welcome!</h2>
+        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center px-4">
+            {/* Glass Container */}
+            <div className="w-full max-w-md">
+                {/* Header con icona */}
+                <div className="text-center mb-10">
+                    <div className="flex items-center justify-center mb-6">
+                        <div className="w-20 h-20 bg-gradient-to-br from-brand to-blue-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-900/40">
+                            <Lock className="w-12 h-12 text-white" />
+                        </div>
                     </div>
+                    <h1 className="text-3xl font-bold text-white mb-2 tracking-wide">🔐 OwnVault</h1>
+                    <p className="text-gray-400 text-sm">Welcome Back!</p>
+                </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Form Glass Card */}
+                <div className="glass rounded-3xl p-8 border border-slate-800 shadow-2xl">
+                    <form onSubmit={handleSubmit} className="space-y-5">
                         {/* Password Input */}
                         <div className="space-y-2">
+                            <label className="text-xs text-gray-400 font-medium">Master Password</label>
                             <div className="relative">
                                 <input
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent pr-12"
-                                    placeholder="Password"
+                                    className="w-full px-4 py-3 bg-slate-800/70 text-gray-200 border border-slate-700 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent pr-12 placeholder-gray-500"
+                                    placeholder="Enter your password"
                                     disabled={isLoading || isBiometricLoading}
                                     autoFocus={!biometricEnabled}
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
                                 >
                                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                 </button>
                             </div>
 
                             {error && (
-                                <p className="text-red-500 text-sm">{error}</p>
+                                <p className="text-red-400 text-sm flex items-center gap-1">
+                                    <span className="text-xs">⚠️</span> {error}
+                                </p>
                             )}
                         </div>
 
@@ -117,14 +120,15 @@ export function LoginPage() {
                         <button
                             type="submit"
                             disabled={isLoading || isBiometricLoading}
-                            className="w-full bg-primary hover:bg-primary-dark text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full bg-gradient-to-r from-brand to-blue-500 hover:from-brand/90 hover:to-blue-500/90 text-white py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-900/40 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {isLoading ? (
-                                <div className="flex items-center justify-center">
+                                <div className="flex items-center justify-center gap-2">
                                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                    <span>Unlocking...</span>
                                 </div>
                             ) : (
-                                'Submit'
+                                'Unlock Vault'
                             )}
                         </button>
 
@@ -133,10 +137,10 @@ export function LoginPage() {
                             <>
                                 <div className="relative">
                                     <div className="absolute inset-0 flex items-center">
-                                        <div className="w-full border-t border-gray-300"></div>
+                                        <div className="w-full border-t border-slate-700"></div>
                                     </div>
                                     <div className="relative flex justify-center text-sm">
-                                        <span className="px-2 bg-gray-50 text-gray-500">or</span>
+                                        <span className="px-3 bg-slate-900/60 text-gray-400">or</span>
                                     </div>
                                 </div>
 
@@ -144,16 +148,16 @@ export function LoginPage() {
                                     type="button"
                                     onClick={handleBiometricLogin}
                                     disabled={isLoading || isBiometricLoading}
-                                    className="w-full bg-white border-2 border-blue-500 text-blue-600 hover:bg-blue-50 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="w-full bg-slate-800/50 border border-slate-700 text-gray-300 hover:bg-slate-800/70 hover:border-brand py-3 rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
                                     {isBiometricLoading ? (
                                         <>
-                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand"></div>
                                             <span>Authenticating...</span>
                                         </>
                                     ) : (
                                         <>
-                                            <Fingerprint size={20} />
+                                            <Fingerprint size={20} className="text-brand" />
                                             <span>Unlock with Biometrics</span>
                                         </>
                                     )}
@@ -161,6 +165,11 @@ export function LoginPage() {
                             </>
                         )}
                     </form>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-6 text-center text-xs text-gray-500">
+                    PWA Ready • End-to-End Encryption
                 </div>
             </div>
         </div>

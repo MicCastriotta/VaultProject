@@ -1,0 +1,95 @@
+﻿import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { Shield, Key, Activity, Settings, LogOut } from 'lucide-react';
+
+export function Sidebar() {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const { logout } = useAuth();
+
+    const navItems = [
+        { label: 'Vault', icon: Shield, path: '/' },
+        { label: 'Generator', icon: Key, path: '/generator' },
+        { label: 'Health', icon: Activity, path: '/health' },
+        { label: 'Settings', icon: Settings, path: '/settings' }
+    ];
+
+    function handleLogout() {
+        logout();
+    }
+
+    return (
+        <>
+            {/* DESKTOP SIDEBAR */}
+            <aside className="hidden md:flex fixed top-0 left-0 h-screen w-64 bg-slate-900/70 backdrop-blur-xl border-r border-slate-800 p-6 flex-col">
+
+
+                <div
+                    onClick={() => navigate('/')}
+                    className="text-2xl font-bold mb-10 text-white tracking-wide cursor-pointer"
+                >
+                    🔐 OwnVault
+                </div>
+
+                <nav className="space-y-2">
+                    {navItems.map(item => {
+                        const Icon = item.icon;
+                        const isActive = location.pathname === item.path;
+
+                        return (
+                            <button
+                                key={item.path}
+                                onClick={() => navigate(item.path)}
+                                className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all
+                  ${isActive
+                                        ? 'bg-blue-500/20 text-blue-400'
+                                        : 'hover:bg-blue-500/10 text-gray-300'
+                                    }`}
+                            >
+                                <Icon size={18} />
+                                {item.label}
+                            </button>
+                        );
+                    })}
+                </nav>
+
+                <div className="mt-auto pt-10">
+                    <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 transition-all"
+                    >
+                        <LogOut size={18} />
+                        Logout
+                    </button>
+
+                    <div className="text-xs text-gray-500 mt-6">
+                        End-to-End Encryption
+                    </div>
+                </div>
+            </aside>
+
+            {/* MOBILE BOTTOM NAV */}
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 flex justify-around py-2 safe-bottom z-50">
+                {navItems.map(item => {
+                    const Icon = item.icon;
+                    const isActive = location.pathname === item.path;
+
+                    return (
+                        <button
+                            key={item.path}
+                            onClick={() => navigate(item.path)}
+                            className={`flex flex-col items-center text-xs transition-all
+                ${isActive
+                                    ? 'text-blue-400'
+                                    : 'text-gray-400'
+                                }`}
+                        >
+                            <Icon size={20} />
+                            <span className="mt-1">{item.label}</span>
+                        </button>
+                    );
+                })}
+            </nav>
+        </>
+    );
+}

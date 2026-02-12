@@ -18,7 +18,8 @@ export function ProfileFormPage() {
     const navigate = useNavigate();
     const { id } = useParams();
     const { refreshHMAC } = useAuth();
-    const isNew = id === 'new';
+    const isNew = !id || id === 'new' || id === 'undefined';
+
 
     const [category, setCategory] = useState('WEB');
     const [formData, setFormData] = useState({
@@ -39,6 +40,7 @@ export function ProfileFormPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
     const [showQRScanner, setShowQRScanner] = useState(false);
+    const [cardType, setCardType] = useState(null);
 
     useEffect(() => {
         if (!isNew && Number.isInteger(Number(id))) {
@@ -73,6 +75,55 @@ export function ProfileFormPage() {
         } finally {
             setIsLoading(false);
         }
+    }
+
+    function detectCardType(number) {
+        // Rimuovi spazi e trattini
+        const cleaned = number.replace(/[\s-]/g, '');
+
+        // Regex per i vari circuiti
+        const patterns = {
+            visa: /^4/,
+            mastercard: /^(5[1-5]|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)/,
+            amex: /^3[47]/,
+            discover: /^6(?:011|5)/,
+            diners: /^3(?:0[0-5]|[68])/,
+            jcb: /^35/
+        };
+
+        for (const [type, pattern] of Object.entries(patterns)) {
+            if (pattern.test(cleaned)) {
+                return type;
+            }
+        }
+
+        return null;
+    }
+
+    function formatCardNumber(value) {
+        // Rimuovi tutti i caratteri non numerici
+        const cleaned = value.replace(/\D/g, '');
+
+        // Rileva il tipo di carta
+        const type = detectCardType(cleaned);
+        setCardType(type);
+
+        // Formatta con spazi ogni 4 cifre
+        const formatted = cleaned.match(/.{1,4}/g)?.join(' ') || cleaned;
+
+        return formatted;
+    }
+
+    function formatExpiration(value) {
+        // Rimuovi tutti i caratteri non numerici
+        const cleaned = value.replace(/\D/g, '');
+
+        // Aggiungi lo slash dopo i primi 2 caratteri
+        if (cleaned.length >= 2) {
+            return cleaned.slice(0, 2) + '/' + cleaned.slice(2, 4);
+        }
+
+        return cleaned;
     }
 
     function generateRandomPassword() {
@@ -397,14 +448,51 @@ export function ProfileFormPage() {
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Card Number
                             </label>
-                            <input
-                                type="text"
-                                value={formData.numberCard}
-                                onChange={(e) => setFormData(prev => ({ ...prev, numberCard: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                                placeholder="1234 5678 9012 3456"
-                                maxLength="19"
-                            />
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={formData.numberCard}
+                                    onChange={(e) => {
+                                        const formatted = formatCardNumber(e.target.value);
+                                        setFormData(prev => ({ ...prev, numberCard: formatted }));
+                                    }}
+                                    className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                                    placeholder="1234 5678 9012 3456"
+                                    maxLength="19"
+                                />
+                                {/* Logo carta */}
+                                {cardType && (
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                        {cardType === 'visa' && (
+                                            <svg className="h-8 w-auto" viewBox="0 0 48 32" fill="none">
+                                                <rect width="48" height="32" rx="4" fill="#1434CB" />
+                                                <path d="M17.8 20.4L19.2 11.6H21.5L20.1 20.4H17.8Z" fill="white" />
+                                                <path d="M28.8 11.8C28.3 11.6 27.5 11.4 26.5 11.4C24.2 11.4 22.6 12.6 22.6 14.3C22.6 15.6 23.8 16.3 24.7 16.7C25.6 17.1 26 17.4 26 17.8C26 18.4 25.2 18.7 24.5 18.7C23.5 18.7 23 18.6 22.2 18.2L21.9 18.1L21.6 20C22.2 20.3 23.3 20.5 24.4 20.5C26.9 20.5 28.4 19.3 28.5 17.5C28.5 16.5 27.9 15.7 26.6 15.1C25.8 14.7 25.3 14.4 25.3 14C25.3 13.6 25.7 13.2 26.6 13.2C27.4 13.2 28 13.3 28.5 13.6L28.7 13.7L29 11.8Z" fill="white" />
+                                                <path d="M32.8 11.6H31C30.4 11.6 29.9 11.8 29.7 12.4L26.4 20.4H28.9L29.4 19H32.4L32.7 20.4H35L32.8 11.6ZM30.1 17.2L31.2 14.1L31.8 17.2H30.1Z" fill="white" />
+                                                <path d="M15.9 11.6L13.5 17.8L13.2 16.3C12.7 14.6 11.1 12.7 9.3 11.8L11.4 20.4H13.9L17.4 11.6H15.9Z" fill="white" />
+                                            </svg>
+                                        )}
+                                        {cardType === 'mastercard' && (
+                                            <svg className="h-8 w-auto" viewBox="0 0 48 32" fill="none">
+                                                <rect width="48" height="32" rx="4" fill="#EB001B" />
+                                                <circle cx="18" cy="16" r="9" fill="#F79E1B" />
+                                                <circle cx="30" cy="16" r="9" fill="#FF5F00" />
+                                            </svg>
+                                        )}
+                                        {cardType === 'amex' && (
+                                            <svg className="h-8 w-auto" viewBox="0 0 48 32" fill="none">
+                                                <rect width="48" height="32" rx="4" fill="#006FCF" />
+                                                <text x="24" y="20" textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">AMEX</text>
+                                            </svg>
+                                        )}
+                                        {!['visa', 'mastercard', 'amex'].includes(cardType) && (
+                                            <div className="h-8 w-12 bg-gray-200 rounded flex items-center justify-center">
+                                                <CreditCard size={20} className="text-gray-500" />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -415,7 +503,10 @@ export function ProfileFormPage() {
                                 <input
                                     type="text"
                                     value={formData.deadline}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, deadline: e.target.value }))}
+                                    onChange={(e) => {
+                                        const formatted = formatExpiration(e.target.value);
+                                        setFormData(prev => ({ ...prev, deadline: formatted }));
+                                    }}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                                     placeholder="MM/YY"
                                     maxLength="5"
