@@ -8,11 +8,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowLeft, Save, User, CreditCard, RefreshCw, QrCode, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, User, CreditCard, RefreshCw, QrCode, Trash2, Image } from 'lucide-react';
 import { syncService } from '../services/syncService';
 import { OTPDisplay } from '../components/OTPDisplay';
 import { QRScanner } from '../components/QRScanner';
+import { IconPicker } from '../components/IconPicker';
 import { validators } from '../services/securityUtils';
+import { getIconBySlug } from '../icons/brandIcons';
+import { IconRenderer } from '../components/IconRenderer';
 
 export function ProfileFormPage() {
     const navigate = useNavigate();
@@ -29,6 +32,7 @@ export function ProfileFormPage() {
         website: '',
         note: '',
         secretKey: '',
+        icon: null, // Icon slug (e.g., 'spotify')
         // CARD fields
         numberCard: '',
         owner: '',
@@ -41,6 +45,7 @@ export function ProfileFormPage() {
     const [error, setError] = useState('');
     const [showQRScanner, setShowQRScanner] = useState(false);
     const [cardType, setCardType] = useState(null);
+    const [showIconPicker, setShowIconPicker] = useState(false);
 
     useEffect(() => {
         if (!isNew && Number.isInteger(Number(id))) {
@@ -207,6 +212,7 @@ export function ProfileFormPage() {
                 sanitizedData.website = validators.url(formData.website || '');
                 sanitizedData.secretKey = validators.text(formData.secretKey || '', 100);
                 sanitizedData.note = validators.notes(formData.note || '');
+                sanitizedData.icon = formData.icon || null; // Icon slug
             }
 
             // Sanitizza campi CARD
@@ -313,6 +319,77 @@ export function ProfileFormPage() {
                 {error && (
                     <div className="bg-red-50 border border-red-300 text-red-800 px-4 py-3 rounded-lg">
                         {error}
+                    </div>
+                )}
+
+                {/* Icon Picker Section (only for WEB) */}
+                {category === 'WEB' && (
+                    <div className="bg-white rounded-lg p-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                            <Image size={16} className="inline mr-2" />
+                            Brand Icon
+                        </label>
+                        
+                        <div className="flex items-center gap-3">
+                            {/* Icon Preview */}
+                            {formData.icon ? (
+                                <>
+                                    <div className="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg flex items-center justify-center border-2 border-primary/20">
+                                        {formData.icon && (
+                                            <IconRenderer
+                                                slug={formData.icon}
+                                                size={32}
+                                                useHex
+                                            />
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm text-gray-600">
+                                            {getIconBySlug(formData.icon)?.name || formData.icon}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowIconPicker(!showIconPicker)}
+                                            className="text-sm text-primary hover:text-primary-dark font-medium"
+                                        >
+                                            Change Icon
+                                        </button>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData(prev => ({ ...prev, icon: null }))}
+                                        className="text-red-600 hover:text-red-700 p-2"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowIconPicker(!showIconPicker)}
+                                    className="w-full py-3 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors font-medium"
+                                >
+                                    + Choose Icon
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Icon Picker Modal */}
+                        {showIconPicker && (
+                            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                                <div className="bg-white rounded-lg w-full max-w-md max-h-96 flex flex-col">
+                                    <IconPicker
+                                        onSelect={(icon) => {
+                                            setFormData(prev => ({ ...prev, icon: icon.slug }));
+                                            setShowIconPicker(false);
+                                        }}
+                                        onClose={() => setShowIconPicker(false)}
+                                        selectedSlug={formData.icon}
+                                        suggestFromTitle={formData.website || formData.title}
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
