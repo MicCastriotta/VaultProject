@@ -19,6 +19,7 @@ import {
     CreditCard
 } from 'lucide-react';
 import { OTPDisplay } from '../components/OTPDisplay';
+import { IconRenderer } from '../components/IconRenderer';
 
 export function ProfileDetailPage() {
     const navigate = useNavigate();
@@ -160,6 +161,13 @@ export function ProfileDetailPage() {
                     <div className="w-12 h-12 flex items-center justify-center bg-primary/10 rounded-lg">
                         {profile.category === 'CARD' ? (
                             <CreditCard className="text-primary" size={24} />
+                        ) : profile.icon ? (
+                            <IconRenderer
+                                slug={profile.icon}
+                                size={24}
+                                useHex={true}
+                                fallback="generic"
+                            />
                         ) : (
                             <User className="text-primary" size={24} />
                         )}
@@ -221,10 +229,10 @@ export function ProfileDetailPage() {
                                     copied={copiedField === 'secret'}
                                     masked
                                 />
-                                
+
                                 {/* OTP Code Display */}
-                                <OTPDisplay 
-                                    secret={profile.secretKey} 
+                                <OTPDisplay
+                                    secret={profile.secretKey}
                                     title={profile.title}
                                 />
                             </div>

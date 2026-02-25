@@ -5,6 +5,7 @@ import { cryptoService } from '../services/cryptoService';
 import { AppLayout } from '../layouts/AppLayout';
 import { Plus, Search, ArrowUpDown, User, CreditCard, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { IconRenderer, getIconHex } from '../components/IconRenderer';
 
 const SORT_OPTIONS = {
     ALPHA_ASC: 'alpha_asc',
@@ -229,11 +230,26 @@ export function MainPage() {
                                                         className="w-full flex justify-between items-center p-4 rounded-2xl bg-slate-800/60 border border-slate-700 hover:bg-slate-800 transition"
                                                     >
                                                         <div className="flex items-center gap-4">
-                                                            <div className="w-10 h-10 flex items-center justify-center bg-blue-500/10 rounded-lg">
-                                                                {profile.category === 'CARD'
-                                                                    ? <CreditCard size={20} />
-                                                                    : <User size={20} />
-                                                                }
+                                                            <div 
+                                                                className="w-10 h-10 flex items-center justify-center rounded-lg"
+                                                                style={{
+                                                                    backgroundColor: profile.icon 
+                                                                        ? `${getIconHex(profile.icon)}20`
+                                                                        : 'rgb(59, 130, 246) / 0.1)'
+                                                                }}
+                                                            >
+                                                                {profile.icon && profile.category === 'WEB' ? (
+                                                                    <IconRenderer
+                                                                        slug={profile.icon}
+                                                                        size={20}
+                                                                        useHex={true}
+                                                                        fallback="generic"
+                                                                    />
+                                                                ) : profile.category === 'CARD' ? (
+                                                                    <CreditCard size={20} />
+                                                                ) : (
+                                                                    <User size={20} />
+                                                                )}
                                                             </div>
 
                                                             <div className="text-left">
