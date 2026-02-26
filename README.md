@@ -171,16 +171,17 @@ Un attaccante che modifica IndexedDB non può ricalcolare un HMAC valido senza l
 
 Funzionalità da implementare:
 
-- [ ] Tutorial iniziale (come Xamarin)
+- [ ] Tutorial iniziale primo avvio
 - [x] Impostazioni (biometric, 2FA, tema)
 - [x] Password generator avanzato
-- [ ] Ricerca migliorata
 - [ ] Ordinamento (A-Z, data, categoria)
 - [ ] Export/Import completo da altri profili
 - [ ] Condivisione profili cifrati
 - [x] Generatore OTP (TOTP)
 - [x] Backup automatico
-- [ ] Tema dark
+- [ ] Tema dark/light
+- [ ] Completamento struttura grafica
+- [ ] PWA
 - [x] Multi-lingua
 - [ ] Logging centralizzato
 
