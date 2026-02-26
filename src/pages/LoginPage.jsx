@@ -3,46 +3,16 @@
  * Unlock con password o biometria
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Eye, EyeOff, Lock, Fingerprint } from 'lucide-react';
+import { Eye, EyeOff, Lock } from 'lucide-react';
 
 export function LoginPage() {
-    const { login, loginWithBiometric, biometricEnabled } = useAuth();
+    const { login, biometricEnabled } = useAuth();
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [isBiometricLoading, setIsBiometricLoading] = useState(false);
     const [error, setError] = useState('');
-    //const [attemptedBiometric, setAttemptedBiometric] = useState(false);
-
-    // Tenta login biometrico automatico all'avvio
-    //useEffect(() => {
-    //    if (biometricEnabled && !attemptedBiometric) {
-    //        setAttemptedBiometric(true);
-    //        handleBiometricLogin();
-    //    }
-    //}, [biometricEnabled]);
-
-    async function handleBiometricLogin() {
-        setIsBiometricLoading(true);
-        setError('');
-
-        try {
-            const result = await loginWithBiometric();
-
-            if (!result.success) {
-                // Non mostrare errore se l'utente cancella - è normale
-                if (!result.error.includes('cancelled') && !result.error.includes('denied')) {
-                    setError(result.error);
-                }
-            }
-        } catch (err) {
-            console.error('Biometric login error:', err);
-        } finally {
-            setIsBiometricLoading(false);
-        }
-    }
 
     async function handleSubmit(e) {
         e.preventDefault();
@@ -97,7 +67,7 @@ export function LoginPage() {
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="w-full px-4 py-3 bg-slate-800/70 text-gray-200 border border-slate-700 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent pr-12 placeholder-gray-500"
                                     placeholder="Enter your password"
-                                    disabled={isLoading || isBiometricLoading}
+                                    disabled={isLoading}
                                     autoFocus={!biometricEnabled}
                                 />
                                 <button
@@ -119,7 +89,7 @@ export function LoginPage() {
                         {/* Submit Button */}
                         <button
                             type="submit"
-                            disabled={isLoading || isBiometricLoading}
+                            disabled={isLoading}
                             className="w-full bg-gradient-to-r from-brand to-blue-500 hover:from-brand/90 hover:to-blue-500/90 text-white py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-900/40 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {isLoading ? (
@@ -132,37 +102,11 @@ export function LoginPage() {
                             )}
                         </button>
 
-                        {/* Biometric Button */}
+                        {/* Hint biometria: la verifica parte automaticamente dopo la password */}
                         {biometricEnabled && (
-                            <>
-                                <div className="relative">
-                                    <div className="absolute inset-0 flex items-center">
-                                        <div className="w-full border-t border-slate-700"></div>
-                                    </div>
-                                    <div className="relative flex justify-center text-sm">
-                                        <span className="px-3 bg-slate-900/60 text-gray-400">or</span>
-                                    </div>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={handleBiometricLogin}
-                                    disabled={isLoading || isBiometricLoading}
-                                    className="w-full bg-slate-800/50 border border-slate-700 text-gray-300 hover:bg-slate-800/70 hover:border-brand py-3 rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                >
-                                    {isBiometricLoading ? (
-                                        <>
-                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-brand"></div>
-                                            <span>Authenticating...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Fingerprint size={20} className="text-brand" />
-                                            <span>Unlock with Biometrics</span>
-                                        </>
-                                    )}
-                                </button>
-                            </>
+                            <p className="text-xs text-center text-gray-500">
+                                Biometric verification will be requested automatically after your password
+                            </p>
                         )}
                     </form>
                 </div>

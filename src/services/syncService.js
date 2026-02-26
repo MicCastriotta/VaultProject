@@ -3,7 +3,7 @@
  * Gestisce sincronizzazione automatica con Google Drive
  */
 
-import { googleDriveService } from './googleDriveService';
+import { googleDriveService } from './googledriveService';
 import { databaseService } from './databaseService';
 
 const SYNC_FILE_NAME = 'safeprofiles-sync.json';

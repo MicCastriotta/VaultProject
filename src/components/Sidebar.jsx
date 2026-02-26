@@ -61,10 +61,6 @@ export function Sidebar() {
                         <LogOut size={18} />
                         Logout
                     </button>
-
-                    <div className="text-xs text-gray-500 mt-6">
-                        End-to-End Encryption
-                    </div>
                 </div>
             </aside>
 

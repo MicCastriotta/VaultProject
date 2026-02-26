@@ -1,12 +1,11 @@
-﻿/**
+/**
  * Password Generator Page
  * Generatore password configurabile con crypto.getRandomValues()
  */
 
 import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Copy, Check, RefreshCw, Shield } from 'lucide-react';
-import { cryptoService } from '../services/cryptoService';
+import { Copy, Check, RefreshCw, Shield } from 'lucide-react';
+import { AppLayout } from '../layouts/AppLayout';
 
 // Set di caratteri
 const CHAR_SETS = {
@@ -93,7 +92,6 @@ const WORD_LIST = [
 function generatePassword(options) {
     const { length, useLower, useUpper, useDigits, useSymbols } = options;
 
-    // Costruisci il set di caratteri in base alle opzioni
     let charPool = '';
     const enabledSets = [];
     if (useLower) { charPool += CHAR_SETS.lower; enabledSets.push(CHAR_SETS.lower); }
@@ -101,16 +99,12 @@ function generatePassword(options) {
     if (useDigits) { charPool += CHAR_SETS.digits; enabledSets.push(CHAR_SETS.digits); }
     if (useSymbols) { charPool += CHAR_SETS.symbols; enabledSets.push(CHAR_SETS.symbols); }
 
-    if (charPool.length === 0 || length < 1) {
-        return '';
-    }
+    if (charPool.length === 0 || length < 1) return '';
 
-    // Genera caratteri random
     const randomValues = new Uint32Array(length);
     crypto.getRandomValues(randomValues);
     const chars = Array.from(randomValues, (val) => charPool[val % charPool.length]);
 
-    // Garantisci almeno 1 carattere da ogni set abilitato (se length lo permette)
     if (enabledSets.length <= length) {
         const guaranteeValues = new Uint32Array(enabledSets.length);
         crypto.getRandomValues(guaranteeValues);
@@ -119,7 +113,6 @@ function generatePassword(options) {
         });
     }
 
-    // Shuffle Fisher-Yates con crypto-random
     const shuffleValues = new Uint32Array(chars.length);
     crypto.getRandomValues(shuffleValues);
     for (let i = chars.length - 1; i > 0; i--) {
@@ -154,11 +147,9 @@ function calculateEntropy(password, mode, options) {
     if (!password) return 0;
 
     if (mode === 'passphrase') {
-        // Entropia passphrase: log2(poolSize) * wordCount
         return Math.floor(Math.log2(WORD_LIST.length) * options.wordCount);
     }
 
-    // Entropia password: log2(charPoolSize) * length
     let poolSize = 0;
     if (options.useLower) poolSize += CHAR_SETS.lower.length;
     if (options.useUpper) poolSize += CHAR_SETS.upper.length;
@@ -173,23 +164,19 @@ function calculateEntropy(password, mode, options) {
  * Valuta la forza in base all'entropia
  */
 function getStrengthFromEntropy(bits) {
-    if (bits === 0) return { label: '', color: 'bg-gray-300', textColor: 'text-gray-400', percent: 0 };
-    if (bits < 30) return { label: 'Very Weak', color: 'bg-red-500', textColor: 'text-red-500', percent: 10 };
-    if (bits < 50) return { label: 'Weak', color: 'bg-orange-500', textColor: 'text-orange-500', percent: 25 };
-    if (bits < 70) return { label: 'Fair', color: 'bg-yellow-500', textColor: 'text-yellow-600', percent: 45 };
-    if (bits < 90) return { label: 'Strong', color: 'bg-blue-500', textColor: 'text-blue-500', percent: 65 };
-    if (bits < 120) return { label: 'Very Strong', color: 'bg-green-500', textColor: 'text-green-500', percent: 85 };
-    return { label: 'Excellent', color: 'bg-green-600', textColor: 'text-green-600', percent: 100 };
+    if (bits === 0) return { label: '', color: 'bg-slate-600', textColor: 'text-slate-500', percent: 0 };
+    if (bits < 30) return { label: 'Very Weak', color: 'bg-red-500', textColor: 'text-red-400', percent: 10 };
+    if (bits < 50) return { label: 'Weak', color: 'bg-orange-500', textColor: 'text-orange-400', percent: 25 };
+    if (bits < 70) return { label: 'Fair', color: 'bg-yellow-500', textColor: 'text-yellow-400', percent: 45 };
+    if (bits < 90) return { label: 'Strong', color: 'bg-blue-500', textColor: 'text-blue-400', percent: 65 };
+    if (bits < 120) return { label: 'Very Strong', color: 'bg-green-500', textColor: 'text-green-400', percent: 85 };
+    return { label: 'Excellent', color: 'bg-green-400', textColor: 'text-green-400', percent: 100 };
 }
 
 
 export function PasswordGeneratorPage() {
-    const navigate = useNavigate();
-
-    // Modalità: 'password' o 'passphrase'
     const [mode, setMode] = useState('password');
 
-    // Opzioni password
     const [passwordOptions, setPasswordOptions] = useState({
         length: 20,
         useLower: true,
@@ -198,7 +185,6 @@ export function PasswordGeneratorPage() {
         useSymbols: true,
     });
 
-    // Opzioni passphrase
     const [passphraseOptions, setPassphraseOptions] = useState({
         wordCount: 5,
         separator: '-',
@@ -209,7 +195,6 @@ export function PasswordGeneratorPage() {
     const [copied, setCopied] = useState(false);
     const [history, setHistory] = useState([]);
 
-    // Genera password/passphrase
     const handleGenerate = useCallback(() => {
         let result;
         if (mode === 'password') {
@@ -220,7 +205,6 @@ export function PasswordGeneratorPage() {
         setGeneratedPassword(result);
         setCopied(false);
 
-        // Aggiungi alla history (max 10)
         if (result) {
             setHistory(prev => [
                 { value: result, mode, timestamp: Date.now() },
@@ -229,14 +213,12 @@ export function PasswordGeneratorPage() {
         }
     }, [mode, passwordOptions, passphraseOptions]);
 
-    // Copia in clipboard
     async function handleCopy(text) {
         try {
             await navigator.clipboard.writeText(text || generatedPassword);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
 
-            // Auto-clear clipboard dopo 30s
             const copiedText = text || generatedPassword;
             setTimeout(async () => {
                 try {
@@ -249,282 +231,252 @@ export function PasswordGeneratorPage() {
         } catch (_) { /* ignore */ }
     }
 
-    // Calcola entropia e forza
     const currentOptions = mode === 'password' ? passwordOptions : passphraseOptions;
     const entropy = calculateEntropy(generatedPassword, mode, currentOptions);
     const strength = getStrengthFromEntropy(entropy);
 
-    // Almeno un set deve essere attivo
     const atLeastOneSet = passwordOptions.useLower || passwordOptions.useUpper
         || passwordOptions.useDigits || passwordOptions.useSymbols;
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* Header */}
-            <div className="bg-primary text-white px-4 py-4 flex items-center gap-3">
-                <button
-                    onClick={() => navigate(-1)}
-                    className="p-2 hover:bg-primary-dark rounded-lg transition-colors"
-                >
-                    <ArrowLeft size={24} />
-                </button>
-                <h1 className="text-xl font-bold">Password Generator</h1>
-            </div>
+        <AppLayout>
+            <div className="p-6 h-full overflow-y-auto">
+                <div className="max-w-2xl mx-auto space-y-4 pb-6">
 
-            <div className="p-4 space-y-4 max-w-2xl mx-auto pb-20">
+                    {/* Page title */}
+                    <h1 className="text-2xl font-bold text-white mb-2">Password Generator</h1>
 
-                {/* Output */}
-                <div className="bg-white rounded-lg p-4 space-y-3">
-                    <div className="flex items-center gap-2">
-                        <div
-                            className="flex-1 font-mono text-sm bg-gray-50 px-3 py-3 rounded border border-gray-200 break-all min-h-[48px] flex items-center"
-                        >
-                            {generatedPassword || (
-                                <span className="text-gray-400">
-                                    Press "Generate" to create a password
-                                </span>
-                            )}
+                    {/* Output */}
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1 font-mono text-sm bg-slate-900/60 border border-slate-700 px-3 py-3 rounded-lg break-all min-h-[48px] flex items-center text-gray-200">
+                                {generatedPassword || (
+                                    <span className="text-slate-500">
+                                        Premi "Generate" per creare una password
+                                    </span>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => handleCopy()}
+                                disabled={!generatedPassword}
+                                className="p-3 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors disabled:opacity-30"
+                            >
+                                {copied ? <Check size={22} /> : <Copy size={22} />}
+                            </button>
                         </div>
+
+                        {/* Strength bar */}
+                        {generatedPassword && (
+                            <div className="space-y-1">
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className={`font-semibold ${strength.textColor}`}>
+                                        {strength.label}
+                                    </span>
+                                    <span className="text-slate-400">
+                                        {entropy} bit entropy
+                                    </span>
+                                </div>
+                                <div className="w-full bg-slate-700 rounded-full h-2">
+                                    <div
+                                        className={`h-2 rounded-full transition-all duration-300 ${strength.color}`}
+                                        style={{ width: `${strength.percent}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Generate button */}
                         <button
-                            onClick={() => handleCopy()}
-                            disabled={!generatedPassword}
-                            className="p-3 text-primary hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-30"
+                            onClick={handleGenerate}
+                            disabled={mode === 'password' && !atLeastOneSet}
+                            className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                         >
-                            {copied ? <Check size={22} /> : <Copy size={22} />}
+                            <RefreshCw size={20} />
+                            Generate
                         </button>
                     </div>
 
-                    {/* Strength bar */}
-                    {generatedPassword && (
-                        <div className="space-y-1">
-                            <div className="flex justify-between items-center text-xs">
-                                <span className={`font-semibold ${strength.textColor}`}>
-                                    {strength.label}
-                                </span>
-                                <span className="text-gray-500">
-                                    {entropy} bit entropy
-                                </span>
+                    {/* Mode selector */}
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden flex">
+                        <button
+                            onClick={() => { setMode('password'); setGeneratedPassword(''); }}
+                            className={`flex-1 py-3 text-sm font-medium transition-colors ${mode === 'password'
+                                ? 'bg-blue-600 text-white'
+                                : 'text-slate-400 hover:bg-slate-700'
+                                }`}
+                        >
+                            Password
+                        </button>
+                        <button
+                            onClick={() => { setMode('passphrase'); setGeneratedPassword(''); }}
+                            className={`flex-1 py-3 text-sm font-medium transition-colors ${mode === 'passphrase'
+                                ? 'bg-blue-600 text-white'
+                                : 'text-slate-400 hover:bg-slate-700'
+                                }`}
+                        >
+                            Passphrase
+                        </button>
+                    </div>
+
+                    {/* Password options */}
+                    {mode === 'password' && (
+                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-4">
+                            {/* Length slider */}
+                            <div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="text-sm font-medium text-gray-300">Length</label>
+                                    <span className="text-sm font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
+                                        {passwordOptions.length}
+                                    </span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="4"
+                                    max="64"
+                                    value={passwordOptions.length}
+                                    onChange={(e) => setPasswordOptions(prev => ({
+                                        ...prev,
+                                        length: Number(e.target.value)
+                                    }))}
+                                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                />
+                                <div className="flex justify-between text-xs text-slate-500 mt-1">
+                                    <span>4</span>
+                                    <span>64</span>
+                                </div>
                             </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                                <div
-                                    className={`h-2 rounded-full transition-all duration-300 ${strength.color}`}
-                                    style={{ width: `${strength.percent}%` }}
+
+                            {/* Character toggles */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-300">Characters</label>
+
+                                <ToggleOption
+                                    label="Lowercase"
+                                    example="a-z"
+                                    checked={passwordOptions.useLower}
+                                    onChange={(v) => setPasswordOptions(prev => ({ ...prev, useLower: v }))}
+                                    disabled={!passwordOptions.useUpper && !passwordOptions.useDigits && !passwordOptions.useSymbols && passwordOptions.useLower}
+                                />
+                                <ToggleOption
+                                    label="Uppercase"
+                                    example="A-Z"
+                                    checked={passwordOptions.useUpper}
+                                    onChange={(v) => setPasswordOptions(prev => ({ ...prev, useUpper: v }))}
+                                    disabled={!passwordOptions.useLower && !passwordOptions.useDigits && !passwordOptions.useSymbols && passwordOptions.useUpper}
+                                />
+                                <ToggleOption
+                                    label="Numbers"
+                                    example="0-9"
+                                    checked={passwordOptions.useDigits}
+                                    onChange={(v) => setPasswordOptions(prev => ({ ...prev, useDigits: v }))}
+                                    disabled={!passwordOptions.useLower && !passwordOptions.useUpper && !passwordOptions.useSymbols && passwordOptions.useDigits}
+                                />
+                                <ToggleOption
+                                    label="Symbols"
+                                    example="!@#$%..."
+                                    checked={passwordOptions.useSymbols}
+                                    onChange={(v) => setPasswordOptions(prev => ({ ...prev, useSymbols: v }))}
+                                    disabled={!passwordOptions.useLower && !passwordOptions.useUpper && !passwordOptions.useDigits && passwordOptions.useSymbols}
                                 />
                             </div>
                         </div>
                     )}
 
-                    {/* Generate button */}
-                    <button
-                        onClick={handleGenerate}
-                        disabled={mode === 'password' && !atLeastOneSet}
-                        className="w-full bg-primary hover:bg-primary-dark text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                        <RefreshCw size={20} />
-                        Generate
-                    </button>
-                </div>
-
-                {/* Mode selector */}
-                <div className="bg-white rounded-lg overflow-hidden flex border border-gray-200">
-                    <button
-                        onClick={() => { setMode('password'); setGeneratedPassword(''); }}
-                        className={`flex-1 py-3 text-sm font-medium transition-colors ${mode === 'password'
-                            ? 'bg-primary text-white'
-                            : 'text-gray-600 hover:bg-gray-50'
-                            }`}
-                    >
-                        Password
-                    </button>
-                    <button
-                        onClick={() => { setMode('passphrase'); setGeneratedPassword(''); }}
-                        className={`flex-1 py-3 text-sm font-medium transition-colors ${mode === 'passphrase'
-                            ? 'bg-primary text-white'
-                            : 'text-gray-600 hover:bg-gray-50'
-                            }`}
-                    >
-                        Passphrase
-                    </button>
-                </div>
-
-                {/* Password options */}
-                {mode === 'password' && (
-                    <div className="bg-white rounded-lg p-4 space-y-4">
-                        {/* Length slider */}
-                        <div>
-                            <div className="flex justify-between items-center mb-2">
-                                <label className="text-sm font-medium text-gray-700">Length</label>
-                                <span className="text-sm font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                                    {passwordOptions.length}
-                                </span>
+                    {/* Passphrase options */}
+                    {mode === 'passphrase' && (
+                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-4">
+                            {/* Word count slider */}
+                            <div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="text-sm font-medium text-gray-300">Words</label>
+                                    <span className="text-sm font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
+                                        {passphraseOptions.wordCount}
+                                    </span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="3"
+                                    max="10"
+                                    value={passphraseOptions.wordCount}
+                                    onChange={(e) => setPassphraseOptions(prev => ({
+                                        ...prev,
+                                        wordCount: Number(e.target.value)
+                                    }))}
+                                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                />
+                                <div className="flex justify-between text-xs text-slate-500 mt-1">
+                                    <span>3</span>
+                                    <span>10</span>
+                                </div>
                             </div>
-                            <input
-                                type="range"
-                                min="4"
-                                max="64"
-                                value={passwordOptions.length}
-                                onChange={(e) => setPasswordOptions(prev => ({
-                                    ...prev,
-                                    length: Number(e.target.value)
-                                }))}
-                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
-                            />
-                            <div className="flex justify-between text-xs text-gray-400 mt-1">
-                                <span>4</span>
-                                <span>64</span>
+
+                            {/* Separator */}
+                            <div>
+                                <label className="text-sm font-medium text-gray-300 block mb-2">Separator</label>
+                                <div className="flex gap-2">
+                                    {['-', '.', '_', ' ', '#'].map((sep) => (
+                                        <button
+                                            key={sep}
+                                            onClick={() => setPassphraseOptions(prev => ({ ...prev, separator: sep }))}
+                                            className={`flex-1 py-2 rounded-lg border text-sm font-mono transition-colors ${passphraseOptions.separator === sep
+                                                ? 'border-blue-500 bg-blue-500/10 text-blue-400 font-bold'
+                                                : 'border-slate-600 text-slate-400 hover:bg-slate-700'
+                                                }`}
+                                        >
+                                            {sep === ' ' ? '⎵' : sep}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Character toggles */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">Characters</label>
-
+                            {/* Capitalize toggle */}
                             <ToggleOption
-                                label="Lowercase"
-                                example="a-z"
-                                checked={passwordOptions.useLower}
-                                onChange={(v) => setPasswordOptions(prev => ({ ...prev, useLower: v }))}
-                                disabled={!passwordOptions.useUpper && !passwordOptions.useDigits && !passwordOptions.useSymbols && passwordOptions.useLower}
-                            />
-                            <ToggleOption
-                                label="Uppercase"
-                                example="A-Z"
-                                checked={passwordOptions.useUpper}
-                                onChange={(v) => setPasswordOptions(prev => ({ ...prev, useUpper: v }))}
-                                disabled={!passwordOptions.useLower && !passwordOptions.useDigits && !passwordOptions.useSymbols && passwordOptions.useUpper}
-                            />
-                            <ToggleOption
-                                label="Numbers"
-                                example="0-9"
-                                checked={passwordOptions.useDigits}
-                                onChange={(v) => setPasswordOptions(prev => ({ ...prev, useDigits: v }))}
-                                disabled={!passwordOptions.useLower && !passwordOptions.useUpper && !passwordOptions.useSymbols && passwordOptions.useDigits}
-                            />
-                            <ToggleOption
-                                label="Symbols"
-                                example="!@#$%..."
-                                checked={passwordOptions.useSymbols}
-                                onChange={(v) => setPasswordOptions(prev => ({ ...prev, useSymbols: v }))}
-                                disabled={!passwordOptions.useLower && !passwordOptions.useUpper && !passwordOptions.useDigits && passwordOptions.useSymbols}
+                                label="Capitalize words"
+                                example="Word vs word"
+                                checked={passphraseOptions.capitalize}
+                                onChange={(v) => setPassphraseOptions(prev => ({ ...prev, capitalize: v }))}
                             />
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* Passphrase options */}
-                {mode === 'passphrase' && (
-                    <div className="bg-white rounded-lg p-4 space-y-4">
-                        {/* Word count slider */}
-                        <div>
-                            <div className="flex justify-between items-center mb-2">
-                                <label className="text-sm font-medium text-gray-700">Words</label>
-                                <span className="text-sm font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                                    {passphraseOptions.wordCount}
-                                </span>
-                            </div>
-                            <input
-                                type="range"
-                                min="3"
-                                max="10"
-                                value={passphraseOptions.wordCount}
-                                onChange={(e) => setPassphraseOptions(prev => ({
-                                    ...prev,
-                                    wordCount: Number(e.target.value)
-                                }))}
-                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
-                            />
-                            <div className="flex justify-between text-xs text-gray-400 mt-1">
-                                <span>3</span>
-                                <span>10</span>
-                            </div>
-                        </div>
-
-                        {/* Separator */}
-                        <div>
-                            <label className="text-sm font-medium text-gray-700 block mb-2">Separator</label>
-                            <div className="flex gap-2">
-                                {['-', '.', '_', ' ', '#'].map((sep) => (
-                                    <button
-                                        key={sep}
-                                        onClick={() => setPassphraseOptions(prev => ({ ...prev, separator: sep }))}
-                                        className={`flex-1 py-2 rounded-lg border text-sm font-mono transition-colors ${passphraseOptions.separator === sep
-                                            ? 'border-primary bg-primary/10 text-primary font-bold'
-                                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                                            }`}
-                                    >
-                                        {sep === ' ' ? '⎵' : sep}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Capitalize toggle */}
-                        <ToggleOption
-                            label="Capitalize words"
-                            example="Word vs word"
-                            checked={passphraseOptions.capitalize}
-                            onChange={(v) => setPassphraseOptions(prev => ({ ...prev, capitalize: v }))}
-                        />
-                    </div>
-                )}
-
-                {/* Info box */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-                    <Shield size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-blue-800">
-                        {mode === 'password' ? (
-                            <p>
-                                Passwords are generated using the browser's cryptographic random number generator
-                                (<code className="text-xs bg-blue-100 px-1 rounded">crypto.getRandomValues</code>).
-                                For maximum security, use at least 16 characters with all character types enabled.
-                            </p>
-                        ) : (
-                            <p>
-                                Passphrases are easier to remember and type. Each word adds ~{Math.floor(Math.log2(WORD_LIST.length))} bits
-                                of entropy. Use at least 5 words for strong security.
-                            </p>
-                        )}
-                    </div>
-                </div>
-
-                {/* History */}
-                {history.length > 0 && (
-                    <div className="bg-white rounded-lg overflow-hidden">
-                        <div className="p-4 border-b bg-gray-50">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-sm font-semibold text-gray-700">
+                    {/* History */}
+                    {history.length > 0 && (
+                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
+                            <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+                                <h2 className="text-sm font-semibold text-gray-300">
                                     Recent ({history.length})
                                 </h2>
                                 <button
                                     onClick={() => setHistory([])}
-                                    className="text-xs text-red-500 hover:text-red-600"
+                                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
                                 >
                                     Clear
                                 </button>
                             </div>
-                        </div>
-                        <div className="divide-y divide-gray-100">
-                            {history.map((item, i) => (
-                                <div key={item.timestamp} className="px-4 py-3 flex items-center gap-2">
-                                    <div className="flex-1 font-mono text-xs text-gray-600 truncate">
-                                        {item.value}
+                            <div className="divide-y divide-slate-700/50">
+                                {history.map((item) => (
+                                    <div key={item.timestamp} className="px-4 py-3 flex items-center gap-2">
+                                        <div className="flex-1 font-mono text-xs text-gray-300 truncate">
+                                            {item.value}
+                                        </div>
+                                        <span className="text-[10px] text-slate-500 uppercase flex-shrink-0">
+                                            {item.mode === 'passphrase' ? 'phrase' : 'pwd'}
+                                        </span>
+                                        <button
+                                            onClick={() => handleCopy(item.value)}
+                                            className="p-1.5 text-blue-400 hover:bg-blue-500/10 rounded transition-colors flex-shrink-0"
+                                        >
+                                            <Copy size={14} />
+                                        </button>
                                     </div>
-                                    <span className="text-[10px] text-gray-400 uppercase flex-shrink-0">
-                                        {item.mode === 'passphrase' ? 'phrase' : 'pwd'}
-                                    </span>
-                                    <button
-                                        onClick={() => handleCopy(item.value)}
-                                        className="p-1.5 text-primary hover:bg-primary/10 rounded transition-colors flex-shrink-0"
-                                    >
-                                        <Copy size={14} />
-                                    </button>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
+
+                </div>
             </div>
-        </div>
+        </AppLayout>
     );
 }
 
@@ -534,16 +486,18 @@ export function PasswordGeneratorPage() {
  */
 function ToggleOption({ label, example, checked, onChange, disabled = false }) {
     return (
-        <label className={`flex items-center justify-between py-2.5 px-3 rounded-lg border transition-colors cursor-pointer ${checked ? 'border-primary/30 bg-primary/5' : 'border-gray-200'
+        <label className={`flex items-center justify-between py-2.5 px-3 rounded-lg border transition-colors cursor-pointer ${checked
+            ? 'border-blue-500/30 bg-blue-500/5'
+            : 'border-slate-700 hover:border-slate-600'
             } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
             <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-800">{label}</span>
+                <span className="text-sm text-gray-200">{label}</span>
                 {example && (
-                    <span className="text-xs text-gray-400 font-mono">{example}</span>
+                    <span className="text-xs text-slate-500 font-mono">{example}</span>
                 )}
             </div>
             <div
-                className={`relative w-10 h-6 rounded-full transition-colors ${checked ? 'bg-primary' : 'bg-gray-300'}`}
+                className={`relative w-10 h-6 rounded-full transition-colors ${checked ? 'bg-blue-500' : 'bg-slate-600'}`}
                 onClick={(e) => {
                     if (disabled) { e.preventDefault(); return; }
                 }}
