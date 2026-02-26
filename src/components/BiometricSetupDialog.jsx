@@ -72,29 +72,33 @@ export function BiometricSetupDialog({ onEnable, onSkip, showSkip = true }) {
                 <div className="p-6 space-y-4">
                     <div className="space-y-3">
                         <p className="text-gray-700 leading-relaxed">
-                            Unlock SafeProfiles quickly and securely using your device's biometric authentication.
+                            Add biometric verification as a second factor when unlocking SafeProfiles.
                         </p>
-                        
+
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
-                            <h3 className="font-semibold text-blue-900 text-sm">Benefits:</h3>
+                            <h3 className="font-semibold text-blue-900 text-sm">How it works:</h3>
                             <ul className="text-sm text-blue-800 space-y-1">
                                 <li className="flex items-start gap-2">
                                     <span className="text-blue-500 mt-0.5">•</span>
-                                    <span>Fast access without typing your password</span>
+                                    <span>Enter your master password as usual</span>
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <span className="text-blue-500 mt-0.5">•</span>
-                                    <span>Protected by your device's secure hardware</span>
+                                    <span>Biometric confirmation is requested automatically after</span>
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <span className="text-blue-500 mt-0.5">•</span>
-                                    <span>Your password remains required for device changes</span>
+                                    <span>Your master password remains the only cryptographic secret</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <span className="text-blue-500 mt-0.5">•</span>
+                                    <span>No keys are stored — biometrics only confirms your presence</span>
                                 </li>
                             </ul>
                         </div>
 
                         <p className="text-xs text-gray-500">
-                            Note: This feature stores encrypted keys on your device. You can disable it anytime in Settings.
+                            You can disable biometric verification anytime in Settings.
                         </p>
                     </div>
 

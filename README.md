@@ -1,218 +1,171 @@
 # SafeProfiles PWA
 
-Porting PWA della app Xamarin SafeProfiles con crittografia migliorata.
+Password manager locale offline-first, con architettura crittografica a doppia chiave ispirata a Bitwarden/1Password. Porting PWA dell'app Xamarin SafeProfiles con sicurezza significativamente migliorata.
 
-## 🔐 Schema Crittografico
+---
 
-Implementa lo schema usato dai password manager professionali (Bitwarden, 1Password):
-
-```
-Password utente
-   ↓
-PBKDF2 (600k iterations)
-   ↓
-KEK (Key Encryption Key)
-   ↓
-sblocca
-   ↓
-DEK (Data Encryption Key) random
-   ↓
-AES-256-GCM
-   ↓
-JSON cifrati in IndexedDB
-```
-
-### Miglioramenti rispetto a Xamarin
-
-| Aspetto | Xamarin (originale) | PWA (nuovo) |
-|---------|---------------------|-------------|
-| Password come chiave | ❌ sì | ✅ no (usa KDF) |
-| IV random | ❌ no (fisso) | ✅ sì (sempre diverso) |
-| AES autenticato | ❌ no (CBC) | ✅ GCM |
-| Salt sicuro | ❌ fisso | ✅ random |
-| Iterazioni KDF | 300 | 600,000 |
-| Cambio password | impossibile | banale |
-| Export/import | fragile | sicuro |
-
-## 🚀 Setup
-
-```bash
-# 1. Installa dipendenze
-npm install
-
-# 2. Avvia in dev
-npm run dev
-
-# 3. Build per produzione
-npm run build
-
-# 4. Preview build
-npm run preview
-```
-
-## 📁 Struttura
+## Schema Crittografico
 
 ```
-safeprofiles-pwa/
-├── src/
-│   ├── services/
-│   │   ├── cryptoService.js      # ⚡ Core crittografico
-│   │   └── databaseService.js    # 💾 IndexedDB + Dexie
-│   ├── contexts/
-│   │   └── AuthContext.jsx       # 🔑 Stato autenticazione
-│   ├── pages/
-│   │   ├── SignUpPage.jsx        # 🆕 Prima volta
-│   │   ├── LoginPage.jsx         # 🔓 Unlock
-│   │   ├── MainPage.jsx          # 📋 Lista profili
-│   │   ├── ProfileFormPage.jsx   # ✏️ Crea/modifica
-│   │   └── ProfileDetailPage.jsx # 👁️ Visualizza
-│   ├── App.jsx                   # 🧭 Router
-│   ├── main.jsx                  # 🏁 Entry point
-│   └── index.css                 # 🎨 Tailwind
-├── index.html
-├── vite.config.js
-├── tailwind.config.js
-└── package.json
+Master Password
+   ↓
+PBKDF2-SHA512 (600.000 iterazioni, salt 256-bit random)
+   ↓
+KEK — Key Encryption Key (mai salvata)
+   ↓
+decifra
+   ↓
+DEK — Data Encryption Key (random, 256-bit)
+   ↓ (in RAM solo durante sessione sbloccata)
+   ├─→ AES-256-GCM → dati cifrati in IndexedDB
+   └─→ HKDF-SHA256 → Integrity Key → HMAC-SHA256 anti-tampering
 ```
 
-## 🔑 Come Funziona
+**La master password non viene mai salvata. La DEK non viene mai salvata in chiaro.**
 
-### 1️⃣ Prima Volta (Setup)
+---
+
+## Funzionalità
+
+### Vault
+- Profili **WEB** (credenziali siti) e **CARD** (carte di credito/debito)
+- Cifratura AES-256-GCM per ogni campo, IV random per record
+- Icone brand automatiche per oltre 500 servizi web
+- Ricerca in-memoria su titolo, sito, note (nessun indice plaintext)
+- Ordinamento A-Z, Z-A, più recenti, meno recenti
+- Generatore OTP/TOTP integrato nel profilo
+
+### Password Generator
+- Modalità **Password** — lunghezza 4-64, set di caratteri configurabili (lower/upper/digits/symbols)
+- Modalità **Passphrase** — 3-10 parole, separatore personalizzabile, capitalizzazione
+- Generazione con `crypto.getRandomValues()` (CSPRNG nativo del browser)
+- Calcolo entropia in bit e strength meter
+- Storico ultimi 10 risultati con copia rapida
+
+### Password Health
+- Rilevamento password compromesse via **HaveIBeenPwned** (k-anonymity API — la password non viene mai inviata)
+- Rilevamento password duplicate tra profili
+- Rilevamento password deboli (lunghezza, complessità)
+- Health score aggregato
+
+### Sicurezza avanzata
+- **Autenticazione biometrica (WebAuthn)** come secondo fattore — non sostituisce la master password, la conferma dopo di essa
+- **Auto-lock** per inattività (timeout configurabile) con rilevamento background tramite `visibilitychange`
+- **Rate limiting persistente** — lockout sopravvive ai reload della pagina (localStorage)
+- **Integrità database** — HMAC-SHA256 ricalcolato ad ogni scrittura, verificato ad ogni unlock
+- **Clipboard auto-clear** — testo copiato eliminato automaticamente dopo 30 secondi
+- **XSS protection** — tutti gli input sanitizzati con DOMPurify
+
+### Backup e Sync
+- Export/Import JSON cifrato (portabile su qualsiasi device con la stessa password)
+- Sync **Google Drive** opzionale (backup automatico, risoluzione conflitti)
+
+### UX
+- PWA installabile (Add to Home Screen)
+- Offline-first (Service Worker)
+- Dark theme consistente su tutte le pagine
+- Sidebar desktop + bottom nav mobile
+- Multi-lingua (i18n)
+
+---
+
+## Architettura di Sicurezza
+
+### Schema biometrico (WebAuthn v2)
+
+Il vecchio schema salvava una chiave simmetrica derivata dalla DEK nel database — permettendo di recuperare la DEK senza password. L'attuale implementazione è corretta:
+
+```
+Master Password → KEK → decifra DEK → DEK in RAM
+                                          ↓
+                              Se biometria abilitata:
+                              WebAuthn assertion → conferma presenza utente
+                                          ↓
+                                   isUnlocked = true
+```
+
+WebAuthn è un **gate di accesso UI** (2FA locale), non un meccanismo crittografico. La DEK non è mai derivabile dalla biometria da sola. Un database rubato è inutilizzabile senza la master password, anche con la configurazione biometrica.
+
+### Integrità database (anti-tampering)
+
+```
+DEK → HKDF → IntegrityKey (domain: "SafeProfiles-Integrity-v1")
+                  ↓
+         HMAC-SHA256(cryptoConfig + profili ordinati per ID + conteggio)
+                  ↓
+         salvato in IndexedDB dopo ogni scrittura
+                  ↓
+         verificato ad ogni unlock → avviso se mismatch
+```
+
+Un attaccante che modifica IndexedDB non può ricalcolare un HMAC valido senza la DEK.
+
+### Rate limiting persistente
 
 ```javascript
-// L'utente sceglie la password
-const password = "mia-password-sicura";
-
-// Il sistema:
-// 1. Genera salt random (32 byte)
-// 2. Genera DEK random (32 byte)
-// 3. Deriva KEK da password + salt (PBKDF2, 600k iter)
-// 4. Cifra DEK con KEK
-// 5. Salva in IndexedDB:
-{
-  salt: "...",
-  encryptedDEK: "...",
-  iv: "..."
-}
+// 5 tentativi falliti → lockout 5 minuti
+// Stato salvato in localStorage → sopravvive a reload, chiusura browser, riapertura
+// Reset solo su login riuscito
 ```
 
-**⚠️ Password mai salvata in chiaro**  
-**⚠️ DEK mai salvata in chiaro**
+| Azione attaccante | Protezione |
+|---|---|
+| Premere F5 dopo 5 tentativi | Bloccato — localStorage persiste |
+| Chiudere e riaprire il browser | Bloccato — localStorage persiste |
+| Cancellare localStorage (DevTools) | Bypass — richiede accesso tecnico |
+| Navigare in modalità privata | Bypass — storage separato per origine |
 
-### 2️⃣ Login (Unlock)
+---
 
-```javascript
-// L'utente inserisce la password
-const password = "mia-password-sicura";
+## Threat Model
 
-// Il sistema:
-// 1. Recupera salt + encryptedDEK dal DB
-// 2. Rideriva KEK da password + salt
-// 3. Tenta di decifrare encryptedDEK
-// 4. Se succede → password corretta, DEK in RAM
-// 5. Se fallisce → password errata
-```
-
-### 3️⃣ Salva Profilo
-
-```javascript
-const profile = {
-  title: "Facebook",
-  username: "user@example.com",
-  password: "secret123",
-  // ...
-};
-
-// Il sistema:
-// 1. Serializza JSON
-// 2. Genera IV random (12 byte)
-// 3. Cifra con AES-GCM usando DEK (in RAM)
-// 4. Salva in IndexedDB:
-{
-  iv: "...",
-  data: "...",  // ciphertext
-  category: "WEB"  // non cifrato per filtri
-}
-```
-
-### 4️⃣ Carica Profili
-
-```javascript
-// Il sistema:
-// 1. Carica tutti i record cifrati da IndexedDB
-// 2. Per ogni record:
-//    - Prende IV e ciphertext
-//    - Decifra con AES-GCM usando DEK (in RAM)
-//    - Deserializza JSON
-// 3. Mostra all'utente
-```
-
-## 🛡️ Sicurezza
-
-### Cosa È Protetto
-
-✅ **Dati a riposo**: tutto cifrato con AES-256-GCM  
-✅ **Password**: mai salvata, usata solo per derivare KEK  
-✅ **Brute-force**: 600k iterazioni PBKDF2  
-✅ **Integrità**: GCM garantisce autenticità  
-✅ **Pattern**: IV sempre random
-
-### Cosa NON È Protetto
-
-❌ **Keylogger**: se qualcuno registra la password mentre digiti  
-❌ **RAM dump**: se qualcuno accede alla RAM mentre app è unlocked  
-❌ **XSS**: se il sito ha vulnerabilità JavaScript  
-❌ **Device fisico**: se qualcuno ha accesso al device unlocked
-
-### Minacce Mitigate
+### Cosa è protetto
 
 | Minaccia | Protezione |
-|----------|------------|
-| DB rubato | ✅ Inutilizzabile senza password |
-| Password debole | ⚠️ Indicatore forza + 600k iter |
-| Rainbow table | ✅ Salt random |
-| Replay attack | ✅ IV sempre diverso |
-| Bit flipping | ✅ GCM rileva modifiche |
-| Padding oracle | ✅ GCM non usa padding |
+|---|---|
+| DB rubato (senza password) | AES-256-GCM + PBKDF2 600k iter — inutilizzabile |
+| Rainbow table / dizionario | Salt 256-bit random per utente |
+| Replay attack | IV 96-bit random per ogni record |
+| Bit flipping / corruzione | GCM rileva qualsiasi modifica |
+| Padding oracle | GCM non usa padding |
+| Tampering IndexedDB | HMAC-SHA256 con chiave derivata dalla DEK |
+| Brute-force locale | Rate limiting persistente + 600k iterazioni KDF |
+| XSS nel DOM | DOMPurify su tutti gli input/output |
+| Dati in clipboard | Auto-clear dopo 30 secondi |
+| Sessione lasciata aperta | Auto-lock per inattività + background timeout |
+| HIBP check (leakage password) | k-anonymity — solo prefisso hash inviato |
 
-## 📦 Export/Import
+### Cosa NON è protetto (limitazioni intrinseche)
 
-Il formato di export è:
+| Minaccia | Motivo |
+|---|---|
+| Keylogger hardware/software | Affligge tutti i password manager incluso Bitwarden |
+| RAM dump (sessione sbloccata) | La DEK è in memoria durante l'uso — limitazione della piattaforma JS |
+| Attaccante con DevTools e pazienza | Può cancellare localStorage per bypassare rate limit |
+| Modalità privata del browser | Storage separato — rate limit non persiste tra sessioni private |
 
-```json
-{
-  "version": 1,
-  "exportDate": "2025-02-05T...",
-  "crypto": {
-    "salt": "...",
-    "encryptedDEK": "...",
-    "iv": "..."
-  },
-  "profiles": [
-    {
-      "iv": "...",
-      "data": "...",
-      "category": "WEB"
-    }
-  ]
-}
-```
+---
 
-**Su altro device:**
-1. Importa il file JSON
-2. Inserisci la stessa password
-3. Il sistema ricrea KEK → sblocca DEK → tutto funziona
+## Stack Tecnologico
 
-## 🏗️ Stack Tecnologico
+| Layer | Tecnologia |
+|---|---|
+| UI | React 18 + Vite |
+| Styling | Tailwind CSS (dark theme) |
+| Routing | React Router v6 |
+| Database locale | Dexie.js (IndexedDB) |
+| KDF | hash-wasm — PBKDF2-SHA512 (WebCrypto nativo non supporta SHA-512) |
+| Cifratura | Web Crypto API — AES-256-GCM |
+| Integrità | Web Crypto API — HMAC-SHA256 |
+| Key derivation | Web Crypto API — HKDF-SHA256 |
+| Autenticazione biometrica | WebAuthn (Platform Authenticator) |
+| XSS protection | DOMPurify |
+| PWA | Vite PWA Plugin + Service Worker |
+| Sync cloud | Google Drive API v3 |
+| Password health | HaveIBeenPwned API (k-anonymity) |
+| Internazionalizzazione | i18next |
 
-- **React 18** - UI
-- **Vite** - Build tool
-- **Tailwind CSS** - Styling
-- **React Router** - Navigation
-- **Dexie.js** - IndexedDB wrapper
-- **hash-wasm** - PBKDF2 veloce
-- **Web Crypto API** - AES-GCM nativo
-- **Vite PWA Plugin** - Service worker
+---
 
 ## 🔧 Prossimi Step
 
@@ -231,73 +184,176 @@ Funzionalità da implementare:
 - [x] Multi-lingua
 - [ ] Logging centralizzato
 
+## Struttura del Progetto
 
-
-## 🐛 Debug
-
-### IndexedDB
-
-Chrome DevTools → Application → IndexedDB → SafeProfilesDB
-
-Vedrai:
-- `config` table: configurazione crypto
-- `profiles` table: profili cifrati
-
-### Crypto in RAM
-
-```javascript
-// Console del browser
-cryptoService.isUnlocked  // true/false
-cryptoService.dek         // Uint8Array o null
 ```
-
-## 📝 Note per lo Sviluppo
-
-1. **Non usare asimmetrico**: per questo caso d'uso è overkill
-2. **IV sempre random**: mai riusare
-3. **GCM sempre**: CBC è obsoleto per nuovi progetti
-4. **PBKDF2 o Argon2**: mai password → chiave diretta
-5. **Salt sempre random**: mai fisso
-6. **600k+ iterazioni**: bilanciare sicurezza/UX
-
-## 🤝 Differenze con Xamarin
-
-| Feature | Xamarin | PWA |
-|---------|---------|-----|
-| Platform | Android/iOS | Web (qualsiasi OS) |
-| Database | SQLite | IndexedDB |
-| Crypto | System.Security | Web Crypto API |
-| AES mode | CBC (inferito) | GCM |
-| KDF | PBKDF2 (300 iter) | PBKDF2 (600k iter) |
-| IV | Fisso | Random |
-| Autenticazione | ❌ | ✅ (GCM) |
-
-## ⚡ Performance
-
-- **PBKDF2**: ~500ms su device medio (600k iterazioni)
-- **Encrypt**: ~1-2ms per profilo
-- **Decrypt**: ~1-2ms per profilo
-- **IndexedDB**: async, non blocca UI
-
-## 📱 PWA Features
-
-- ✅ Installabile (Add to Home Screen)
-- ✅ Offline-first (Service Worker)
-- ✅ Responsive (mobile + desktop)
-- ✅ Fast (Vite + lazy loading)
-
-## 🔒 Privacy
-
-- ✅ Zero telemetria
-- ✅ Nessun server
-- ✅ Nessuna terza parte
-- ✅ Tutto locale (device)
-- ✅ Open source
-
-## 📄 Licenza
-
-MIT - Usa pure come vuoi
+src/
+├── App.jsx                        # Router + Auth guard
+├── main.jsx                       # Entry point PWA
+├── index.css                      # Tailwind + glass effects
+│
+├── layouts/
+│   └── AppLayout.jsx              # Sidebar + layout wrapper
+│
+├── contexts/
+│   └── AuthContext.jsx            # Stato globale auth + biometria
+│
+├── pages/
+│   ├── LoginPage.jsx              # Unlock con password (+ 2FA biometrico)
+│   ├── SignUpPage.jsx             # Setup master password (prima volta)
+│   ├── MainPage.jsx               # Vault — lista profili con ricerca/ordinamento
+│   ├── ProfileDetailPage.jsx      # Visualizzazione profilo + OTP
+│   ├── ProfileFormPage.jsx        # Creazione / modifica profilo
+│   ├── PasswordGeneratorPage.jsx  # Generatore password e passphrase
+│   ├── PasswordHealthPage.jsx     # Analisi sicurezza password
+│   ├── SettingsPage.jsx           # Impostazioni (biometria, sync, auto-lock)
+│   └── ImportPage.jsx             # Import da database legacy
+│
+├── components/
+│   ├── Sidebar.jsx                # Navigazione desktop + mobile bottom nav
+│   ├── IconRenderer.jsx           # Icone brand dinamiche
+│   ├── IconPicker.jsx             # Selettore icona profilo
+│   ├── OTPDisplay.jsx             # Display TOTP con countdown
+│   ├── QRScanner.jsx              # Scanner QR per setup 2FA
+│   ├── BiometricSetupDialog.jsx   # Dialog abilitazione biometria
+│   ├── BiometricSettingsSection.jsx # Gestione biometria nelle impostazioni
+│   ├── IntegrityWarningBanner.jsx # Avviso tampering database
+│   ├── LanguageSelector.jsx       # Cambio lingua
+│   ├── SyncConflictDialog.jsx     # Risoluzione conflitti sync
+│   └── UpdateAvailableDialog.jsx  # Notifica aggiornamento PWA
+│
+├── services/
+│   ├── cryptoService.js           # PBKDF2, AES-GCM, HKDF, HMAC
+│   ├── databaseService.js         # IndexedDB (Dexie), export/import
+│   ├── biometricService.js        # WebAuthn registration + assertion
+│   ├── googledriveService.js      # OAuth2 + Drive API
+│   ├── syncService.js             # Logica sync + conflict resolution
+│   ├── hibpService.js             # HaveIBeenPwned k-anonymity
+│   ├── securityUtils.js           # RateLimiter, AutoLockTimer, DOMPurify
+│   └── legacyImportService.js     # Import da database SQLite legacy
+│
+├── icons/
+│   └── brandIcons.js              # Mapping servizi → icone brand
+│
+└── i18n/
+    ├── config.js
+    └── locales/                   # Traduzioni (it, en, ...)
+```
 
 ---
 
-**Made with ❤️ by Claude & You**
+## Setup e Sviluppo
+
+```bash
+# Installa dipendenze
+npm install
+
+# Avvia in dev (hot reload)
+npm run dev
+
+# Build produzione
+npm run build
+
+# Preview build produzione
+npm run preview
+```
+
+### Variabili d'ambiente (opzionali — solo per sync Google Drive)
+
+```env
+VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+VITE_GOOGLE_API_KEY=your-api-key
+```
+
+---
+
+## Flusso di Autenticazione
+
+### Prima volta
+
+```
+Utente sceglie master password
+   → genera salt 256-bit random
+   → genera DEK 256-bit random
+   → PBKDF2-SHA512(password, salt, 600k) → KEK
+   → AES-GCM(KEK, DEK) → encryptedDEK salvato in IndexedDB
+   → HKDF(DEK) → IntegrityKey
+   → HMAC(IntegrityKey, DB state) → salvato in IndexedDB
+   → (opzionale) WebAuthn registration → credentialId salvato in IndexedDB
+```
+
+### Login
+
+```
+Utente inserisce master password
+   → PBKDF2-SHA512(password, salt, 600k) → KEK
+   → AES-GCM-decrypt(KEK, encryptedDEK) → DEK in RAM
+   → [se biometria abilitata] WebAuthn assertion → conferma presenza
+   → HMAC verify → controlla integrità DB
+   → isUnlocked = true
+```
+
+### Lock (auto o manuale)
+
+```
+DEK.fill(0) → DEK = null   (zeroing esplicito prima del GC)
+integrityKey = null
+isUnlocked = false
+```
+
+---
+
+## Export / Import
+
+```json
+{
+  "version": 1,
+  "exportDate": "2025-01-01T00:00:00.000Z",
+  "crypto": {
+    "kdf": "PBKDF2",
+    "iterations": 600000,
+    "salt": "<base64>",
+    "iv": "<base64>",
+    "encryptedDEK": "<base64>"
+  },
+  "profiles": [
+    {
+      "iv": "<base64>",
+      "data": "<base64 ciphertext>",
+      "category": "WEB"
+    }
+  ]
+}
+```
+
+Il file è portabile: funziona su qualsiasi device che abbia l'app e la stessa master password. L'import valida rigorosamente la struttura prima di sovrascrivere il database.
+
+---
+
+## Miglioramenti rispetto all'app Xamarin originale
+
+| Aspetto | Xamarin | PWA |
+|---|---|---|
+| Password usata come chiave | Diretta | PBKDF2 600k iterazioni |
+| IV | Fisso | Random per ogni record |
+| AES mode | CBC | GCM (autenticato) |
+| Salt | Fisso | Random 256-bit |
+| Integrità dati | Nessuna | HMAC-SHA256 anti-tampering |
+| Biometria | N/A | WebAuthn 2FA locale |
+| Rate limiting | Nessuno | 5 tentativi / 5 min, persistente |
+| Auto-lock | Nessuno | Timer configurabile + background |
+| XSS protection | N/A (nativo) | DOMPurify |
+| Password health | Nessuna | HIBP k-anonymity |
+| Backup | Manuale | Google Drive automatico |
+| Platform | Android/iOS | Web (qualsiasi OS/device) |
+
+---
+
+## PWA Features
+
+- Installabile (Add to Home Screen) su Android, iOS, Windows, macOS
+- Offline-first con Service Worker
+- Responsive: layout desktop con sidebar, mobile con bottom nav
+- Auto-aggiornamento con notifica
+
+---

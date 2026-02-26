@@ -162,93 +162,6 @@ export function AuthProvider({ children }) {
     }
 
     /**
-     * Login con biometria
-     */
-    async function loginWithBiometric() {
-        try {
-            const biometricConfig = await databaseService.getBiometricConfig();
-            if (!biometricConfig) {
-                return { success: false, error: 'Biometric not configured' };
-            }
-
-            securityLog('Biometric login attempt');
-
-            // Autentica con biometria e ottieni la BUK
-            const authResult = await biometricService.authenticateBiometric(biometricConfig);
-
-            if (!authResult.success) {
-                return { success: false, error: 'Biometric authentication failed' };
-            }
-
-            // La BUK deve corrispondere alla DEK derivata
-            // Dobbiamo ricostruire la DEK usando la BUK come riferimento
-            // In realtà la BUK è derivata dalla DEK, quindi dobbiamo:
-            // 1. Usare la BUK per verificare che corrisponda
-            // 2. Caricare la DEK cifrata e decifrarla usando il KEK derivato dalla password
-
-            // IMPORTANTE: Per il login biometrico, dobbiamo salvare la DEK cifrata
-            // con una chiave derivata dalla BUK stessa durante l'abilitazione
-            // Questo è il passo mancante - lo implementeremo nella funzione di abilitazione
-
-            // Per ora, verifichiamo che la biometria funzioni e decifriamo la DEK
-            const cryptoConfig = await databaseService.getCryptoConfig();
-
-            // Recuperiamo la DEK cifrata con la BUK
-            if (!biometricConfig.encryptedDEK || !biometricConfig.dekIV) {
-                return { success: false, error: 'Invalid biometric configuration' };
-            }
-
-            // Importa la BUK come chiave AES
-            const bukKey = await crypto.subtle.importKey(
-                'raw',
-                authResult.biometricUnlockKey,
-                { name: 'AES-GCM' },
-                false,
-                ['decrypt']
-            );
-
-            // Decifra la DEK
-            const encryptedDEK = biometricService.base64ToArrayBuffer(biometricConfig.encryptedDEK);
-            const dekIV = biometricService.base64ToArrayBuffer(biometricConfig.dekIV);
-
-            const dekBytes = await crypto.subtle.decrypt(
-                { name: 'AES-GCM', iv: dekIV },
-                bukKey,
-                encryptedDEK
-            );
-
-            // Imposta la DEK nel cryptoService
-            cryptoService.dek = new Uint8Array(dekBytes);
-            cryptoService.integrityKey = await cryptoService.deriveIntegrityKey(cryptoService.dek);
-            cryptoService.isUnlocked = true;
-
-            securityLog('Biometric login successful');
-
-            // Verifica integrità
-            const integrityResult = await verifyDatabaseIntegrity();
-
-            if (!integrityResult.valid && !integrityResult.firstRun) {
-                securityLog('INTEGRITY VIOLATION DETECTED', {
-                    reason: integrityResult.reason
-                });
-                setIntegrityError(integrityResult.reason);
-            }
-
-            if (integrityResult.firstRun) {
-                await refreshHMAC();
-                securityLog('HMAC generated on first run after update');
-            }
-
-            setIsUnlocked(true);
-            return { success: true, integrityWarning: integrityResult.valid ? null : integrityResult.reason };
-        } catch (error) {
-            securityLog('Biometric login error', { error: error.message });
-            console.error('Biometric login error:', error);
-            return { success: false, error: error.message };
-        }
-    }
-
-    /**
      * Setup: prima volta, crea password master
      */
     async function setupMasterPassword(password) {
@@ -301,6 +214,30 @@ export function AuthProvider({ children }) {
             if (unlocked) {
                 rateLimiter.current.reset();
                 securityLog('Login successful');
+
+                // ===== GATE BIOMETRICO (2FA locale) =====
+                // La biometria non recupera chiavi: verifica solo che l'utente
+                // sia fisicamente presente sul device. La DEK è già in memoria.
+                if (biometricEnabled) {
+                    try {
+                        const biometricConfig = await databaseService.getBiometricConfig();
+                        const authResult = await biometricService.authenticateBiometric(biometricConfig);
+
+                        if (!authResult.success) {
+                            cryptoService.lock();
+                            return { success: false, error: 'Biometric authentication failed' };
+                        }
+
+                        securityLog('Biometric 2FA passed');
+                    } catch (bioError) {
+                        cryptoService.lock();
+                        const isCancelled = bioError.message.includes('cancelled') || bioError.message.includes('denied');
+                        return {
+                            success: false,
+                            error: isCancelled ? 'Biometric cancelled' : bioError.message
+                        };
+                    }
+                }
 
                 // ===== VERIFICA INTEGRITÀ =====
                 const integrityResult = await verifyDatabaseIntegrity();
@@ -410,11 +347,11 @@ export function AuthProvider({ children }) {
     }
 
     /**
-     * Abilita autenticazione biometrica
-     * Deve essere chiamata quando il sistema è sbloccato (DEK disponibile)
+     * Abilita autenticazione biometrica come secondo fattore (2FA locale).
+     * Registra la credenziale WebAuthn sul device — nessuna chiave viene salvata.
      */
     async function enableBiometric() {
-        if (!cryptoService.isUnlocked || !cryptoService.dek) {
+        if (!cryptoService.isUnlocked) {
             return { success: false, error: 'System must be unlocked first' };
         }
 
@@ -425,40 +362,14 @@ export function AuthProvider({ children }) {
         try {
             securityLog('Enabling biometric authentication');
 
-            // 1. Registra credenziali WebAuthn e ottieni la configurazione base
-            const biometricConfig = await biometricService.registerBiometric(cryptoService.dek);
+            // Registra la credenziale WebAuthn — salva solo credentialId, nessuna chiave
+            const biometricConfig = await biometricService.registerBiometric();
 
-            // 2. Cifra la DEK con la BUK per il login futuro
-            // Deriva la BUK dalla DEK
-            const buk = await biometricService.deriveBiometricUnlockKey(cryptoService.dek);
-
-            // Esporta la DEK
-            const dekRaw = cryptoService.dek;
-
-            // Genera IV per cifrare la DEK
-            const dekIV = new Uint8Array(12);
-            crypto.getRandomValues(dekIV);
-
-            // Cifra la DEK con la BUK
-            const encryptedDEK = await crypto.subtle.encrypt(
-                { name: 'AES-GCM', iv: dekIV },
-                buk,
-                dekRaw
-            );
-
-            // 3. Salva la configurazione completa
-            const completeBiometricConfig = {
-                ...biometricConfig,
-                encryptedDEK: biometricService.arrayBufferToBase64(encryptedDEK),
-                dekIV: biometricService.arrayBufferToBase64(dekIV)
-            };
-
-            await databaseService.saveBiometricConfig(completeBiometricConfig);
+            await databaseService.saveBiometricConfig(biometricConfig);
             setBiometricEnabled(true);
             setShowBiometricSetup(false);
 
             securityLog('Biometric authentication enabled');
-
             return { success: true };
         } catch (error) {
             securityLog('Failed to enable biometric', { error: error.message });
@@ -501,7 +412,6 @@ export function AuthProvider({ children }) {
         setAutoLockTimeout,
         setupMasterPassword,
         login,
-        loginWithBiometric,
         logout,
         resetAll,
         checkUserExists,

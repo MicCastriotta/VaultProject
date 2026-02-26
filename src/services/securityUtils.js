@@ -183,24 +183,53 @@ export async function secureCopyToClipboard(text, clearAfterMs = 30000) {
 /**
  * Rate limiter per prevenire brute-force
  */
+// Chiave localStorage per persistenza rate limiting (offuscata)
+const RL_STORAGE_KEY = '_sp_sec_rl';
+
 export class RateLimiter {
     constructor(maxAttempts = 5, windowMs = 300000) { // 5 tentativi in 5 minuti
         this.maxAttempts = maxAttempts;
         this.windowMs = windowMs;
-        this.attempts = [];
+        // Carica tentativi precedenti da localStorage (sopravvive ai reload)
+        this.attempts = this._load();
     }
 
     /**
-     * Registra un tentativo
+     * Carica tentativi persistiti, scartando quelli scaduti
+     */
+    _load() {
+        try {
+            const stored = localStorage.getItem(RL_STORAGE_KEY);
+            if (!stored) return [];
+            const parsed = JSON.parse(stored);
+            if (!Array.isArray(parsed)) return [];
+            const now = Date.now();
+            // Filtra solo timestamp validi e non scaduti
+            return parsed.filter(t => typeof t === 'number' && t > 0 && now - t < this.windowMs);
+        } catch {
+            return [];
+        }
+    }
+
+    /**
+     * Persiste lo stato corrente in localStorage
+     */
+    _save() {
+        try {
+            localStorage.setItem(RL_STORAGE_KEY, JSON.stringify(this.attempts));
+        } catch {
+            // localStorage non disponibile (es. Safari private mode) — degrada silenziosamente
+        }
+    }
+
+    /**
+     * Registra un tentativo fallito e lo persiste
      */
     recordAttempt() {
         const now = Date.now();
-
-        // Rimuovi tentativi vecchi
         this.attempts = this.attempts.filter(time => now - time < this.windowMs);
-
-        // Aggiungi nuovo tentativo
         this.attempts.push(now);
+        this._save();
     }
 
     /**
@@ -208,10 +237,7 @@ export class RateLimiter {
      */
     canAttempt() {
         const now = Date.now();
-
-        // Rimuovi tentativi vecchi
         this.attempts = this.attempts.filter(time => now - time < this.windowMs);
-
         return this.attempts.length < this.maxAttempts;
     }
 
@@ -229,10 +255,13 @@ export class RateLimiter {
     }
 
     /**
-     * Reset manuale (per test o dopo successo)
+     * Reset dopo login riuscito — rimuove anche la persistenza
      */
     reset() {
         this.attempts = [];
+        try {
+            localStorage.removeItem(RL_STORAGE_KEY);
+        } catch { /* ignore */ }
     }
 }
 
