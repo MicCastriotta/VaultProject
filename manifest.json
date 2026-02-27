@@ -1,7 +1,7 @@
 {
-  "name": "SafeProfiles App",
-  "short_name": "SfPApp",
-  "description": "Una Progressive Web App creata con React",
+  "name": "OwnVault",
+  "short_name": "OwnVault",
+  "description": "OwnVault. Your Keys. Your Control",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

@@ -1,4 +1,4 @@
-# SafeProfiles PWA
+# OwnVault
 
 Password manager locale offline-first, con architettura crittografica a doppia chiave ispirata a Bitwarden/1Password. Porting PWA dell'app Xamarin SafeProfiles con sicurezza significativamente migliorata.
 
@@ -89,7 +89,7 @@ WebAuthn è un **gate di accesso UI** (2FA locale), non un meccanismo crittograf
 ### Integrità database (anti-tampering)
 
 ```
-DEK → HKDF → IntegrityKey (domain: "SafeProfiles-Integrity-v1")
+DEK → HKDF → IntegrityKey (domain: "OwnVault-Integrity-v1")
                   ↓
          HMAC-SHA256(cryptoConfig + profili ordinati per ID + conteggio)
                   ↓

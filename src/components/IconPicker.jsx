@@ -10,7 +10,7 @@
  * - Privacy-first (offline, no tracking)
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, X } from 'lucide-react';
 import { getBrandIcons, FALLBACK_ICONS, suggestIconFromTitle } from '../icons/brandIcons';
 import './IconPicker.css';
@@ -23,16 +23,23 @@ export function IconPicker({
 }) {
     const [query, setQuery] = useState('');
     const [showFallbacks, setShowFallbacks] = useState(false);
+    const [allIcons, setAllIcons] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [suggestedIcon, setSuggestedIcon] = useState(null);
 
-    // Pre-indicizza il catalogo in useMemo
-    const allIcons = useMemo(() => getBrandIcons(), []);
+    // Carica il catalogo icone in modo lazy (dynamic import)
+    useEffect(() => {
+        getBrandIcons().then(icons => {
+            setAllIcons(icons);
+            setIsLoading(false);
+        });
+    }, []);
 
     // Auto-suggest dall'URL/titolo
-    const suggestedIcon = useMemo(() => {
+    useEffect(() => {
         if (suggestFromTitle) {
-            return suggestIconFromTitle(suggestFromTitle);
+            suggestIconFromTitle(suggestFromTitle).then(setSuggestedIcon);
         }
-        return null;
     }, [suggestFromTitle]);
 
     // Ricerca live con debounce implicito (useMemo)
@@ -121,7 +128,9 @@ export function IconPicker({
 
             {/* Results Grid */}
             <div className="icon-picker__grid">
-                {searchResults.length > 0 ? (
+                {isLoading ? (
+                    <div className="icon-picker__no-results">Caricamento icone...</div>
+                ) : searchResults.length > 0 ? (
                     searchResults.map(icon => (
                         <button
                             key={icon.slug}

@@ -1,9 +1,13 @@
-﻿/**
+/**
  * IconRenderer Component
  * Renderizza un'icona brand da uno slug salvato
  * Con fallback e colore brand automatico
+ *
+ * Le icone vengono caricate in modo lazy (dynamic import di simple-icons)
+ * per evitare di appesantire il bundle principale.
  */
 
+import { useState, useEffect } from 'react';
 import { getIconBySlug, FALLBACK_ICONS } from '../icons/brandIcons';
 
 /**
@@ -11,7 +15,8 @@ import { getIconBySlug, FALLBACK_ICONS } from '../icons/brandIcons';
  * @param {string} slug - Icon slug (e.g., 'spotify')
  * @param {number} size - Dimensione in pixel (default 24)
  * @param {string} className - CSS classes aggiuntive
- * @returns {JSX} SVG element o fallback
+ * @param {string} fallback - Slug fallback icon
+ * @param {boolean} useHex - Usa il colore brand come fill
  */
 export function IconRenderer({
     slug,
@@ -20,48 +25,52 @@ export function IconRenderer({
     fallback = 'generic',
     useHex = false
 }) {
-      
-    let icon = getIconBySlug(slug);
-    
-    if (!icon && slug && FALLBACK_ICONS[slug]) {
-        icon = FALLBACK_ICONS[slug];
-    }
+    const [icon, setIcon] = useState(null);
 
-    if (!icon) {
-        icon = FALLBACK_ICONS[fallback] || FALLBACK_ICONS.generic;
-    }
+    useEffect(() => {
+        if (!slug) {
+            setIcon(null);
+            return;
+        }
+
+        getIconBySlug(slug).then(found => {
+            setIcon(found || FALLBACK_ICONS[slug] || null);
+        });
+    }, [slug]);
+
+    const displayIcon = icon || FALLBACK_ICONS[fallback] || FALLBACK_ICONS.generic;
 
     return (
         <svg
             viewBox="0 0 24 24"
-            dangerouslySetInnerHTML={{ __html: icon.svg }}
+            dangerouslySetInnerHTML={{ __html: displayIcon.svg }}
             className={className}
             style={{
                 width: size,
                 height: size,
-                fill: useHex && icon.hex ? `#${icon.hex}` : 'currentColor'
+                fill: useHex && displayIcon.hex ? `#${displayIcon.hex}` : 'currentColor'
             }}
-            aria-label={icon.name}
+            aria-label={displayIcon.name}
         />
     );
 }
 
 /**
- * Renderizza il colore brand
+ * Recupera il colore hex di un'icona brand (async)
  * @param {string} slug - Icon slug
- * @returns {string} Hex color (e.g., '#1DB954')
+ * @returns {Promise<string>} Hex color (e.g., '#1DB954')
  */
-export function getIconHex(slug) {
-  const icon = getIconBySlug(slug);
-  return icon ? `#${icon.hex}` : '#6b7280'; // Gray as fallback
+export async function getIconHex(slug) {
+    const icon = await getIconBySlug(slug);
+    return icon ? `#${icon.hex}` : '#6b7280';
 }
 
 /**
- * Renderizza il nome dell'icona
+ * Recupera il nome di un'icona brand (async)
  * @param {string} slug - Icon slug
- * @returns {string} Icon name
+ * @returns {Promise<string>} Icon name
  */
-export function getIconName(slug) {
-  const icon = getIconBySlug(slug);
-  return icon?.name || 'Unknown';
+export async function getIconName(slug) {
+    const icon = await getIconBySlug(slug);
+    return icon?.name || 'Unknown';
 }

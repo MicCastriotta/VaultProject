@@ -6,7 +6,7 @@
 import { googleDriveService } from './googledriveService';
 import { databaseService } from './databaseService';
 
-const SYNC_FILE_NAME = 'safeprofiles-sync.json';
+const SYNC_FILE_NAME = 'ownvault-sync.json';
 const SYNC_DEBOUNCE_MS = 2000; // Aspetta 2s dopo ultima modifica
 
 class SyncService {
@@ -22,10 +22,10 @@ class SyncService {
      * Genera o recupera Device ID univoco
      */
     getOrCreateDeviceId() {
-        let deviceId = localStorage.getItem('safeprofiles_device_id');
+        let deviceId = localStorage.getItem('ownvault_device_id');
         if (!deviceId) {
             deviceId = 'device_' + Math.random().toString(36).substr(2, 9) + Date.now();
-            localStorage.setItem('safeprofiles_device_id', deviceId);
+            localStorage.setItem('ownvault_device_id', deviceId);
         }
         return deviceId;
     }

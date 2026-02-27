@@ -14,7 +14,7 @@ const PBKDF2_ITERATIONS = 600000;
 const KEY_LENGTH = 32; // 256 bit
 const IV_LENGTH = 12; // 96 bit per GCM
 const SALT_LENGTH = 32; // 256 bit
-const HMAC_CONTEXT = 'SafeProfiles-Integrity-v1'; // Domain separation per HKDF
+const HMAC_CONTEXT = 'OwnVault-Integrity-v1'; // Domain separation per HKDF
 
 class CryptoService {
     constructor() {

@@ -72,7 +72,7 @@ export function BiometricSetupDialog({ onEnable, onSkip, showSkip = true }) {
                 <div className="p-6 space-y-4">
                     <div className="space-y-3">
                         <p className="text-gray-700 leading-relaxed">
-                            Add biometric verification as a second factor when unlocking SafeProfiles.
+                            Add biometric verification as a second factor when unlocking OwnVault.
                         </p>
 
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
