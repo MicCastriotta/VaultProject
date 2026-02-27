@@ -18,10 +18,10 @@
  * - Nessuna chiave salvata in chiaro o cifrata nel DB
  */
 
-const RP_NAME = 'SafeProfiles';
+const RP_NAME = 'OwnVault';
 const RP_ID = window.location.hostname;
-const USER_ID = 'safeprofiles-user';
-const USER_NAME = 'SafeProfiles User';
+const USER_ID = 'ownvault-user';
+const USER_NAME = 'OwnVault User';
 
 class BiometricService {
     constructor() {

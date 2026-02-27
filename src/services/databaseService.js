@@ -8,9 +8,9 @@
 
 import Dexie from 'dexie';
 
-class SafeProfilesDB extends Dexie {
+class OwnVaultDB extends Dexie {
     constructor() {
-        super('SafeProfilesDB');
+        super('OwnVaultDB');
 
         this.version(1).stores({
             config: 'id',
@@ -29,7 +29,7 @@ class SafeProfilesDB extends Dexie {
     }
 }
 
-export const db = new SafeProfilesDB();
+export const db = new OwnVaultDB();
 
 /**
  * Service per operazioni DB

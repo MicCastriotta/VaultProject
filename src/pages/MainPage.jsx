@@ -2,10 +2,10 @@
 import { useNavigate } from 'react-router-dom';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
-import { AppLayout } from '../layouts/AppLayout';
 import { Plus, Search, ArrowUpDown, User, CreditCard, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { IconRenderer, getIconHex } from '../components/IconRenderer';
+import { IconRenderer } from '../components/IconRenderer';
+import { getIconBySlug } from '../icons/brandIcons';
 
 const SORT_OPTIONS = {
     ALPHA_ASC: 'alpha_asc',
@@ -27,7 +27,24 @@ export function MainPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [showSortMenu, setShowSortMenu] = useState(false);
+    const [iconColors, setIconColors] = useState({});
     const { logout } = useAuth();
+
+    // Carica i colori hex brand in modo lazy, solo per gli slug presenti
+    useEffect(() => {
+        const slugs = [...new Set(
+            decryptedProfiles.filter(p => p.icon).map(p => p.icon)
+        )];
+        if (slugs.length === 0) return;
+
+        Promise.all(slugs.map(async slug => {
+            const icon = await getIconBySlug(slug);
+            return icon ? [slug, `#${icon.hex}`] : null;
+        })).then(entries => {
+            const colors = Object.fromEntries(entries.filter(Boolean));
+            setIconColors(colors);
+        });
+    }, [decryptedProfiles]);
 
     const [sortBy, setSortBy] = useState(() => {
         return localStorage.getItem('profileSortOrder') || SORT_OPTIONS.ALPHA_ASC;
@@ -137,8 +154,7 @@ export function MainPage() {
     });
 
     return (
-        <AppLayout>
-            <div className="p-6 h-full flex flex-col">
+        <div className="p-6 h-full flex flex-col">
 
                 {/* Header */}
                 <div className="flex justify-between items-center mb-6 relative">
@@ -233,9 +249,9 @@ export function MainPage() {
                                                             <div 
                                                                 className="w-10 h-10 flex items-center justify-center rounded-lg"
                                                                 style={{
-                                                                    backgroundColor: profile.icon 
-                                                                        ? `${getIconHex(profile.icon)}20`
-                                                                        : 'rgb(59, 130, 246) / 0.1)'
+                                                                    backgroundColor: iconColors[profile.icon]
+                                                                        ? `${iconColors[profile.icon]}20`
+                                                                        : 'rgba(59, 130, 246, 0.1)'
                                                                 }}
                                                             >
                                                                 {profile.icon && profile.category === 'WEB' ? (
@@ -283,6 +299,5 @@ export function MainPage() {
                 </button>
 
             </div>
-        </AppLayout>
     );
 }

@@ -21,7 +21,7 @@ export function OTPDisplay({ secret, title = 'OTP Code' }) {
         // Tenta di generare il codice OTP
         try {
             const totp = new OTPAuth.TOTP({
-                issuer: 'SafeProfiles',
+                issuer: 'OwnVault',
                 label: title,
                 algorithm: 'SHA1',
                 digits: 6,

@@ -2,7 +2,7 @@
  * Password Health Page
  * Analizza tutti i profili WEB e rileva:
  * - Password compromesse (via HaveIBeenPwned k-anonymity API)
- * - Password duplicate (usate su più account)
+ * - Password duplicate (usate su piÃ¹ account)
  * - Password deboli (corte o semplici)
  */
 
@@ -82,7 +82,7 @@ export function PasswordHealthPage() {
 
     /**
      * Carica profili, decifra, e analizza localmente (duplicati + deboli).
-     * Il check HIBP viene fatto separatamente perché richiede rete.
+     * Il check HIBP viene fatto separatamente perchÃ© richiede rete.
      */
     async function loadAndAnalyze() {
         setIsLoading(true);
@@ -178,7 +178,7 @@ export function PasswordHealthPage() {
                 }
             });
 
-            // Ordina per gravità (più esposizioni prima)
+            // Ordina per gravitÃ  (piÃ¹ esposizioni prima)
             pwnedProfiles.sort((a, b) => b.breachCount - a.breachCount);
             setCompromised(pwnedProfiles);
 
@@ -221,19 +221,11 @@ export function PasswordHealthPage() {
     }
 
     function getScoreColor(score) {
-        if (score === null) return 'text-gray-400';
+        if (score === null) return 'text-slate-400';
         if (score >= 80) return 'text-green-500';
         if (score >= 60) return 'text-yellow-500';
         if (score >= 40) return 'text-orange-500';
         return 'text-red-500';
-    }
-
-    function getScoreBg(score) {
-        if (score === null) return 'bg-gray-200';
-        if (score >= 80) return 'bg-green-500';
-        if (score >= 60) return 'bg-yellow-500';
-        if (score >= 40) return 'bg-orange-500';
-        return 'bg-red-500';
     }
 
     function getScoreLabel(score) {
@@ -252,221 +244,236 @@ export function PasswordHealthPage() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-gray-50">
-                <div className="bg-primary text-white px-4 py-4 flex items-center gap-3">
-                    <button onClick={() => navigate(-1)} className="p-2 hover:bg-primary-dark rounded-lg transition-colors">
-                        <ArrowLeft size={24} />
-                    </button>
-                    <h1 className="text-xl font-bold">Password Health</h1>
-                </div>
-                <div className="flex items-center justify-center py-20">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                        <p className="text-gray-500">Analyzing passwords...</p>
+            <div className="h-full flex flex-col">
+                    <div className="max-w-2xl mx-auto w-full flex flex-col flex-1 min-h-0 p-6">
+                        <div className="flex items-center gap-3 mb-6">
+                            <button
+                                onClick={() => navigate(-1)}
+                                className="p-2 text-gray-400 hover:bg-slate-700 rounded-lg transition-colors"
+                            >
+                                <ArrowLeft size={24} />
+                            </button>
+                            <h1 className="text-2xl font-bold text-white">Password Health</h1>
+                        </div>
+                        <div className="flex-1 flex items-center justify-center">
+                            <div className="text-center">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto mb-4"></div>
+                                <p className="text-slate-400">Analyzing passwords...</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* Header */}
-            <div className="bg-primary text-white px-4 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <button onClick={() => navigate(-1)} className="p-2 hover:bg-primary-dark rounded-lg transition-colors">
-                        <ArrowLeft size={24} />
-                    </button>
-                    <h1 className="text-xl font-bold">Password Health</h1>
-                </div>
-                {!isChecking && profiles.length > 0 && isOnline && (
-                    <button
-                        onClick={() => runHIBPCheck()}
-                        className="p-2 hover:bg-primary-dark rounded-lg transition-colors"
-                        title="Re-check"
-                    >
-                        <RefreshCw size={20} />
-                    </button>
-                )}
-            </div>
+        <div className="h-full flex flex-col">
+                <div className="max-w-2xl mx-auto w-full flex flex-col flex-1 min-h-0 p-6">
 
-            <div className="p-4 space-y-4 max-w-2xl mx-auto pb-20">
-
-                {/* No profiles */}
-                {profiles.length === 0 && (
-                    <div className="text-center py-12">
-                        <Shield size={48} className="mx-auto text-gray-300 mb-4" />
-                        <p className="text-gray-500">No web accounts with passwords to analyze.</p>
+                    {/* Header - fisso */}
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => navigate(-1)}
+                                className="p-2 text-gray-400 hover:bg-slate-700 rounded-lg transition-colors"
+                            >
+                                <ArrowLeft size={24} />
+                            </button>
+                            <h1 className="text-2xl font-bold text-white">Password Health</h1>
+                        </div>
+                        {!isChecking && profiles.length > 0 && isOnline && (
+                            <button
+                                onClick={() => runHIBPCheck()}
+                                className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+                                title="Re-check"
+                            >
+                                <RefreshCw size={20} />
+                            </button>
+                        )}
                     </div>
-                )}
 
-                {profiles.length > 0 && (
-                    <>
-                        {/* Health Score */}
-                        <div className="bg-white rounded-lg p-6 text-center">
-                            <div className="relative w-32 h-32 mx-auto mb-4">
-                                {/* Circular progress */}
-                                <svg className="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
-                                    <circle cx="60" cy="60" r="52" fill="none" stroke="#e5e7eb" strokeWidth="8" />
-                                    <circle
-                                        cx="60" cy="60" r="52" fill="none"
-                                        stroke={healthScore >= 80 ? '#22c55e' : healthScore >= 60 ? '#eab308' : healthScore >= 40 ? '#f97316' : '#ef4444'}
-                                        strokeWidth="8"
-                                        strokeLinecap="round"
-                                        strokeDasharray={`${(healthScore || 0) * 3.267} 326.7`}
-                                        className="transition-all duration-1000"
-                                    />
-                                </svg>
-                                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span className={`text-3xl font-bold ${getScoreColor(healthScore)}`}>
-                                        {healthScore !== null ? healthScore : '—'}
-                                    </span>
-                                    <span className="text-xs text-gray-400">/ 100</span>
+                    {/* Contenuto - scorrevole */}
+                    <div className="flex-1 overflow-y-auto">
+                        <div className="space-y-4 pb-6">
+
+                            {/* No profiles */}
+                            {profiles.length === 0 && (
+                                <div className="text-center py-12">
+                                    <Shield size={48} className="mx-auto text-slate-600 mb-4" />
+                                    <p className="text-slate-400">No web accounts with passwords to analyze.</p>
                                 </div>
-                            </div>
-                            <p className={`font-semibold ${getScoreColor(healthScore)}`}>
-                                {getScoreLabel(healthScore)}
-                            </p>
-                            <p className="text-sm text-gray-500 mt-1">
-                                {profiles.length} account{profiles.length !== 1 ? 's' : ''} analyzed
-                                {totalIssues > 0 && ` · ${totalIssues} issue${totalIssues !== 1 ? 's' : ''} found`}
-                            </p>
+                            )}
+
+                            {profiles.length > 0 && (
+                                <>
+                                    {/* Health Score */}
+                                    <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 text-center">
+                                        <div className="relative w-32 h-32 mx-auto mb-4">
+                                            <svg className="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
+                                                <circle cx="60" cy="60" r="52" fill="none" stroke="#334155" strokeWidth="8" />
+                                                <circle
+                                                    cx="60" cy="60" r="52" fill="none"
+                                                    stroke={healthScore >= 80 ? '#22c55e' : healthScore >= 60 ? '#eab308' : healthScore >= 40 ? '#f97316' : '#ef4444'}
+                                                    strokeWidth="8"
+                                                    strokeLinecap="round"
+                                                    strokeDasharray={`${(healthScore || 0) * 3.267} 326.7`}
+                                                    className="transition-all duration-1000"
+                                                />
+                                            </svg>
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                <span className={`text-3xl font-bold ${getScoreColor(healthScore)}`}>
+                                                    {healthScore !== null ? healthScore : 'â€“'}
+                                                </span>
+                                                <span className="text-xs text-slate-400">/ 100</span>
+                                            </div>
+                                        </div>
+                                        <p className={`font-semibold ${getScoreColor(healthScore)}`}>
+                                            {getScoreLabel(healthScore)}
+                                        </p>
+                                        <p className="text-sm text-slate-400 mt-1">
+                                            {profiles.length} account{profiles.length !== 1 ? 's' : ''} analyzed
+                                            {totalIssues > 0 && ` Â· ${totalIssues} issue${totalIssues !== 1 ? 's' : ''} found`}
+                                        </p>
+                                    </div>
+
+                                    {/* HIBP progress bar */}
+                                    {isChecking && (
+                                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-sm text-gray-300">Checking breaches...</span>
+                                                <span className="text-sm font-medium text-blue-400">
+                                                    {progress.checked}/{progress.total}
+                                                </span>
+                                            </div>
+                                            <div className="w-full bg-slate-700 rounded-full h-2">
+                                                <div
+                                                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                                    style={{ width: `${progress.total > 0 ? (progress.checked / progress.total) * 100 : 0}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Offline warning */}
+                                    {!isOnline && (
+                                        <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-4 flex items-start gap-3">
+                                            <WifiOff size={20} className="text-yellow-400 flex-shrink-0 mt-0.5" />
+                                            <div>
+                                                <p className="text-sm font-medium text-yellow-300">You're offline</p>
+                                                <p className="text-sm text-yellow-400">
+                                                    Breach check requires an internet connection. Duplicate and weak password analysis is available offline.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* ===== COMPROMISED ===== */}
+                                    <IssueSection
+                                        title="Compromised Passwords"
+                                        icon={<ShieldAlert size={20} />}
+                                        count={compromised.length}
+                                        color="red"
+                                        isExpanded={expandedSection === 'compromised'}
+                                        onToggle={() => toggleSection('compromised')}
+                                        emptyText={isChecking ? 'Checking...' : 'No compromised passwords found'}
+                                    >
+                                        {compromised.map(profile => (
+                                            <ProfileIssueCard
+                                                key={profile.id}
+                                                profile={profile}
+                                                navigate={navigate}
+                                                badge={
+                                                    <span className="text-xs bg-red-900/30 text-red-400 px-2 py-0.5 rounded-full font-medium">
+                                                        Found in {profile.breachCount.toLocaleString()} breach{profile.breachCount !== 1 ? 'es' : ''}
+                                                    </span>
+                                                }
+                                            />
+                                        ))}
+                                    </IssueSection>
+
+                                    {/* ===== DUPLICATES ===== */}
+                                    <IssueSection
+                                        title="Reused Passwords"
+                                        icon={<Copy size={20} />}
+                                        count={duplicates.reduce((s, d) => s + d.count, 0)}
+                                        color="orange"
+                                        isExpanded={expandedSection === 'duplicates'}
+                                        onToggle={() => toggleSection('duplicates')}
+                                        emptyText="No reused passwords"
+                                    >
+                                        {duplicates.map((group, i) => (
+                                            <div key={i} className="space-y-1">
+                                                <p className="text-xs text-orange-400 font-medium px-1 pt-2">
+                                                    Same password used on {group.count} accounts:
+                                                </p>
+                                                {group.profiles.map(profile => (
+                                                    <ProfileIssueCard
+                                                        key={profile.id}
+                                                        profile={profile}
+                                                        navigate={navigate}
+                                                    />
+                                                ))}
+                                            </div>
+                                        ))}
+                                    </IssueSection>
+
+                                    {/* ===== WEAK ===== */}
+                                    <IssueSection
+                                        title="Weak Passwords"
+                                        icon={<AlertTriangle size={20} />}
+                                        count={weakPasswords.length}
+                                        color="yellow"
+                                        isExpanded={expandedSection === 'weak'}
+                                        onToggle={() => toggleSection('weak')}
+                                        emptyText="No weak passwords"
+                                    >
+                                        {weakPasswords.map(profile => (
+                                            <ProfileIssueCard
+                                                key={profile.id}
+                                                profile={profile}
+                                                navigate={navigate}
+                                                badge={
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${profile.strength.level === 'critical'
+                                                        ? 'bg-red-900/30 text-red-400'
+                                                        : 'bg-yellow-900/30 text-yellow-400'
+                                                        }`}>
+                                                        {profile.strength.label} Â· {profile.password.length} chars
+                                                    </span>
+                                                }
+                                            />
+                                        ))}
+                                    </IssueSection>
+
+                                    {/* All clear */}
+                                    {!isChecking && totalIssues === 0 && (
+                                        <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-6 text-center">
+                                            <ShieldCheck size={40} className="mx-auto text-green-500 mb-3" />
+                                            <p className="font-semibold text-green-300">All passwords look good!</p>
+                                            <p className="text-sm text-green-400 mt-1">
+                                                No compromised, reused, or weak passwords detected.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Info */}
+                                    <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 flex items-start gap-3">
+                                        <Shield size={20} className="text-blue-400 flex-shrink-0 mt-0.5" />
+                                        <div className="text-sm text-blue-300 space-y-1">
+                                            <p>
+                                                Breach data is checked via <strong>HaveIBeenPwned</strong> using k-anonymity.
+                                                Your passwords are never sent over the network â€” only the first 5 characters
+                                                of the SHA-1 hash are transmitted.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
                         </div>
+                    </div>
 
-                        {/* HIBP progress bar */}
-                        {isChecking && (
-                            <div className="bg-white rounded-lg p-4">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-sm text-gray-600">Checking breaches...</span>
-                                    <span className="text-sm font-medium text-primary">
-                                        {progress.checked}/{progress.total}
-                                    </span>
-                                </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2">
-                                    <div
-                                        className="bg-primary h-2 rounded-full transition-all duration-300"
-                                        style={{ width: `${progress.total > 0 ? (progress.checked / progress.total) * 100 : 0}%` }}
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Offline warning */}
-                        {!isOnline && (
-                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
-                                <WifiOff size={20} className="text-yellow-600 flex-shrink-0 mt-0.5" />
-                                <div>
-                                    <p className="text-sm font-medium text-yellow-800">You're offline</p>
-                                    <p className="text-sm text-yellow-700">
-                                        Breach check requires an internet connection. Duplicate and weak password analysis is available offline.
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ===== COMPROMISED ===== */}
-                        <IssueSection
-                            title="Compromised Passwords"
-                            icon={<ShieldAlert size={20} />}
-                            count={compromised.length}
-                            color="red"
-                            isExpanded={expandedSection === 'compromised'}
-                            onToggle={() => toggleSection('compromised')}
-                            emptyText={isChecking ? 'Checking...' : 'No compromised passwords found'}
-                        >
-                            {compromised.map(profile => (
-                                <ProfileIssueCard
-                                    key={profile.id}
-                                    profile={profile}
-                                    navigate={navigate}
-                                    badge={
-                                        <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
-                                            Found in {profile.breachCount.toLocaleString()} breach{profile.breachCount !== 1 ? 'es' : ''}
-                                        </span>
-                                    }
-                                />
-                            ))}
-                        </IssueSection>
-
-                        {/* ===== DUPLICATES ===== */}
-                        <IssueSection
-                            title="Reused Passwords"
-                            icon={<Copy size={20} />}
-                            count={duplicates.reduce((s, d) => s + d.count, 0)}
-                            color="orange"
-                            isExpanded={expandedSection === 'duplicates'}
-                            onToggle={() => toggleSection('duplicates')}
-                            emptyText="No reused passwords"
-                        >
-                            {duplicates.map((group, i) => (
-                                <div key={i} className="space-y-1">
-                                    <p className="text-xs text-orange-600 font-medium px-1 pt-2">
-                                        Same password used on {group.count} accounts:
-                                    </p>
-                                    {group.profiles.map(profile => (
-                                        <ProfileIssueCard
-                                            key={profile.id}
-                                            profile={profile}
-                                            navigate={navigate}
-                                        />
-                                    ))}
-                                </div>
-                            ))}
-                        </IssueSection>
-
-                        {/* ===== WEAK ===== */}
-                        <IssueSection
-                            title="Weak Passwords"
-                            icon={<AlertTriangle size={20} />}
-                            count={weakPasswords.length}
-                            color="yellow"
-                            isExpanded={expandedSection === 'weak'}
-                            onToggle={() => toggleSection('weak')}
-                            emptyText="No weak passwords"
-                        >
-                            {weakPasswords.map(profile => (
-                                <ProfileIssueCard
-                                    key={profile.id}
-                                    profile={profile}
-                                    navigate={navigate}
-                                    badge={
-                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${profile.strength.level === 'critical'
-                                                ? 'bg-red-100 text-red-700'
-                                                : 'bg-yellow-100 text-yellow-700'
-                                            }`}>
-                                            {profile.strength.label} · {profile.password.length} chars
-                                        </span>
-                                    }
-                                />
-                            ))}
-                        </IssueSection>
-
-                        {/* All clear */}
-                        {!isChecking && totalIssues === 0 && (
-                            <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-                                <ShieldCheck size={40} className="mx-auto text-green-500 mb-3" />
-                                <p className="font-semibold text-green-800">All passwords look good!</p>
-                                <p className="text-sm text-green-600 mt-1">
-                                    No compromised, reused, or weak passwords detected.
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Info */}
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-                            <Shield size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
-                            <div className="text-sm text-blue-800 space-y-1">
-                                <p>
-                                    Breach data is checked via <strong>HaveIBeenPwned</strong> using k-anonymity.
-                                    Your passwords are never sent over the network — only the first 5 characters
-                                    of the SHA-1 hash are transmitted.
-                                </p>
-                            </div>
-                        </div>
-                    </>
-                )}
+                </div>
             </div>
-        </div>
     );
 }
 
@@ -475,68 +482,52 @@ export function PasswordHealthPage() {
  * Sezione collassabile per un tipo di problema
  */
 function IssueSection({ title, icon, count, color, isExpanded, onToggle, emptyText, children }) {
-    const colorClasses = {
-        red: {
-            bg: 'bg-red-50',
-            border: 'border-red-200',
-            badge: 'bg-red-500',
-            text: 'text-red-700',
-            icon: 'text-red-500'
-        },
-        orange: {
-            bg: 'bg-orange-50',
-            border: 'border-orange-200',
-            badge: 'bg-orange-500',
-            text: 'text-orange-700',
-            icon: 'text-orange-500'
-        },
-        yellow: {
-            bg: 'bg-yellow-50',
-            border: 'border-yellow-200',
-            badge: 'bg-yellow-500',
-            text: 'text-yellow-700',
-            icon: 'text-yellow-500'
-        },
-        green: {
-            bg: 'bg-green-50',
-            border: 'border-green-200',
-            badge: 'bg-green-500',
-            text: 'text-green-700',
-            icon: 'text-green-500'
-        }
+    const badgeColors = {
+        red: 'bg-red-500',
+        orange: 'bg-orange-500',
+        yellow: 'bg-yellow-500',
+        green: 'bg-green-500'
     };
 
-    const c = count > 0 ? colorClasses[color] : colorClasses.green;
+    const iconColors = {
+        red: 'text-red-500',
+        orange: 'text-orange-500',
+        yellow: 'text-yellow-500',
+        green: 'text-green-500'
+    };
+
+    const badgeColor = count > 0 ? badgeColors[color] : 'bg-green-500';
+    const iconColor = count > 0 ? iconColors[color] : 'text-green-500';
 
     return (
-        <div className="bg-white rounded-lg overflow-hidden shadow-sm">
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
             <button
                 onClick={onToggle}
-                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-700/50 transition-colors"
             >
                 <div className="flex items-center gap-3">
-                    <span className={count > 0 ? c.icon : 'text-green-500'}>
-                        {icon}
-                    </span>
-                    <span className="font-medium text-gray-800 text-sm">{title}</span>
+                    <span className={iconColor}>{icon}</span>
+                    <span className="font-medium text-gray-200 text-sm">{title}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full text-white ${count > 0 ? c.badge : 'bg-green-500'}`}>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full text-white ${badgeColor}`}>
                         {count}
                     </span>
                     {count > 0 && (
-                        isExpanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />
+                        isExpanded
+                            ? <ChevronUp size={16} className="text-slate-400" />
+                            : <ChevronDown size={16} className="text-slate-400" />
                     )}
                 </div>
             </button>
             {isExpanded && count > 0 && (
-                <div className="px-4 pb-4 space-y-2 border-t border-gray-100 pt-3">
+                <div className="px-4 pb-4 space-y-2 border-t border-slate-700 pt-3">
                     {children}
                 </div>
             )}
             {isExpanded && count === 0 && (
-                <div className="px-4 pb-4 border-t border-gray-100 pt-3">
-                    <p className="text-sm text-gray-500 text-center py-2">{emptyText}</p>
+                <div className="px-4 pb-4 border-t border-slate-700 pt-3">
+                    <p className="text-sm text-slate-400 text-center py-2">{emptyText}</p>
                 </div>
             )}
         </div>
@@ -551,25 +542,25 @@ function ProfileIssueCard({ profile, navigate, badge }) {
     return (
         <button
             onClick={() => navigate(`/profile/${profile.id}`)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors text-left"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-700/50 transition-colors text-left"
         >
-            <div className="w-9 h-9 flex items-center justify-center bg-primary/10 rounded-lg flex-shrink-0">
-                <span className="text-primary font-bold text-sm">
+            <div className="w-9 h-9 flex items-center justify-center bg-blue-500/10 rounded-lg flex-shrink-0">
+                <span className="text-blue-400 font-bold text-sm">
                     {profile.title?.[0]?.toUpperCase() || '?'}
                 </span>
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-800 truncate">
+                    <span className="text-sm font-medium text-gray-200 truncate">
                         {profile.title}
                     </span>
                 </div>
                 {profile.website && (
-                    <p className="text-xs text-gray-400 truncate">{profile.website}</p>
+                    <p className="text-xs text-slate-400 truncate">{profile.website}</p>
                 )}
                 {badge && <div className="mt-1">{badge}</div>}
             </div>
-            <ExternalLink size={14} className="text-gray-300 flex-shrink-0" />
+            <ExternalLink size={14} className="text-slate-500 flex-shrink-0" />
         </button>
     );
 }

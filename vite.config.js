@@ -31,6 +31,23 @@ function cspPlugin() {
 }
 
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/simple-icons')) return 'vendor-simple-icons';
+          if (id.includes('node_modules/react') ||
+              id.includes('node_modules/react-dom') ||
+              id.includes('node_modules/react-router-dom')) return 'vendor-react';
+          if (id.includes('node_modules/hash-wasm') ||
+              id.includes('node_modules/dexie')) return 'vendor-crypto';
+          if (id.includes('node_modules/i18next') ||
+              id.includes('node_modules/react-i18next')) return 'vendor-i18n';
+          if (id.includes('node_modules/otpauth')) return 'vendor-otp';
+        }
+      }
+    }
+  },
   plugins: [
     react(),
     cspPlugin(), // Aggiunge CSP headers durante lo sviluppo
@@ -38,9 +55,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'SafeProfiles',
-        short_name: 'SafeProfiles',
-        description: 'Secure password and card manager',
+        name: 'OwnVault',
+        short_name: 'OwnVault',
+        description: 'OwnVault. Your Keys. Your Control',
         theme_color: '#2196F3',
         background_color: '#ffffff',
         display: 'standalone',
@@ -59,6 +76,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MB
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
