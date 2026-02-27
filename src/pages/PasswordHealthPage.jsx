@@ -24,7 +24,6 @@ import {
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
 import { hibpService } from '../services/hibpService';
-import { AppLayout } from '../layouts/AppLayout';
 
 /**
  * Valuta la forza di una password (semplificato)
@@ -245,8 +244,7 @@ export function PasswordHealthPage() {
 
     if (isLoading) {
         return (
-            <AppLayout>
-                <div className="h-full flex flex-col">
+            <div className="h-full flex flex-col">
                     <div className="max-w-2xl mx-auto w-full flex flex-col flex-1 min-h-0 p-6">
                         <div className="flex items-center gap-3 mb-6">
                             <button
@@ -265,13 +263,11 @@ export function PasswordHealthPage() {
                         </div>
                     </div>
                 </div>
-            </AppLayout>
         );
     }
 
     return (
-        <AppLayout>
-            <div className="h-full flex flex-col">
+        <div className="h-full flex flex-col">
                 <div className="max-w-2xl mx-auto w-full flex flex-col flex-1 min-h-0 p-6">
 
                     {/* Header - fisso */}
@@ -478,7 +474,6 @@ export function PasswordHealthPage() {
 
                 </div>
             </div>
-        </AppLayout>
     );
 }
 

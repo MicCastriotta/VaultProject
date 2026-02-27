@@ -5,7 +5,6 @@
 
 import { useState, useCallback } from 'react';
 import { Copy, Check, RefreshCw, Shield } from 'lucide-react';
-import { AppLayout } from '../layouts/AppLayout';
 
 // Set di caratteri
 const CHAR_SETS = {
@@ -239,8 +238,7 @@ export function PasswordGeneratorPage() {
         || passwordOptions.useDigits || passwordOptions.useSymbols;
 
     return (
-        <AppLayout>
-            <div className="p-6 h-full overflow-y-auto">
+        <div className="p-6 h-full overflow-y-auto">
                 <div className="max-w-2xl mx-auto space-y-4 pb-6">
 
                     {/* Page title */}
@@ -476,7 +474,6 @@ export function PasswordGeneratorPage() {
 
                 </div>
             </div>
-        </AppLayout>
     );
 }
 

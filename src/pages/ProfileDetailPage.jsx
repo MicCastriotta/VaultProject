@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { OTPDisplay } from '../components/OTPDisplay';
 import { IconRenderer } from '../components/IconRenderer';
-import { AppLayout } from '../layouts/AppLayout';
 
 export function ProfileDetailPage() {
     const navigate = useNavigate();
@@ -114,11 +113,9 @@ export function ProfileDetailPage() {
 
     if (isLoading) {
         return (
-            <AppLayout>
-                <div className="p-6 h-full overflow-y-auto flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400"></div>
-                </div>
-            </AppLayout>
+            <div className="p-6 h-full overflow-y-auto flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400"></div>
+            </div>
         );
     }
 
@@ -127,8 +124,8 @@ export function ProfileDetailPage() {
     }
 
     return (
-        <AppLayout>
-            <div className="p-6 h-full overflow-y-auto">
+        <>
+        <div className="p-6 h-full overflow-y-auto">
                 <div className="max-w-2xl mx-auto space-y-4 pb-6">
 
                     {/* Page Header */}
@@ -374,7 +371,7 @@ export function ProfileDetailPage() {
                     </div>
                 </div>
             )}
-        </AppLayout>
+        </>
     );
 }
 

@@ -17,7 +17,6 @@ import { validators } from '../services/securityUtils';
 import { getIconBySlug } from '../icons/brandIcons';
 
 import { IconRenderer } from '../components/IconRenderer';
-import { AppLayout } from '../layouts/AppLayout';
 
 export function ProfileFormPage() {
     const navigate = useNavigate();
@@ -252,17 +251,15 @@ export function ProfileFormPage() {
 
     if (isLoading) {
         return (
-            <AppLayout>
-                <div className="p-6 h-full overflow-y-auto flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400"></div>
-                </div>
-            </AppLayout>
+            <div className="p-6 h-full overflow-y-auto flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400"></div>
+            </div>
         );
     }
 
     return (
-        <AppLayout>
-            <div className="h-full flex flex-col">
+        <>
+        <div className="h-full flex flex-col">
                 <div className="max-w-2xl mx-auto w-full flex flex-col flex-1 min-h-0 p-6">
 
                     {/* Page Header - fisso */}
@@ -672,6 +669,6 @@ export function ProfileFormPage() {
                 onClose={() => setShowQRScanner(false)}
                 onScan={handleQRScan}
             />
-        </AppLayout>
+        </>
     );
 }

@@ -4,10 +4,11 @@
  */
 
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { IntegrityWarningBanner } from './components/IntegrityWarningBanner';
 import { BiometricSetupDialog } from './components/BiometricSetupDialog';
+import { AppLayout } from './layouts/AppLayout';
 
 // Pagine caricate al volo (lazy) per ridurre il bundle iniziale
 const SignUpPage = lazy(() => import('./pages/SignUpPage').then(m => ({ default: m.SignUpPage })));
@@ -20,11 +21,39 @@ const PasswordGeneratorPage = lazy(() => import('./pages/PasswordGeneratorPage')
 const PasswordHealthPage = lazy(() => import('./pages/PasswordHealthPage').then(m => ({ default: m.PasswordHealthPage })));
 const ImportPage = lazy(() => import('./pages/ImportPage'));
 
+// Spinner piccolo per transizioni interne (non sostituisce tutto lo schermo)
+const PageSpinner = () => (
+    <div className="flex-1 flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500" />
+    </div>
+);
+
 const PageLoader = () => (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500" />
     </div>
 );
+
+/**
+ * Shell statico per le route autenticate.
+ * AppLayout (sidebar + sfondo) rimane montato durante le navigazioni;
+ * solo il contenuto interno sospende.
+ */
+function AppShell({ showBiometricSetup, enableBiometric, skipBiometricSetup }) {
+    return (
+        <AppLayout>
+            {showBiometricSetup && (
+                <BiometricSetupDialog
+                    onEnable={enableBiometric}
+                    onSkip={skipBiometricSetup}
+                />
+            )}
+            <Suspense fallback={<PageSpinner />}>
+                <Outlet />
+            </Suspense>
+        </AppLayout>
+    );
+}
 
 function AppRoutes() {
     const {
@@ -69,21 +98,18 @@ function AppRoutes() {
         );
     }
 
-    // Utente unlocked -> App normale
+    // Utente unlocked -> shell statico + pagine lazy
     return (
         <>
             <IntegrityWarningBanner />
-
-            {/* Biometric Setup Dialog */}
-            {showBiometricSetup && (
-                <BiometricSetupDialog
-                    onEnable={enableBiometric}
-                    onSkip={skipBiometricSetup}
-                />
-            )}
-
-            <Suspense fallback={<PageLoader />}>
-                <Routes>
+            <Routes>
+                <Route element={
+                    <AppShell
+                        showBiometricSetup={showBiometricSetup}
+                        enableBiometric={enableBiometric}
+                        skipBiometricSetup={skipBiometricSetup}
+                    />
+                }>
                     <Route path="/" element={<MainPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/import" element={<ImportPage />} />
@@ -93,8 +119,8 @@ function AppRoutes() {
                     <Route path="/profile/:id" element={<ProfileDetailPage />} />
                     <Route path="/profile/:id/edit" element={<ProfileFormPage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-            </Suspense>
+                </Route>
+            </Routes>
         </>
     );
 }

@@ -2,7 +2,6 @@
 import { useNavigate } from 'react-router-dom';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
-import { AppLayout } from '../layouts/AppLayout';
 import { Plus, Search, ArrowUpDown, User, CreditCard, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { IconRenderer } from '../components/IconRenderer';
@@ -155,8 +154,7 @@ export function MainPage() {
     });
 
     return (
-        <AppLayout>
-            <div className="p-6 h-full flex flex-col">
+        <div className="p-6 h-full flex flex-col">
 
                 {/* Header */}
                 <div className="flex justify-between items-center mb-6 relative">
@@ -301,6 +299,5 @@ export function MainPage() {
                 </button>
 
             </div>
-        </AppLayout>
     );
 }

@@ -26,7 +26,6 @@ import { SyncConflictDialog } from '../components/SyncConflictDialog';
 import { BiometricSettingsSection } from '../components/BiometricSettingsSection';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { useTranslation } from 'react-i18next';
-import { AppLayout } from '../layouts/AppLayout';
 
 export function SettingsPage() {
     const navigate = useNavigate();
@@ -224,8 +223,8 @@ export function SettingsPage() {
     }
 
     return (
-        <AppLayout>
-            <div className="h-full flex flex-col">
+        <>
+        <div className="h-full flex flex-col">
                 <div className="max-w-2xl mx-auto w-full flex flex-col flex-1 min-h-0 p-6">
 
                     {/* Header - fisso */}
@@ -562,6 +561,6 @@ export function SettingsPage() {
                     </div>
                 </div>
             )}
-        </AppLayout>
+        </>
     );
 }
