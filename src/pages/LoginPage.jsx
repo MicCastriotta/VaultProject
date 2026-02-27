@@ -14,6 +14,8 @@ export function LoginPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
+    const version = __APP_VERSION__;
+
     async function handleSubmit(e) {
         e.preventDefault();
         setError('');
@@ -113,7 +115,7 @@ export function LoginPage() {
 
                 {/* Footer */}
                 <div className="mt-6 text-center text-xs text-gray-500">
-                    PWA Ready • End-to-End Encryption
+                    End-to-End Encryption • v{version}
                 </div>
             </div>
         </div>

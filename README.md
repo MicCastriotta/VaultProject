@@ -171,10 +171,10 @@ Un attaccante che modifica IndexedDB non può ricalcolare un HMAC valido senza l
 
 Funzionalità da implementare:
 
-- [ ] Tutorial iniziale primo avvio
+- [x] Tutorial iniziale primo avvio
 - [x] Impostazioni (biometric, 2FA, tema)
 - [x] Password generator avanzato
-- [ ] Ordinamento (A-Z, data, categoria)
+- [x] Ordinamento (A-Z, data)
 - [ ] Export/Import completo da altri profili
 - [ ] Condivisione profili cifrati
 - [x] Generatore OTP (TOTP)

@@ -19,6 +19,8 @@ export function SignUpPage() {
 
     const strength = cryptoService.checkPasswordStrength(password);
 
+    const version = __APP_VERSION__;
+
     const strengthConfig = {
         Blank: { progress: 0, color: 'bg-gray-300', text: '' },
         VeryWeak: { progress: 25, color: 'bg-red-500', text: 'Very Weak!' },
@@ -187,7 +189,7 @@ export function SignUpPage() {
 
                 {/* Footer */}
                 <div className="mt-6 text-center text-xs text-gray-500">
-                    PWA Ready • End-to-End Encryption
+                    End-to-End Encryption • v{version}
                 </div>
             </div>
         </div>
