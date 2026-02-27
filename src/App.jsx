@@ -3,7 +3,7 @@
  * Gestisce routing e protezione route
  */
 
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { IntegrityWarningBanner } from './components/IntegrityWarningBanner';
@@ -11,6 +11,7 @@ import { BiometricSetupDialog } from './components/BiometricSetupDialog';
 import { AppLayout } from './layouts/AppLayout';
 
 // Pagine caricate al volo (lazy) per ridurre il bundle iniziale
+const TutorialPage = lazy(() => import('./pages/TutorialPage').then(m => ({ default: m.TutorialPage })));
 const SignUpPage = lazy(() => import('./pages/SignUpPage').then(m => ({ default: m.SignUpPage })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
 const MainPage = lazy(() => import('./pages/MainPage').then(m => ({ default: m.MainPage })));
@@ -65,6 +66,15 @@ function AppRoutes() {
         skipBiometricSetup
     } = useAuth();
 
+    const [tutorialDone, setTutorialDone] = useState(
+        () => localStorage.getItem('tutorialCompleted') === 'true'
+    );
+
+    function completeTutorial() {
+        localStorage.setItem('tutorialCompleted', 'true');
+        setTutorialDone(true);
+    }
+
     if (isLoading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -76,8 +86,15 @@ function AppRoutes() {
         );
     }
 
-    // Se non esiste utente -> SignUp
+    // Se non esiste utente -> Tutorial (prima volta) poi SignUp
     if (!userExists) {
+        if (!tutorialDone) {
+            return (
+                <Suspense fallback={<PageLoader />}>
+                    <TutorialPage onDone={completeTutorial} />
+                </Suspense>
+            );
+        }
         return (
             <Suspense fallback={<PageLoader />}>
                 <Routes>

@@ -12,11 +12,11 @@ function cspPlugin() {
         if (req.url === '/' || req.url === '/index.html') {
           res.setHeader('Content-Security-Policy', [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'https://www.googleapis.com/' 'https://apis.google.com/js/api.js'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.googleapis.com",
             "style-src 'self' 'unsafe-inline'", // Tailwind necessita inline styles
             "img-src 'self' data: blob:",
             "font-src 'self' data:",
-            "connect-src 'self'",
+            "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://www.google.com",
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",
@@ -54,6 +54,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      devOptions: {
+        enabled: true
+      },
       manifest: {
         name: 'OwnVault',
         short_name: 'OwnVault',
@@ -63,12 +66,12 @@ export default defineConfig({
         display: 'standalone',
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: '/icons/icon-192x192.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
+            src: '/icons/icon-512x512.png',
             sizes: '512x512',
             type: 'image/png'
           }
@@ -99,8 +102,10 @@ export default defineConfig({
   server: {
       port: 3000,
       allowedHosts: [
-          'choicest-shantay-conciliatory.ngrok-free.dev'
+          'ownvault.eu'
       ]
-
+  },
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
   }
 });
