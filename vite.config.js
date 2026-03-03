@@ -4,19 +4,41 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 // Plugin personalizzato per aggiungere CSP headers
 function cspPlugin() {
+  // CSP per produzione (iniettata come meta tag nel build output)
+  // Nota: frame-ancestors non funziona nei meta tag (limitazione spec) — impostarlo via HTTP header lato server
+  const PROD_CSP = [
+    "default-src 'self'",
+    "script-src 'self' 'wasm-unsafe-eval'",       // wasm-unsafe-eval richiesto da hash-wasm (PBKDF2); più stretto di unsafe-eval
+    "style-src 'self' 'unsafe-inline'",           // Tailwind richiede inline styles
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://api.pwnedpasswords.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "upgrade-insecure-requests"
+  ].join('; ');
+
+  let isBuild = false;
+
   return {
     name: 'csp-plugin',
+
+    configResolved(config) {
+      isBuild = config.command === 'build';
+    },
+
+    // Dev: header HTTP sul server di sviluppo
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        // Applica CSP header a tutte le risposte HTML
         if (req.url === '/' || req.url === '/index.html') {
           res.setHeader('Content-Security-Policy', [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.googleapis.com",
-            "style-src 'self' 'unsafe-inline'", // Tailwind necessita inline styles
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://apis.google.com https://www.googleapis.com",
+            "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob:",
             "font-src 'self' data:",
-            "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://www.google.com",
+            "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://api.pwnedpasswords.com",
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",
@@ -26,12 +48,22 @@ function cspPlugin() {
         }
         next();
       });
+    },
+
+    // Produzione: inietta meta tag CSP nell'index.html del build (non in dev)
+    transformIndexHtml(html) {
+      if (!isBuild) return html;
+      return html.replace(
+        '<meta charset="UTF-8" />',
+        `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${PROD_CSP}" />`
+      );
     }
   };
 }
 
 export default defineConfig({
   build: {
+    modulePreload: { polyfill: false }, // evita lo script inline del polyfill (incompatibile con CSP strict)
     rollupOptions: {
       output: {
         manualChunks(id) {

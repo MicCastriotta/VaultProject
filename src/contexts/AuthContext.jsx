@@ -12,6 +12,7 @@ import { databaseService } from '../services/databaseService';
 import { biometricService } from '../services/biometricService';
 import { RateLimiter, AutoLockTimer, securityLog } from '../services/securityUtils';
 import { hibpService } from '../services/hibpService';
+import { healthCache } from '../services/healthCacheService';
 import { useRef, useCallback } from 'react';
 
 const AuthContext = createContext();
@@ -43,6 +44,7 @@ export function AuthProvider({ children }) {
     const performAutoLock = useCallback(() => {
         securityLog('Auto-lock triggered after inactivity');
         cryptoService.lock();
+        healthCache.clear();
         setIsUnlocked(false);
         setIntegrityError(null);
     }, []);
@@ -318,6 +320,7 @@ export function AuthProvider({ children }) {
         }
         cryptoService.lock();
         hibpService.clearCache();
+        healthCache.clear();
         setIsUnlocked(false);
         setIntegrityError(null);
     }
@@ -329,6 +332,7 @@ export function AuthProvider({ children }) {
         try {
             await databaseService.deleteAllData();
             cryptoService.lock();
+            healthCache.clear();
             setIsUnlocked(false);
             setUserExists(false);
             setIntegrityError(null);

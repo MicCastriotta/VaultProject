@@ -4,6 +4,10 @@
  * - Password compromesse (via HaveIBeenPwned k-anonymity API)
  * - Password duplicate (usate su più account)
  * - Password deboli (corte o semplici)
+ *
+ * I risultati vengono salvati in memoria (healthCache) e mostrati
+ * immediatamente al ritorno sulla pagina, senza ri-analisi.
+ * La cache viene cancellata al lock/logout del vault.
  */
 
 import { useState, useEffect } from 'react';
@@ -24,6 +28,7 @@ import {
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
 import { hibpService } from '../services/hibpService';
+import { healthCache } from '../services/healthCacheService';
 
 /**
  * Valuta la forza di una password (semplificato)
@@ -47,6 +52,38 @@ function getPasswordStrength(password) {
     return { level: 'strong', label: 'Very Strong' };
 }
 
+/**
+ * Calcola il punteggio di salute 0–100 e lo restituisce (senza side-effect).
+ */
+function computeHealthScoreValue(allProfiles, pwned, dupes, weak) {
+    if (allProfiles.length === 0) return null;
+
+    const total = allProfiles.length;
+    const pwnedCount = pwned.length;
+    const dupProfileCount = dupes.reduce((sum, d) => sum + d.count, 0);
+    const weakCount = weak.length;
+
+    const penalty = (pwnedCount * 20 + dupProfileCount * 10 + weakCount * 8);
+    const maxPenalty = total * 20;
+
+    return Math.max(0, Math.round(100 - (penalty / maxPenalty) * 100));
+}
+
+/**
+ * Formatta il timestamp in una stringa relativa leggibile.
+ */
+function formatLastChecked(timestamp) {
+    if (!timestamp) return null;
+    const diffMs = Date.now() - timestamp;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin === 1) return '1 minute ago';
+    if (diffMin < 60) return `${diffMin} minutes ago`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH === 1) return '1 hour ago';
+    return `${diffH} hours ago`;
+}
+
 
 export function PasswordHealthPage() {
     const navigate = useNavigate();
@@ -62,6 +99,7 @@ export function PasswordHealthPage() {
     const [duplicates, setDuplicates] = useState([]);
     const [weakPasswords, setWeakPasswords] = useState([]);
     const [healthScore, setHealthScore] = useState(null);
+    const [lastChecked, setLastChecked] = useState(null);
 
     // UI
     const [expandedSection, setExpandedSection] = useState(null);
@@ -72,7 +110,19 @@ export function PasswordHealthPage() {
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
 
-        loadAndAnalyze();
+        // Carica dalla cache se disponibile, altrimenti analizza
+        const cached = healthCache.get();
+        if (cached) {
+            setProfiles(cached.profiles);
+            setCompromised(cached.compromised);
+            setDuplicates(cached.duplicates);
+            setWeakPasswords(cached.weakPasswords);
+            setHealthScore(cached.healthScore);
+            setLastChecked(cached.timestamp);
+            setIsLoading(false);
+        } else {
+            loadAndAnalyze();
+        }
 
         return () => {
             window.removeEventListener('online', handleOnline);
@@ -81,8 +131,8 @@ export function PasswordHealthPage() {
     }, []);
 
     /**
-     * Carica profili, decifra, e analizza localmente (duplicati + deboli).
-     * Il check HIBP viene fatto separatamente perché richiede rete.
+     * Carica profili, decifra, analizza localmente (duplicati + deboli) e via HIBP.
+     * Salva i risultati nella cache al termine.
      */
     async function loadAndAnalyze() {
         setIsLoading(true);
@@ -109,36 +159,41 @@ export function PasswordHealthPage() {
             const passwordMap = new Map();
             decrypted.forEach(p => {
                 const pwd = p.password;
-                if (!passwordMap.has(pwd)) {
-                    passwordMap.set(pwd, []);
-                }
+                if (!passwordMap.has(pwd)) passwordMap.set(pwd, []);
                 passwordMap.get(pwd).push(p);
             });
 
             const dupes = [];
             passwordMap.forEach((profileList) => {
                 if (profileList.length > 1) {
-                    dupes.push({
-                        profiles: profileList,
-                        count: profileList.length
-                    });
+                    dupes.push({ profiles: profileList, count: profileList.length });
                 }
             });
             setDuplicates(dupes);
 
             // 3. Analisi locale: password deboli
-            const weak = decrypted.filter(p => {
-                const s = getPasswordStrength(p.password);
-                return s.level === 'critical' || s.level === 'weak';
-            }).map(p => ({
-                ...p,
-                strength: getPasswordStrength(p.password)
-            }));
+            const weak = decrypted
+                .filter(p => {
+                    const s = getPasswordStrength(p.password);
+                    return s.level === 'critical' || s.level === 'weak';
+                })
+                .map(p => ({ ...p, strength: getPasswordStrength(p.password) }));
             setWeakPasswords(weak);
 
-            // 4. Check HIBP se online
+            // 4. Check HIBP se online, poi salva in cache con i dati completi
             if (navigator.onLine) {
-                await runHIBPCheck(decrypted);
+                const pwnedProfiles = await runHIBPCheck(decrypted, dupes, weak);
+                const score = computeHealthScoreValue(decrypted, pwnedProfiles, dupes, weak);
+                const now = Date.now();
+                healthCache.set({ profiles: decrypted, compromised: pwnedProfiles, duplicates: dupes, weakPasswords: weak, healthScore: score, timestamp: now });
+                setLastChecked(now);
+            } else {
+                // Offline: salva analisi locale senza dati HIBP
+                const score = computeHealthScoreValue(decrypted, [], dupes, weak);
+                setHealthScore(score);
+                const now = Date.now();
+                healthCache.set({ profiles: decrypted, compromised: [], duplicates: dupes, weakPasswords: weak, healthScore: score, timestamp: now });
+                setLastChecked(now);
             }
 
         } catch (error) {
@@ -149,11 +204,15 @@ export function PasswordHealthPage() {
     }
 
     /**
-     * Controlla le password contro HaveIBeenPwned
+     * Controlla le password contro HaveIBeenPwned.
+     * Restituisce l'array dei profili compromessi (per poterli cachare).
      */
-    async function runHIBPCheck(profilesList = null) {
+    async function runHIBPCheck(profilesList, dupesList, weakList) {
         const list = profilesList || profiles;
-        if (list.length === 0) return;
+        const dupes = dupesList !== undefined ? dupesList : duplicates;
+        const weak  = weakList  !== undefined ? weakList  : weakPasswords;
+
+        if (list.length === 0) return [];
 
         setIsChecking(true);
         setProgress({ checked: 0, total: list.length });
@@ -169,51 +228,24 @@ export function PasswordHealthPage() {
             results.forEach((result, id) => {
                 if (result.pwned) {
                     const profile = list.find(p => p.id === id);
-                    if (profile) {
-                        pwnedProfiles.push({
-                            ...profile,
-                            breachCount: result.count
-                        });
-                    }
+                    if (profile) pwnedProfiles.push({ ...profile, breachCount: result.count });
                 }
             });
 
-            // Ordina per gravità (più esposizioni prima)
             pwnedProfiles.sort((a, b) => b.breachCount - a.breachCount);
             setCompromised(pwnedProfiles);
 
-            // Calcola health score
-            computeHealthScore(list, pwnedProfiles, duplicates, weakPasswords);
+            const score = computeHealthScoreValue(list, pwnedProfiles, dupes, weak);
+            setHealthScore(score);
+
+            return pwnedProfiles;
 
         } catch (error) {
             console.error('HIBP check error:', error);
+            return [];
         } finally {
             setIsChecking(false);
         }
-    }
-
-    /**
-     * Calcola un punteggio di salute 0-100
-     */
-    function computeHealthScore(allProfiles, pwned, dupes, weak) {
-        if (allProfiles.length === 0) {
-            setHealthScore(null);
-            return;
-        }
-
-        const total = allProfiles.length;
-
-        // Ogni problema abbassa il punteggio
-        const pwnedCount = pwned.length;
-        const dupProfileCount = dupes.reduce((sum, d) => sum + d.count, 0);
-        const weakCount = weak.length;
-
-        // Pesi: compromessa = -20pt, duplicata = -10pt, debole = -8pt (per profilo)
-        const penalty = (pwnedCount * 20 + dupProfileCount * 10 + weakCount * 8);
-        const maxPenalty = total * 20; // Caso peggiore: tutte compromesse
-
-        const score = Math.max(0, Math.round(100 - (penalty / maxPenalty) * 100));
-        setHealthScore(score);
     }
 
     function toggleSection(section) {
@@ -279,13 +311,20 @@ export function PasswordHealthPage() {
                             >
                                 <ArrowLeft size={24} />
                             </button>
-                            <h1 className="text-2xl font-bold text-white">Password Health</h1>
+                            <div>
+                                <h1 className="text-2xl font-bold text-white">Password Health</h1>
+                                {lastChecked && (
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        Last checked: {formatLastChecked(lastChecked)}
+                                    </p>
+                                )}
+                            </div>
                         </div>
-                        {!isChecking && profiles.length > 0 && isOnline && (
+                        {!isChecking && profiles.length > 0 && (
                             <button
-                                onClick={() => runHIBPCheck()}
+                                onClick={() => loadAndAnalyze()}
                                 className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
-                                title="Re-check"
+                                title="Re-analyze"
                             >
                                 <RefreshCw size={20} />
                             </button>
