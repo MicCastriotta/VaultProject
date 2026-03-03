@@ -5,10 +5,37 @@
 
 import { lazy, Suspense, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { IntegrityWarningBanner } from './components/IntegrityWarningBanner';
 import { BiometricSetupDialog } from './components/BiometricSetupDialog';
 import { AppLayout } from './layouts/AppLayout';
+
+/* global __APP_VERSION__ */
+
+function UpdateBanner() {
+    const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW();
+
+    if (!needRefresh) return null;
+
+    return (
+        <div className="fixed top-0 left-0 right-0 z-[9999] bg-blue-600 text-white px-4 py-3 flex items-center justify-between gap-4 shadow-lg">
+            <span className="text-sm">
+                Nuova versione disponibile
+                {typeof __APP_VERSION__ !== 'undefined' && __APP_VERSION__
+                    ? ` — v${__APP_VERSION__}`
+                    : ''}
+            </span>
+            <button
+                onClick={() => updateServiceWorker(true)}
+                className="bg-white text-blue-600 text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors flex-shrink-0"
+            >
+                Aggiorna
+            </button>
+        </div>
+    );
+}
 
 // Pagine caricate al volo (lazy) per ridurre il bundle iniziale
 const TutorialPage = lazy(() => import('./pages/TutorialPage').then(m => ({ default: m.TutorialPage })));
@@ -144,10 +171,13 @@ function AppRoutes() {
 
 export function App() {
     return (
-        <AuthProvider>
-            <BrowserRouter>
-                <AppRoutes />
-            </BrowserRouter>
-        </AuthProvider>
+        <ThemeProvider>
+            <AuthProvider>
+                <BrowserRouter>
+                    <UpdateBanner />
+                    <AppRoutes />
+                </BrowserRouter>
+            </AuthProvider>
+        </ThemeProvider>
     );
 }

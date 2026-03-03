@@ -84,7 +84,7 @@ export default defineConfig({
     react(),
     cspPlugin(), // Aggiunge CSP headers durante lo sviluppo
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       devOptions: {
         enabled: true
