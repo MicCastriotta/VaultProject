@@ -12,6 +12,57 @@ body {
     min-height: 100vh;
 }
 
+/* Light theme overrides */
+[data-theme="light"] body {
+    background: linear-gradient(to bottom right, #f1f5f9, #e2e8f0, #f1f5f9);
+}
+
+[data-theme="light"] .bg-slate-800\/50 {
+    background-color: rgba(248, 250, 252, 0.9) !important;
+}
+
+[data-theme="light"] .bg-slate-800 {
+    background-color: rgb(241, 245, 249) !important;
+}
+
+[data-theme="light"] .bg-slate-900\/60 {
+    background-color: rgba(226, 232, 240, 0.8) !important;
+}
+
+[data-theme="light"] .bg-slate-900 {
+    background-color: rgb(226, 232, 240) !important;
+}
+
+[data-theme="light"] .border-slate-700 {
+    border-color: rgb(203, 213, 225) !important;
+}
+
+[data-theme="light"] .text-gray-200 {
+    color: rgb(30, 41, 59) !important;
+}
+
+[data-theme="light"] .text-gray-300 {
+    color: rgb(51, 65, 85) !important;
+}
+
+[data-theme="light"] .text-gray-400 {
+    color: rgb(100, 116, 139) !important;
+}
+
+[data-theme="light"] .text-white {
+    color: rgb(15, 23, 42) !important;
+}
+
+[data-theme="light"] select,
+[data-theme="light"] input[type="text"],
+[data-theme="light"] input[type="password"],
+[data-theme="light"] input[type="email"],
+[data-theme="light"] textarea {
+    background-color: rgba(241, 245, 249, 0.9);
+    color: rgb(30, 41, 59);
+    border-color: rgb(203, 213, 225);
+}
+
 code {
     font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }

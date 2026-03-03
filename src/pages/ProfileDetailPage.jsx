@@ -125,11 +125,11 @@ export function ProfileDetailPage() {
 
     return (
         <>
-        <div className="p-6 h-full overflow-y-auto">
-                <div className="max-w-2xl mx-auto space-y-4 pb-6">
+        <div className="h-full flex flex-col">
+                <div className="max-w-2xl mx-auto w-full flex flex-col flex-1 min-h-0 p-6">
 
-                    {/* Page Header */}
-                    <div className="flex items-center justify-between">
+                    {/* Page Header - fisso */}
+                    <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={() => navigate('/')}
@@ -154,6 +154,10 @@ export function ProfileDetailPage() {
                             </button>
                         </div>
                     </div>
+
+                    {/* Contenuto - scorrevole */}
+                    <div className="flex-1 overflow-y-auto">
+                    <div className="space-y-4 pb-6">
 
                     {/* Profile Title Card */}
                     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 flex items-start gap-3">
@@ -343,8 +347,11 @@ export function ProfileDetailPage() {
                         </div>
                     )}
 
-                </div>
-            </div>
+                    </div>{/* fine space-y-4 */}
+                    </div>{/* fine flex-1 overflow-y-auto */}
+
+                </div>{/* fine max-w-2xl */}
+            </div>{/* fine h-full flex flex-col */}
 
             {/* Delete Confirmation Modal */}
             {showDeleteConfirm && (
