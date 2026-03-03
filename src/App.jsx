@@ -11,6 +11,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { IntegrityWarningBanner } from './components/IntegrityWarningBanner';
 import { BiometricSetupDialog } from './components/BiometricSetupDialog';
 import { AppLayout } from './layouts/AppLayout';
+import { InstallPrompt } from './components/InstallPrompt';
 
 /* global __APP_VERSION__ */
 
@@ -175,6 +176,7 @@ export function App() {
             <AuthProvider>
                 <BrowserRouter>
                     <UpdateBanner />
+                    <InstallPrompt />
                     <AppRoutes />
                 </BrowserRouter>
             </AuthProvider>
