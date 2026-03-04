@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Fingerprint, Shield, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { biometricService } from '../services/biometricService';
@@ -11,6 +12,7 @@ import { BiometricSetupDialog } from '../components/BiometricSetupDialog';
 
 export function BiometricSettingsSection() {
     const { biometricEnabled, biometricAvailable, enableBiometric, disableBiometric } = useAuth();
+    const { t } = useTranslation();
     const [showSetupDialog, setShowSetupDialog] = useState(false);
     const [biometricType, setBiometricType] = useState('Biometric Authentication');
     const [message, setMessage] = useState(null);
@@ -41,7 +43,7 @@ export function BiometricSettingsSection() {
             } else {
                 setMessage({
                     type: 'error',
-                    text: result.error || 'Failed to enable biometric authentication'
+                    text: result.error || t('settings.biometric.enableError')
                 });
             }
         } catch (error) {
@@ -57,7 +59,7 @@ export function BiometricSettingsSection() {
     }
 
     async function handleDisable() {
-        if (!confirm(`Are you sure you want to disable ${biometricType}? You'll need to use your password to unlock.`)) {
+        if (!confirm(t('settings.biometric.disableConfirm', { type: biometricType }))) {
             return;
         }
 
@@ -72,7 +74,7 @@ export function BiometricSettingsSection() {
             } else {
                 setMessage({
                     type: 'error',
-                    text: result.error || 'Failed to disable biometric authentication'
+                    text: result.error || t('settings.biometric.disableError')
                 });
             }
         } catch (error) {
@@ -88,7 +90,7 @@ export function BiometricSettingsSection() {
                 <div className="p-4 border-b border-slate-700">
                     <h2 className="font-semibold text-gray-200 flex items-center gap-2">
                         <Fingerprint size={20} />
-                        Biometric Authentication
+                        {t('settings.biometric.title')}
                     </h2>
                 </div>
                 <div className="p-4">
@@ -96,10 +98,10 @@ export function BiometricSettingsSection() {
                         <Shield size={20} className="text-slate-400 flex-shrink-0 mt-0.5" />
                         <div>
                             <p className="text-sm text-gray-300">
-                                Biometric authentication is not available on this device.
+                                {t('settings.biometric.notAvailable')}
                             </p>
                             <p className="text-xs text-slate-400 mt-1">
-                                Your device doesn't support Face ID, Touch ID, Windows Hello, or fingerprint authentication.
+                                {t('settings.biometric.deviceNoSupport')}
                             </p>
                         </div>
                     </div>
@@ -142,16 +144,15 @@ export function BiometricSettingsSection() {
                     <div>
                         <p className="text-sm text-gray-400 mb-2">
                             {biometricEnabled
-                                ? `Quick unlock is enabled using ${biometricType}. You can still use your password anytime.`
-                                : `Enable ${biometricType} for quick and secure access without typing your password.`
+                                ? t('settings.biometric.enabledDescription', { type: biometricType })
+                                : t('settings.biometric.disabledDescription', { type: biometricType })
                             }
                         </p>
 
                         {biometricEnabled && (
                             <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 mt-3">
                                 <p className="text-xs text-blue-300">
-                                    <strong>Note:</strong> Your encrypted data remains protected by your master password.
-                                    Biometric authentication provides convenient access on this device only.
+                                    {t('settings.biometric.note')}
                                 </p>
                             </div>
                         )}
@@ -167,12 +168,12 @@ export function BiometricSettingsSection() {
                             {isProcessing ? (
                                 <>
                                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                    <span>Disabling...</span>
+                                    <span>{t('settings.biometric.disabling')}</span>
                                 </>
                             ) : (
                                 <>
                                     <Fingerprint size={20} />
-                                    <span>Disable {biometricType}</span>
+                                    <span>{t('settings.biometric.disableBtn', { type: biometricType })}</span>
                                 </>
                             )}
                         </button>
@@ -183,7 +184,7 @@ export function BiometricSettingsSection() {
                             className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             <Fingerprint size={20} />
-                            <span>Enable {biometricType}</span>
+                            <span>{t('settings.biometric.enableBtn', { type: biometricType })}</span>
                         </button>
                     )}
                 </div>

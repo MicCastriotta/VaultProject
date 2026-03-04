@@ -12,6 +12,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
     ArrowLeft,
     Shield,
@@ -34,9 +35,9 @@ import { healthCache } from '../services/healthCacheService';
  * Valuta la forza di una password (semplificato)
  */
 function getPasswordStrength(password) {
-    if (!password) return { level: 'none', label: 'Empty' };
-    if (password.length < 6) return { level: 'critical', label: 'Very Weak' };
-    if (password.length < 8) return { level: 'weak', label: 'Weak' };
+    if (!password) return { level: 'none', labelKey: 'health.strength.empty' };
+    if (password.length < 6) return { level: 'critical', labelKey: 'health.strength.veryWeak' };
+    if (password.length < 8) return { level: 'weak', labelKey: 'health.strength.weak' };
 
     let score = 0;
     if (password.length >= 8) score++;
@@ -46,10 +47,10 @@ function getPasswordStrength(password) {
     if (/\d/.test(password)) score++;
     if (/[^A-Za-z0-9]/.test(password)) score++;
 
-    if (score <= 2) return { level: 'weak', label: 'Weak' };
-    if (score <= 3) return { level: 'fair', label: 'Fair' };
-    if (score <= 4) return { level: 'good', label: 'Strong' };
-    return { level: 'strong', label: 'Very Strong' };
+    if (score <= 2) return { level: 'weak', labelKey: 'health.strength.weak' };
+    if (score <= 3) return { level: 'fair', labelKey: 'health.strength.fair' };
+    if (score <= 4) return { level: 'good', labelKey: 'health.strength.strong' };
+    return { level: 'strong', labelKey: 'health.strength.veryStrong' };
 }
 
 /**
@@ -72,21 +73,22 @@ function computeHealthScoreValue(allProfiles, pwned, dupes, weak) {
 /**
  * Formatta il timestamp in una stringa relativa leggibile.
  */
-function formatLastChecked(timestamp) {
+function formatLastChecked(timestamp, t) {
     if (!timestamp) return null;
     const diffMs = Date.now() - timestamp;
     const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return 'just now';
-    if (diffMin === 1) return '1 minute ago';
-    if (diffMin < 60) return `${diffMin} minutes ago`;
+    if (diffMin < 1) return t('health.time.justNow');
+    if (diffMin === 1) return t('health.time.minuteAgo');
+    if (diffMin < 60) return t('health.time.minutesAgo', { count: diffMin });
     const diffH = Math.floor(diffMin / 60);
-    if (diffH === 1) return '1 hour ago';
-    return `${diffH} hours ago`;
+    if (diffH === 1) return t('health.time.hourAgo');
+    return t('health.time.hoursAgo', { count: diffH });
 }
 
 
 export function PasswordHealthPage() {
     const navigate = useNavigate();
+    const { t } = useTranslation();
 
     const [isLoading, setIsLoading] = useState(true);
     const [isChecking, setIsChecking] = useState(false);
@@ -261,12 +263,12 @@ export function PasswordHealthPage() {
     }
 
     function getScoreLabel(score) {
-        if (score === null) return 'No data';
-        if (score >= 90) return 'Excellent';
-        if (score >= 80) return 'Good';
-        if (score >= 60) return 'Fair';
-        if (score >= 40) return 'Needs Work';
-        return 'Critical';
+        if (score === null) return t('health.score.noData');
+        if (score >= 90) return t('health.score.excellent');
+        if (score >= 80) return t('health.score.good');
+        if (score >= 60) return t('health.score.fair');
+        if (score >= 40) return t('health.score.needsWork');
+        return t('health.score.critical');
     }
 
     // Conteggi totali problemi
@@ -285,12 +287,12 @@ export function PasswordHealthPage() {
                             >
                                 <ArrowLeft size={24} />
                             </button>
-                            <h1 className="text-2xl font-bold text-white">Password Health</h1>
+                            <h1 className="text-2xl font-bold text-white">{t('health.title')}</h1>
                         </div>
                         <div className="flex-1 flex items-center justify-center">
                             <div className="text-center">
                                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto mb-4"></div>
-                                <p className="text-slate-400">Analyzing passwords...</p>
+                                <p className="text-slate-400">{t('health.analyzing')}</p>
                             </div>
                         </div>
                     </div>
@@ -312,10 +314,10 @@ export function PasswordHealthPage() {
                                 <ArrowLeft size={24} />
                             </button>
                             <div>
-                                <h1 className="text-2xl font-bold text-white">Password Health</h1>
+                                <h1 className="text-2xl font-bold text-white">{t('health.title')}</h1>
                                 {lastChecked && (
                                     <p className="text-xs text-slate-500 mt-0.5">
-                                        Last checked: {formatLastChecked(lastChecked)}
+                                        {t('health.lastChecked', { time: formatLastChecked(lastChecked, t) })}
                                     </p>
                                 )}
                             </div>
@@ -339,7 +341,7 @@ export function PasswordHealthPage() {
                             {profiles.length === 0 && (
                                 <div className="text-center py-12">
                                     <Shield size={48} className="mx-auto text-slate-600 mb-4" />
-                                    <p className="text-slate-400">No web accounts with passwords to analyze.</p>
+                                    <p className="text-slate-400">{t('health.noAccounts')}</p>
                                 </div>
                             )}
 
@@ -370,8 +372,8 @@ export function PasswordHealthPage() {
                                             {getScoreLabel(healthScore)}
                                         </p>
                                         <p className="text-sm text-slate-400 mt-1">
-                                            {profiles.length} account{profiles.length !== 1 ? 's' : ''} analyzed
-                                            {totalIssues > 0 && ` · ${totalIssues} issue${totalIssues !== 1 ? 's' : ''} found`}
+                                            {t('health.accountsAnalyzed', { count: profiles.length })}
+                                            {totalIssues > 0 && ` · ${t('health.issuesFound', { count: totalIssues })}`}
                                         </p>
                                     </div>
 
@@ -379,7 +381,7 @@ export function PasswordHealthPage() {
                                     {isChecking && (
                                         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="text-sm text-gray-300">Checking breaches...</span>
+                                                <span className="text-sm text-gray-300">{t('health.checkingBreaches')}</span>
                                                 <span className="text-sm font-medium text-blue-400">
                                                     {progress.checked}/{progress.total}
                                                 </span>
@@ -398,9 +400,9 @@ export function PasswordHealthPage() {
                                         <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-4 flex items-start gap-3">
                                             <WifiOff size={20} className="text-yellow-400 flex-shrink-0 mt-0.5" />
                                             <div>
-                                                <p className="text-sm font-medium text-yellow-300">You're offline</p>
+                                                <p className="text-sm font-medium text-yellow-300">{t('health.offline')}</p>
                                                 <p className="text-sm text-yellow-400">
-                                                    Breach check requires an internet connection. Duplicate and weak password analysis is available offline.
+                                                    {t('health.offlineMessage')}
                                                 </p>
                                             </div>
                                         </div>
@@ -408,13 +410,13 @@ export function PasswordHealthPage() {
 
                                     {/* ===== COMPROMISED ===== */}
                                     <IssueSection
-                                        title="Compromised Passwords"
+                                        title={t('health.compromised')}
                                         icon={<ShieldAlert size={20} />}
                                         count={compromised.length}
                                         color="red"
                                         isExpanded={expandedSection === 'compromised'}
                                         onToggle={() => toggleSection('compromised')}
-                                        emptyText={isChecking ? 'Checking...' : 'No compromised passwords found'}
+                                        emptyText={isChecking ? t('health.checking') : t('health.noCompromised')}
                                     >
                                         {compromised.map(profile => (
                                             <ProfileIssueCard
@@ -423,7 +425,7 @@ export function PasswordHealthPage() {
                                                 navigate={navigate}
                                                 badge={
                                                     <span className="text-xs bg-red-900/30 text-red-400 px-2 py-0.5 rounded-full font-medium">
-                                                        Found in {profile.breachCount.toLocaleString()} breach{profile.breachCount !== 1 ? 'es' : ''}
+                                                        {t('health.foundInBreaches', { count: profile.breachCount })}
                                                     </span>
                                                 }
                                             />
@@ -432,18 +434,18 @@ export function PasswordHealthPage() {
 
                                     {/* ===== DUPLICATES ===== */}
                                     <IssueSection
-                                        title="Reused Passwords"
+                                        title={t('health.reused')}
                                         icon={<Copy size={20} />}
                                         count={duplicates.reduce((s, d) => s + d.count, 0)}
                                         color="orange"
                                         isExpanded={expandedSection === 'duplicates'}
                                         onToggle={() => toggleSection('duplicates')}
-                                        emptyText="No reused passwords"
+                                        emptyText={t('health.noReused')}
                                     >
                                         {duplicates.map((group, i) => (
                                             <div key={i} className="space-y-1">
                                                 <p className="text-xs text-orange-400 font-medium px-1 pt-2">
-                                                    Same password used on {group.count} accounts:
+                                                    {t('health.samePasswordOn', { count: group.count })}
                                                 </p>
                                                 {group.profiles.map(profile => (
                                                     <ProfileIssueCard
@@ -458,13 +460,13 @@ export function PasswordHealthPage() {
 
                                     {/* ===== WEAK ===== */}
                                     <IssueSection
-                                        title="Weak Passwords"
+                                        title={t('health.weak')}
                                         icon={<AlertTriangle size={20} />}
                                         count={weakPasswords.length}
                                         color="yellow"
                                         isExpanded={expandedSection === 'weak'}
                                         onToggle={() => toggleSection('weak')}
-                                        emptyText="No weak passwords"
+                                        emptyText={t('health.noWeak')}
                                     >
                                         {weakPasswords.map(profile => (
                                             <ProfileIssueCard
@@ -476,7 +478,7 @@ export function PasswordHealthPage() {
                                                         ? 'bg-red-900/30 text-red-400'
                                                         : 'bg-yellow-900/30 text-yellow-400'
                                                         }`}>
-                                                        {profile.strength.label} · {profile.password.length} chars
+                                                        {t(profile.strength.labelKey)} · {profile.password.length} {t('health.chars')}
                                                     </span>
                                                 }
                                             />
@@ -487,9 +489,9 @@ export function PasswordHealthPage() {
                                     {!isChecking && totalIssues === 0 && (
                                         <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-6 text-center">
                                             <ShieldCheck size={40} className="mx-auto text-green-500 mb-3" />
-                                            <p className="font-semibold text-green-300">All passwords look good!</p>
+                                            <p className="font-semibold text-green-300">{t('health.allClear')}</p>
                                             <p className="text-sm text-green-400 mt-1">
-                                                No compromised, reused, or weak passwords detected.
+                                                {t('health.allClearMessage')}
                                             </p>
                                         </div>
                                     )}
@@ -498,11 +500,7 @@ export function PasswordHealthPage() {
                                     <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 flex items-start gap-3">
                                         <Shield size={20} className="text-blue-400 flex-shrink-0 mt-0.5" />
                                         <div className="text-sm text-blue-300 space-y-1">
-                                            <p>
-                                                Breach data is checked via <strong>HaveIBeenPwned</strong> using k-anonymity.
-                                                Your passwords are never sent over the network — only the first 5 characters
-                                                of the SHA-1 hash are transmitted.
-                                            </p>
+                                            <p>{t('health.hibpInfo')}</p>
                                         </div>
                                     </div>
                                 </>

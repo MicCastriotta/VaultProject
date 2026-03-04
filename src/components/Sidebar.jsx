@@ -1,4 +1,5 @@
 ﻿import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { Shield, Key, Activity, Settings, LogOut } from 'lucide-react';
 
@@ -6,12 +7,13 @@ export function Sidebar() {
     const navigate = useNavigate();
     const location = useLocation();
     const { logout } = useAuth();
+    const { t } = useTranslation();
 
     const navItems = [
-        { label: 'Vault', icon: Shield, path: '/' },
-        { label: 'Generator', icon: Key, path: '/generator' },
-        { label: 'Health', icon: Activity, path: '/health' },
-        { label: 'Settings', icon: Settings, path: '/settings' }
+        { label: t('nav.vault'), icon: Shield, path: '/' },
+        { label: t('nav.generator'), icon: Key, path: '/generator' },
+        { label: t('nav.health'), icon: Activity, path: '/health' },
+        { label: t('nav.settings'), icon: Settings, path: '/settings' }
     ];
 
     function handleLogout() {
@@ -59,7 +61,7 @@ export function Sidebar() {
                         className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 transition-all"
                     >
                         <LogOut size={18} />
-                        Logout
+                        {t('auth.logout')}
                     </button>
                 </div>
             </aside>

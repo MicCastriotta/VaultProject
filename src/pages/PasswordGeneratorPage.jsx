@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Copy, Check, RefreshCw, Shield } from 'lucide-react';
 
 // Set di caratteri
@@ -163,17 +164,18 @@ function calculateEntropy(password, mode, options) {
  * Valuta la forza in base all'entropia
  */
 function getStrengthFromEntropy(bits) {
-    if (bits === 0) return { label: '', color: 'bg-slate-600', textColor: 'text-slate-500', percent: 0 };
-    if (bits < 30) return { label: 'Very Weak', color: 'bg-red-500', textColor: 'text-red-400', percent: 10 };
-    if (bits < 50) return { label: 'Weak', color: 'bg-orange-500', textColor: 'text-orange-400', percent: 25 };
-    if (bits < 70) return { label: 'Fair', color: 'bg-yellow-500', textColor: 'text-yellow-400', percent: 45 };
-    if (bits < 90) return { label: 'Strong', color: 'bg-blue-500', textColor: 'text-blue-400', percent: 65 };
-    if (bits < 120) return { label: 'Very Strong', color: 'bg-green-500', textColor: 'text-green-400', percent: 85 };
-    return { label: 'Excellent', color: 'bg-green-400', textColor: 'text-green-400', percent: 100 };
+    if (bits === 0) return { labelKey: '', color: 'bg-slate-600', textColor: 'text-slate-500', percent: 0 };
+    if (bits < 30) return { labelKey: 'generator.strength.veryWeak', color: 'bg-red-500', textColor: 'text-red-400', percent: 10 };
+    if (bits < 50) return { labelKey: 'generator.strength.weak', color: 'bg-orange-500', textColor: 'text-orange-400', percent: 25 };
+    if (bits < 70) return { labelKey: 'generator.strength.fair', color: 'bg-yellow-500', textColor: 'text-yellow-400', percent: 45 };
+    if (bits < 90) return { labelKey: 'generator.strength.strong', color: 'bg-blue-500', textColor: 'text-blue-400', percent: 65 };
+    if (bits < 120) return { labelKey: 'generator.strength.veryStrong', color: 'bg-green-500', textColor: 'text-green-400', percent: 85 };
+    return { labelKey: 'generator.strength.excellent', color: 'bg-green-400', textColor: 'text-green-400', percent: 100 };
 }
 
 
 export function PasswordGeneratorPage() {
+    const { t } = useTranslation();
     const [mode, setMode] = useState('password');
 
     const [passwordOptions, setPasswordOptions] = useState({
@@ -242,7 +244,7 @@ export function PasswordGeneratorPage() {
                 <div className="max-w-2xl mx-auto space-y-4 pb-6">
 
                     {/* Page title */}
-                    <h1 className="text-2xl font-bold text-white mb-2">Password Generator</h1>
+                    <h1 className="text-2xl font-bold text-white mb-2">{t('generator.title')}</h1>
 
                     {/* Output */}
                     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-3">
@@ -250,7 +252,7 @@ export function PasswordGeneratorPage() {
                             <div className="flex-1 font-mono text-sm bg-slate-900/60 border border-slate-700 px-3 py-3 rounded-lg break-all min-h-[48px] flex items-center text-gray-200">
                                 {generatedPassword || (
                                     <span className="text-slate-500">
-                                        Premi "Generate" per creare una password
+                                        {t('generator.pressGenerate')}
                                     </span>
                                 )}
                             </div>
@@ -268,10 +270,10 @@ export function PasswordGeneratorPage() {
                             <div className="space-y-1">
                                 <div className="flex justify-between items-center text-xs">
                                     <span className={`font-semibold ${strength.textColor}`}>
-                                        {strength.label}
+                                        {strength.labelKey ? t(strength.labelKey) : ''}
                                     </span>
                                     <span className="text-slate-400">
-                                        {entropy} bit entropy
+                                        {t('generator.entropy', { bits: entropy })}
                                     </span>
                                 </div>
                                 <div className="w-full bg-slate-700 rounded-full h-2">
@@ -290,7 +292,7 @@ export function PasswordGeneratorPage() {
                             className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             <RefreshCw size={20} />
-                            Generate
+                            {t('generator.generate')}
                         </button>
                     </div>
 
@@ -303,7 +305,7 @@ export function PasswordGeneratorPage() {
                                 : 'text-slate-400 hover:bg-slate-700'
                                 }`}
                         >
-                            Password
+                            {t('generator.mode.password')}
                         </button>
                         <button
                             onClick={() => { setMode('passphrase'); setGeneratedPassword(''); }}
@@ -312,7 +314,7 @@ export function PasswordGeneratorPage() {
                                 : 'text-slate-400 hover:bg-slate-700'
                                 }`}
                         >
-                            Passphrase
+                            {t('generator.mode.passphrase')}
                         </button>
                     </div>
 
@@ -322,7 +324,7 @@ export function PasswordGeneratorPage() {
                             {/* Length slider */}
                             <div>
                                 <div className="flex justify-between items-center mb-2">
-                                    <label className="text-sm font-medium text-gray-300">Length</label>
+                                    <label className="text-sm font-medium text-gray-300">{t('generator.length')}</label>
                                     <span className="text-sm font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
                                         {passwordOptions.length}
                                     </span>
@@ -346,31 +348,31 @@ export function PasswordGeneratorPage() {
 
                             {/* Character toggles */}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-300">Characters</label>
+                                <label className="text-sm font-medium text-gray-300">{t('generator.characters')}</label>
 
                                 <ToggleOption
-                                    label="Lowercase"
+                                    label={t('generator.lowercase')}
                                     example="a-z"
                                     checked={passwordOptions.useLower}
                                     onChange={(v) => setPasswordOptions(prev => ({ ...prev, useLower: v }))}
                                     disabled={!passwordOptions.useUpper && !passwordOptions.useDigits && !passwordOptions.useSymbols && passwordOptions.useLower}
                                 />
                                 <ToggleOption
-                                    label="Uppercase"
+                                    label={t('generator.uppercase')}
                                     example="A-Z"
                                     checked={passwordOptions.useUpper}
                                     onChange={(v) => setPasswordOptions(prev => ({ ...prev, useUpper: v }))}
                                     disabled={!passwordOptions.useLower && !passwordOptions.useDigits && !passwordOptions.useSymbols && passwordOptions.useUpper}
                                 />
                                 <ToggleOption
-                                    label="Numbers"
+                                    label={t('generator.numbers')}
                                     example="0-9"
                                     checked={passwordOptions.useDigits}
                                     onChange={(v) => setPasswordOptions(prev => ({ ...prev, useDigits: v }))}
                                     disabled={!passwordOptions.useLower && !passwordOptions.useUpper && !passwordOptions.useSymbols && passwordOptions.useDigits}
                                 />
                                 <ToggleOption
-                                    label="Symbols"
+                                    label={t('generator.symbols')}
                                     example="!@#$%..."
                                     checked={passwordOptions.useSymbols}
                                     onChange={(v) => setPasswordOptions(prev => ({ ...prev, useSymbols: v }))}
@@ -386,7 +388,7 @@ export function PasswordGeneratorPage() {
                             {/* Word count slider */}
                             <div>
                                 <div className="flex justify-between items-center mb-2">
-                                    <label className="text-sm font-medium text-gray-300">Words</label>
+                                    <label className="text-sm font-medium text-gray-300">{t('generator.words')}</label>
                                     <span className="text-sm font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
                                         {passphraseOptions.wordCount}
                                     </span>
@@ -410,7 +412,7 @@ export function PasswordGeneratorPage() {
 
                             {/* Separator */}
                             <div>
-                                <label className="text-sm font-medium text-gray-300 block mb-2">Separator</label>
+                                <label className="text-sm font-medium text-gray-300 block mb-2">{t('generator.separator')}</label>
                                 <div className="flex gap-2">
                                     {['-', '.', '_', ' ', '#'].map((sep) => (
                                         <button
@@ -429,8 +431,8 @@ export function PasswordGeneratorPage() {
 
                             {/* Capitalize toggle */}
                             <ToggleOption
-                                label="Capitalize words"
-                                example="Word vs word"
+                                label={t('generator.capitalizeWords')}
+                                example={t('generator.capitalizeExample')}
                                 checked={passphraseOptions.capitalize}
                                 onChange={(v) => setPassphraseOptions(prev => ({ ...prev, capitalize: v }))}
                             />
@@ -442,13 +444,13 @@ export function PasswordGeneratorPage() {
                         <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
                             <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
                                 <h2 className="text-sm font-semibold text-gray-300">
-                                    Recent ({history.length})
+                                    {t('generator.recent', { count: history.length })}
                                 </h2>
                                 <button
                                     onClick={() => setHistory([])}
                                     className="text-xs text-red-400 hover:text-red-300 transition-colors"
                                 >
-                                    Clear
+                                    {t('generator.clear')}
                                 </button>
                             </div>
                             <div className="divide-y divide-slate-700/50">

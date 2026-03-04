@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,6 +26,7 @@ export function ProfileDetailPage() {
     const navigate = useNavigate();
     const { id } = useParams();
     const { refreshHMAC } = useAuth();
+    const { t } = useTranslation();
     const [profile, setProfile] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [copiedField, setCopiedField] = useState(null);
@@ -137,7 +139,7 @@ export function ProfileDetailPage() {
                             >
                                 <ArrowLeft size={24} />
                             </button>
-                            <h1 className="text-2xl font-bold text-white">Details</h1>
+                            <h1 className="text-2xl font-bold text-white">{t('profiles.details')}</h1>
                         </div>
                         <div className="flex items-center gap-2">
                             <button
@@ -178,7 +180,7 @@ export function ProfileDetailPage() {
                         <div className="flex-1">
                             <h2 className="text-xl font-bold text-white">{profile.title}</h2>
                             <p className="text-sm text-slate-400 mt-1">
-                                Last modified: {new Date(profile.lastModified).toLocaleDateString()}
+                                {t('profiles.lastModified')} {new Date(profile.lastModified).toLocaleDateString()}
                             </p>
                         </div>
                     </div>
@@ -188,7 +190,7 @@ export function ProfileDetailPage() {
                         <>
                             {profile.website && (
                                 <DetailField
-                                    label="Web Site"
+                                    label={t('profiles.fields.website')}
                                     value={profile.website}
                                     onCopy={() => handleCopy(profile.website, 'website')}
                                     copied={copiedField === 'website'}
@@ -205,7 +207,7 @@ export function ProfileDetailPage() {
 
                             {profile.username && (
                                 <DetailField
-                                    label="Username / Email"
+                                    label={t('profiles.fields.usernameEmail')}
                                     value={profile.username}
                                     onCopy={() => handleCopy(profile.username, 'username')}
                                     copied={copiedField === 'username'}
@@ -214,7 +216,7 @@ export function ProfileDetailPage() {
 
                             {profile.password && (
                                 <DetailField
-                                    label="Password"
+                                    label={t('profiles.fields.password')}
                                     value={profile.password}
                                     onCopy={() => handleCopy(profile.password, 'password')}
                                     copied={copiedField === 'password'}
@@ -226,7 +228,7 @@ export function ProfileDetailPage() {
                             {profile.secretKey && (
                                 <div className="space-y-3">
                                     <DetailField
-                                        label="OTP Secret Key"
+                                        label={t('profiles.fields.otpSecret')}
                                         value={profile.secretKey}
                                         onCopy={() => handleCopy(profile.secretKey, 'secret')}
                                         copied={copiedField === 'secret'}
@@ -249,7 +251,7 @@ export function ProfileDetailPage() {
                             {profile.numberCard && (
                                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Card Number
+                                        {t('profiles.fields.cardNumber')}
                                     </label>
                                     <div className="flex items-center gap-2">
                                         <div className="flex-1 font-mono text-sm bg-slate-900/60 border border-slate-700 px-3 py-2 rounded-lg text-gray-200 flex items-center justify-between">
@@ -298,7 +300,7 @@ export function ProfileDetailPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 {profile.deadline && (
                                     <DetailField
-                                        label="Expiration"
+                                        label={t('profiles.fields.expiration')}
                                         value={profile.deadline}
                                         onCopy={() => handleCopy(profile.deadline, 'deadline')}
                                         copied={copiedField === 'deadline'}
@@ -307,7 +309,7 @@ export function ProfileDetailPage() {
 
                                 {profile.cvv && (
                                     <DetailField
-                                        label="CVV"
+                                        label={t('profiles.fields.cvv')}
                                         value={profile.cvv}
                                         onCopy={() => handleCopy(profile.cvv, 'cvv')}
                                         copied={copiedField === 'cvv'}
@@ -318,7 +320,7 @@ export function ProfileDetailPage() {
 
                             {profile.owner && (
                                 <DetailField
-                                    label="Card Owner"
+                                    label={t('profiles.fields.cardOwner')}
                                     value={profile.owner}
                                     onCopy={() => handleCopy(profile.owner, 'owner')}
                                     copied={copiedField === 'owner'}
@@ -327,7 +329,7 @@ export function ProfileDetailPage() {
 
                             {profile.pin && (
                                 <DetailField
-                                    label="PIN"
+                                    label={t('profiles.fields.pin')}
                                     value={profile.pin}
                                     onCopy={() => handleCopy(profile.pin, 'pin')}
                                     copied={copiedField === 'pin'}
@@ -341,7 +343,7 @@ export function ProfileDetailPage() {
                     {profile.note && (
                         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                             <label className="block text-sm font-medium text-gray-300 mb-2">
-                                Comments
+                                {t('profiles.fields.comments')}
                             </label>
                             <p className="text-gray-200 whitespace-pre-wrap">{profile.note}</p>
                         </div>
@@ -357,22 +359,22 @@ export function ProfileDetailPage() {
             {showDeleteConfirm && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
                     <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-sm w-full">
-                        <h3 className="text-lg font-bold text-white mb-2">Delete Profile?</h3>
+                        <h3 className="text-lg font-bold text-white mb-2">{t('profiles.deleteTitle')}</h3>
                         <p className="text-gray-400 mb-4">
-                            Are you sure you want to delete this profile? This action cannot be undone.
+                            {t('profiles.deleteMessage')}
                         </p>
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setShowDeleteConfirm(false)}
                                 className="flex-1 px-4 py-2 border border-slate-600 text-gray-300 rounded-lg hover:bg-slate-700 transition-colors"
                             >
-                                Cancel
+                                {t('common.cancel')}
                             </button>
                             <button
                                 onClick={handleDelete}
                                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                             >
-                                Delete
+                                {t('common.delete')}
                             </button>
                         </div>
                     </div>
@@ -385,6 +387,7 @@ export function ProfileDetailPage() {
 // Helper component
 function DetailField({ label, value, onCopy, copied, masked = false, action }) {
     const [showValue, setShowValue] = useState(!masked);
+    const { t } = useTranslation();
 
     return (
         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
@@ -400,7 +403,7 @@ function DetailField({ label, value, onCopy, copied, masked = false, action }) {
                         onClick={() => setShowValue(!showValue)}
                         className="p-2 text-slate-400 hover:bg-slate-700 rounded-lg transition-colors text-sm"
                     >
-                        {showValue ? 'Hide' : 'Show'}
+                        {showValue ? t('profiles.hide') : t('profiles.show')}
                     </button>
                 )}
                 <button
