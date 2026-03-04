@@ -64,7 +64,7 @@ export function SettingsPage() {
     const { logout, autoLockTimeout, setAutoLockTimeout } = useAuth();
     const { t } = useTranslation();
     const { theme, setTheme } = useTheme();
-    const [openSections, setOpenSections] = useState(new Set(['interface']));
+    const [openSections, setOpenSections] = useState(new Set());
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const [isImporting, setIsImporting] = useState(false);

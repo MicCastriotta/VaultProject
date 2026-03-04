@@ -143,7 +143,7 @@
     },
     "step1": {
       "title": "Seleziona Database SQLite",
-      "description": "Carica il file database (.db, .sqlite) dalla tua vecchia app SafeProfiles",
+      "description": "Carica il file database (.db, .sqlite, .db3) dalla tua vecchia app SafeProfiles",
       "selectFile": "Clicca per selezionare il file database",
       "fileSelected": "File selezionato"
     },
@@ -177,7 +177,7 @@
       "finish": "Vai ai Profili"
     },
     "errors": {
-      "invalidFileType": "Tipo file non valido. Seleziona un file .db, .sqlite o .sqlite3",
+      "invalidFileType": "Tipo file non valido. Seleziona un file .db, .db3, .sqlite o .sqlite3",
       "fileTooLarge": "File troppo grande (max 50MB)",
       "noFileSelected": "Nessun file selezionato",
       "noPassword": "Inserisci la password",
