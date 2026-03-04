@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,6 +24,7 @@ export function ProfileFormPage() {
     const { id } = useParams();
     const { refreshHMAC } = useAuth();
     const isNew = !id || id === 'new' || id === 'undefined';
+    const { t } = useTranslation();
 
 
     const [category, setCategory] = useState('WEB');
@@ -70,7 +72,7 @@ export function ProfileFormPage() {
         try {
             const encrypted = await databaseService.getProfile(numericId);
             if (!encrypted) {
-                setError('Profile not found');
+                setError(t('profileForm.profileNotFound'));
                 return;
             }
 
@@ -83,7 +85,7 @@ export function ProfileFormPage() {
             setFormData(data);
         } catch (err) {
             console.error('Error loading profile:', err);
-            setError('Failed to load profile');
+            setError(t('profileForm.failedToLoad'));
         } finally {
             setIsLoading(false);
         }
@@ -189,7 +191,7 @@ export function ProfileFormPage() {
         setError('');
 
         if (!formData.title) {
-            setError('Title is required');
+            setError(t('profileForm.titleRequired'));
             return;
         }
 
@@ -243,7 +245,7 @@ export function ProfileFormPage() {
             navigate('/');
         } catch (err) {
             console.error('Error saving profile:', err);
-            setError('Failed to save profile');
+            setError(t('profileForm.failedToSave'));
         } finally {
             setIsSaving(false);
         }
@@ -272,7 +274,7 @@ export function ProfileFormPage() {
                                 <ArrowLeft size={24} />
                             </button>
                             <h1 className="text-2xl font-bold text-white">
-                                {isNew ? 'New Profile' : 'Edit Profile'}
+                                {isNew ? t('profileForm.newProfile') : t('profileForm.editProfile')}
                             </h1>
                         </div>
                         <button
@@ -299,7 +301,7 @@ export function ProfileFormPage() {
                                     }`}
                             >
                                 <User size={20} />
-                                <span>Account</span>
+                                <span>{t('profileForm.account')}</span>
                             </button>
                             <button
                                 onClick={() => setCategory('CARD')}
@@ -309,7 +311,7 @@ export function ProfileFormPage() {
                                     }`}
                             >
                                 <CreditCard size={20} />
-                                <span>Card</span>
+                                <span>{t('profileForm.card')}</span>
                             </button>
                         </div>
                     )}
@@ -328,7 +330,7 @@ export function ProfileFormPage() {
                             <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                                 <label className="block text-sm font-medium text-gray-300 mb-3">
                                     <Image size={16} className="inline mr-2" />
-                                    Brand Icon
+                                    {t('profileForm.brandIcon')}
                                 </label>
 
                                 <div className="flex items-center gap-3">
@@ -353,7 +355,7 @@ export function ProfileFormPage() {
                                                     onClick={() => setShowIconPicker(!showIconPicker)}
                                                     className="text-sm text-blue-400 hover:text-blue-300 font-medium"
                                                 >
-                                                    Change Icon
+                                                    {t('profileForm.changeIcon')}
                                                 </button>
                                             </div>
                                             <button
@@ -370,7 +372,7 @@ export function ProfileFormPage() {
                                             onClick={() => setShowIconPicker(!showIconPicker)}
                                             className="w-full py-3 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 transition-colors font-medium"
                                         >
-                                            + Choose Icon
+                                            {t('profileForm.chooseIcon')}
                                         </button>
                                     )}
                                 </div>
@@ -397,7 +399,7 @@ export function ProfileFormPage() {
                         {/* Title (common) */}
                         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                             <label className="block text-sm font-medium text-gray-300 mb-2">
-                                Title *
+                                {t('profileForm.titleLabel')} *
                             </label>
                             <input
                                 type="text"
@@ -413,7 +415,7 @@ export function ProfileFormPage() {
                             <>
                                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Web Site
+                                        {t('profiles.fields.website')}
                                     </label>
                                     <input
                                         type="text"
@@ -426,7 +428,7 @@ export function ProfileFormPage() {
 
                                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Username / Email
+                                        {t('profiles.fields.usernameEmail')}
                                     </label>
                                     <input
                                         type="text"
@@ -439,7 +441,7 @@ export function ProfileFormPage() {
 
                                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Password
+                                        {t('profiles.fields.password')}
                                     </label>
                                     <div className="flex gap-2">
                                         <input
@@ -463,7 +465,7 @@ export function ProfileFormPage() {
                                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-4">
                                     <div className="flex items-center justify-between">
                                         <label className="block text-sm font-medium text-gray-300">
-                                            Two-Factor Authentication (2FA)
+                                            {t('profileForm.twoFactor')}
                                         </label>
                                         {formData.secretKey && (
                                             <button
@@ -472,13 +474,13 @@ export function ProfileFormPage() {
                                                 className="text-sm text-red-400 hover:text-red-300 flex items-center gap-1"
                                             >
                                                 <Trash2 size={16} />
-                                                Remove
+                                                {t('profileForm.remove2fa')}
                                             </button>
                                         )}
                                     </div>
 
                                     <p className="text-xs text-slate-500">
-                                        Add your 2FA secret key manually or scan a QR code
+                                        {t('profileForm.twoFactorHint')}
                                     </p>
 
                                     {!formData.secretKey ? (
@@ -488,7 +490,7 @@ export function ProfileFormPage() {
                                                 value={formData.secretKey}
                                                 onChange={(e) => setFormData(prev => ({ ...prev, secretKey: e.target.value }))}
                                                 className="w-full px-3 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm placeholder-slate-500"
-                                                placeholder="Enter Base32 secret key..."
+                                                placeholder={t('profileForm.base32Placeholder')}
                                             />
 
                                             <button
@@ -497,14 +499,14 @@ export function ProfileFormPage() {
                                                 className="w-full py-3 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 transition-colors flex items-center justify-center gap-2 font-medium"
                                             >
                                                 <QrCode size={20} />
-                                                Scan QR Code
+                                                {t('profileForm.scanQR')}
                                             </button>
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
                                             {/* Secret Key Display */}
                                             <div className="bg-slate-900/60 border border-slate-700 px-3 py-2 rounded-lg">
-                                                <div className="text-xs text-slate-500 mb-1">Secret Key</div>
+                                                <div className="text-xs text-slate-500 mb-1">{t('profileForm.secretKey')}</div>
                                                 <div className="font-mono text-sm break-all text-gray-200">{formData.secretKey}</div>
                                             </div>
 
@@ -524,7 +526,7 @@ export function ProfileFormPage() {
                             <>
                                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Card Number
+                                        {t('profiles.fields.cardNumber')}
                                     </label>
                                     <div className="relative">
                                         <input
@@ -576,7 +578,7 @@ export function ProfileFormPage() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                                         <label className="block text-sm font-medium text-gray-300 mb-2">
-                                            Expiration
+                                            {t('profiles.fields.expiration')}
                                         </label>
                                         <input
                                             type="text"
@@ -593,7 +595,7 @@ export function ProfileFormPage() {
 
                                     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                                         <label className="block text-sm font-medium text-gray-300 mb-2">
-                                            CVV
+                                            {t('profiles.fields.cvv')}
                                         </label>
                                         <input
                                             type="text"
@@ -608,7 +610,7 @@ export function ProfileFormPage() {
 
                                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Card Owner
+                                        {t('profiles.fields.cardOwner')}
                                     </label>
                                     <input
                                         type="text"
@@ -621,7 +623,7 @@ export function ProfileFormPage() {
 
                                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        PIN
+                                        {t('profiles.fields.pin')}
                                     </label>
                                     <input
                                         type="text"
@@ -638,14 +640,14 @@ export function ProfileFormPage() {
                         {/* Note (common) */}
                         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                             <label className="block text-sm font-medium text-gray-300 mb-2">
-                                Comments
+                                {t('profiles.fields.comments')}
                             </label>
                             <textarea
                                 value={formData.note}
                                 onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
                                 className="w-full px-3 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-500"
                                 rows="4"
-                                placeholder="Additional notes..."
+                                placeholder={t('profileForm.additionalNotes')}
                             />
                         </div>
 
@@ -655,7 +657,7 @@ export function ProfileFormPage() {
                             disabled={isSaving}
                             className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                         >
-                            {isSaving ? 'Saving...' : 'Save Profile'}
+                            {isSaving ? t('profileForm.saving') : t('profileForm.saveProfile')}
                         </button>
                     </form>
                     </div>{/* fine flex-1 overflow-y-auto */}

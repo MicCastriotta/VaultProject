@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
 import { Plus, Search, ArrowUpDown, User, CreditCard, LogOut } from 'lucide-react';
@@ -14,15 +15,9 @@ const SORT_OPTIONS = {
     DATE_DESC: 'date_desc'
 };
 
-const SORT_LABELS = {
-    [SORT_OPTIONS.ALPHA_ASC]: 'A → Z',
-    [SORT_OPTIONS.ALPHA_DESC]: 'Z → A',
-    [SORT_OPTIONS.DATE_ASC]: 'Oldest First',
-    [SORT_OPTIONS.DATE_DESC]: 'Newest First'
-};
-
 export function MainPage() {
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const [decryptedProfiles, setDecryptedProfiles] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
@@ -158,7 +153,7 @@ export function MainPage() {
 
                 {/* Header */}
                 <div className="flex justify-between items-center mb-6 relative">
-                    <h1 className="text-2xl font-semibold text-white">Your Vault</h1>
+                    <h1 className="text-2xl font-semibold text-white">{t('profiles.vault')}</h1>
 
                     <div className="flex items-center gap-2">
 
@@ -191,7 +186,12 @@ export function MainPage() {
 
                         <div className="absolute right-6 mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-50 w-48">
                             <div className="py-2">
-                                {Object.entries(SORT_LABELS).map(([value, label]) => (
+                                {Object.entries({
+                            [SORT_OPTIONS.ALPHA_ASC]: t('profiles.sort.alphaAsc'),
+                            [SORT_OPTIONS.ALPHA_DESC]: t('profiles.sort.alphaDesc'),
+                            [SORT_OPTIONS.DATE_ASC]: t('profiles.sort.dateAsc'),
+                            [SORT_OPTIONS.DATE_DESC]: t('profiles.sort.dateDesc'),
+                        }).map(([value, label]) => (
                                     <button
                                         key={value}
                                         onClick={() => {
@@ -217,7 +217,7 @@ export function MainPage() {
                     <input
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Search..."
+                        placeholder={t('profiles.searchPlaceholder')}
                         className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-800/70 border border-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />
                 </div>
@@ -229,7 +229,7 @@ export function MainPage() {
                             <div className="animate-spin h-10 w-10 border-b-2 border-blue-500 rounded-full" />
                         </div>
                     ) : sortedProfiles.length === 0 ? (
-                        <p className="text-gray-400">No profiles yet</p>
+                        <p className="text-gray-400">{t('profiles.noProfiles')}</p>
                     ) : (
                                 <div className="space-y-6">
                                     {sortedGroupKeys.map(group => (

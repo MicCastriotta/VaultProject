@@ -5,10 +5,12 @@
 
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, Lock } from 'lucide-react';
 
 export function LoginPage() {
     const { login, biometricEnabled } = useAuth();
+    const { t } = useTranslation();
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -21,7 +23,7 @@ export function LoginPage() {
         setError('');
 
         if (!password) {
-            setError('Required field');
+            setError(t('auth.requiredField'));
             return;
         }
 
@@ -31,11 +33,11 @@ export function LoginPage() {
             const result = await login(password);
 
             if (!result.success) {
-                setError(result.error === 'Wrong password' ? 'Wrong Password' : result.error);
+                setError(result.error === 'Wrong password' ? t('auth.wrongPassword') : result.error);
             }
             // Se successo, AuthContext reindirizza automaticamente
         } catch (err) {
-            setError('Unexpected error');
+            setError(t('auth.unexpectedError'));
         } finally {
             setIsLoading(false);
         }
@@ -53,7 +55,7 @@ export function LoginPage() {
                         </div>
                     </div>
                     <h1 className="text-3xl font-bold text-white mb-2 tracking-wide">🔐 OwnVault</h1>
-                    <p className="text-gray-400 text-sm">Welcome Back!</p>
+                    <p className="text-gray-400 text-sm">{t('login.welcomeBack')}</p>
                 </div>
 
                 {/* Form Glass Card */}
@@ -61,14 +63,14 @@ export function LoginPage() {
                     <form onSubmit={handleSubmit} className="space-y-5">
                         {/* Password Input */}
                         <div className="space-y-2">
-                            <label className="text-xs text-gray-400 font-medium">Master Password</label>
+                            <label className="text-xs text-gray-400 font-medium">{t('auth.masterPassword')}</label>
                             <div className="relative">
                                 <input
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="w-full px-4 py-3 bg-slate-800/70 text-gray-200 border border-slate-700 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent pr-12 placeholder-gray-500"
-                                    placeholder="Enter your password"
+                                    placeholder={t('login.enterPassword')}
                                     disabled={isLoading}
                                     autoFocus={!biometricEnabled}
                                 />
@@ -97,17 +99,17 @@ export function LoginPage() {
                             {isLoading ? (
                                 <div className="flex items-center justify-center gap-2">
                                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                    <span>Unlocking...</span>
+                                    <span>{t('login.unlocking')}</span>
                                 </div>
                             ) : (
-                                'Unlock Vault'
+                                t('login.unlockVault')
                             )}
                         </button>
 
-                        {/* Hint biometria: la verifica parte automaticamente dopo la password */}
+                        {/* Hint biometria */}
                         {biometricEnabled && (
                             <p className="text-xs text-center text-gray-500">
-                                Biometric verification will be requested automatically after your password
+                                {t('login.biometricHint')}
                             </p>
                         )}
                     </form>
@@ -115,7 +117,7 @@ export function LoginPage() {
 
                 {/* Footer */}
                 <div className="mt-6 text-center text-xs text-gray-500">
-                    End-to-End Encryption • v{version}
+                    {t('login.e2eEncryption')} • v{version}
                 </div>
             </div>
         </div>

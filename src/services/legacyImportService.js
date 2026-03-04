@@ -28,7 +28,7 @@ class LegacyImportService {
 
         const initSqlJs = (await import('sql.js')).default;
         this.SQL = await initSqlJs({
-            locateFile: file => `https://sql.js.org/dist/${file}`
+            locateFile: file => `/${file}`  // servito da public/ nel build
         });
     }
 

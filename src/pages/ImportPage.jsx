@@ -230,7 +230,7 @@ const ImportPage = () => {
                 <input
                     type="file"
                     id="db-file"
-                    accept=".db,.sqlite,.sqlite3"
+                    accept=".db,.sqlite,.sqlite3,.db3"
                     onChange={handleFileSelect}
                     className="hidden"
                 />
@@ -243,7 +243,7 @@ const ImportPage = () => {
                         {t('import.step1.selectFile')}
                     </span>
                     <span className="text-xs text-gray-500 mt-1">
-                        .db, .sqlite, .sqlite3
+                        .db, .db3, .sqlite, .sqlite3
                     </span>
                 </label>
             </div>

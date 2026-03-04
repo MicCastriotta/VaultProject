@@ -64,7 +64,7 @@ export function SettingsPage() {
     const { logout, autoLockTimeout, setAutoLockTimeout } = useAuth();
     const { t } = useTranslation();
     const { theme, setTheme } = useTheme();
-    const [openSections, setOpenSections] = useState(new Set(['interface']));
+    const [openSections, setOpenSections] = useState(new Set());
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
@@ -90,9 +90,9 @@ export function SettingsPage() {
                 setSyncConflict(data);
             } else if (event === 'synced') {
                 loadSyncStatus();
-                setMessage({ type: 'success', text: `Synced successfully (${data.direction})` });
+                setMessage({ type: 'success', text: t('settings.sync.syncedDirection', { direction: data.direction }) });
             } else if (event === 'error') {
-                setMessage({ type: 'error', text: `Sync error: ${data.error}` });
+                setMessage({ type: 'error', text: t('settings.sync.syncErrorMsg', { error: data.error }) });
             }
         };
 
@@ -114,7 +114,7 @@ export function SettingsPage() {
         try {
             await syncService.enableSync();
             await loadSyncStatus();
-            setMessage({ type: 'success', text: 'Google Drive sync enabled!' });
+            setMessage({ type: 'success', text: t('settings.sync.enableSuccess') });
         } catch (error) {
             console.error('Error enabling sync:', error);
             setMessage({ type: 'error', text: 'Failed to enable sync: ' + error.message });
@@ -125,7 +125,7 @@ export function SettingsPage() {
         try {
             await syncService.disableSync();
             await loadSyncStatus();
-            setMessage({ type: 'success', text: 'Google Drive sync disabled' });
+            setMessage({ type: 'success', text: t('settings.sync.disableSuccess') });
         } catch (error) {
             console.error('Error disabling sync:', error);
             setMessage({ type: 'error', text: 'Failed to disable sync: ' + error.message });
@@ -135,7 +135,7 @@ export function SettingsPage() {
     async function handleSyncNow() {
         try {
             await syncService.sync();
-            setMessage({ type: 'success', text: 'Sync completed!' });
+            setMessage({ type: 'success', text: t('settings.sync.syncSuccess') });
         } catch (error) {
             console.error('Error syncing:', error);
             setMessage({ type: 'error', text: 'Sync failed: ' + error.message });
@@ -163,7 +163,7 @@ export function SettingsPage() {
                     const file = new File([blob], fileName, { type: 'application/json' });
                     if (navigator.canShare({ files: [file] })) {
                         await navigator.share({ files: [file], title: 'OwnVault Backup', text: 'Encrypted backup of OwnVault database' });
-                        setMessage({ type: 'success', text: 'Backup shared successfully!' });
+                        setMessage({ type: 'success', text: t('settings.export.success') });
                         return;
                     }
                 } catch (shareError) {
@@ -185,7 +185,7 @@ export function SettingsPage() {
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
-                setMessage({ type: 'success', text: 'Database exported successfully! Check your downloads.' });
+                setMessage({ type: 'success', text: t('settings.export.successDownload') });
                 return;
             } catch (downloadError) {
                 console.log('Download failed, trying clipboard...', downloadError);
@@ -193,9 +193,9 @@ export function SettingsPage() {
 
             try {
                 await navigator.clipboard.writeText(jsonString);
-                setMessage({ type: 'success', text: 'Backup copied to clipboard! Paste it in a text file to save.' });
+                setMessage({ type: 'success', text: t('settings.export.successClipboard') });
             } catch {
-                throw new Error('All export methods failed. Please try on desktop browser.');
+                throw new Error(t('settings.export.allMethodsFailed'));
             }
         } catch (error) {
             console.error('Export error:', error);
@@ -216,7 +216,7 @@ export function SettingsPage() {
             const result = await databaseService.importData(data);
             setMessage({
                 type: 'success',
-                text: `Import successful! Config: ${result.configImported ? '✓' : '✗'}, Profiles: ${result.profilesImported}. Logging out...`
+                text: t('settings.import.successFull', { config: result.configImported ? '✓' : '✗', profiles: result.profilesImported })
             });
             setTimeout(() => { logout(); }, 2000);
         } catch (error) {
@@ -276,7 +276,7 @@ export function SettingsPage() {
                             {/* ── Interfaccia ── */}
                             <AccordionSection
                                 icon={<Monitor size={18} />}
-                                title="Interfaccia"
+                                title={t('settings.interface')}
                                 sectionKey="interface"
                                 openSections={openSections}
                                 onToggle={toggleSection}
@@ -290,7 +290,7 @@ export function SettingsPage() {
                                 <div className="p-4">
                                     <p className="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
                                         {theme === 'dark' ? <Moon size={15} /> : <Sun size={15} />}
-                                        Theme
+                                        {t('settings.theme')}
                                     </p>
                                     <div className="grid grid-cols-2 gap-3">
                                         <button
@@ -302,7 +302,7 @@ export function SettingsPage() {
                                             }`}
                                         >
                                             <Moon size={22} className={theme === 'dark' ? 'text-blue-400' : 'text-gray-400'} />
-                                            <span className={`text-sm font-medium ${theme === 'dark' ? 'text-blue-300' : 'text-gray-400'}`}>Dark</span>
+                                            <span className={`text-sm font-medium ${theme === 'dark' ? 'text-blue-300' : 'text-gray-400'}`}>{t('settings.dark')}</span>
                                         </button>
                                         <button
                                             onClick={() => setTheme('light')}
@@ -313,7 +313,7 @@ export function SettingsPage() {
                                             }`}
                                         >
                                             <Sun size={22} className={theme === 'light' ? 'text-blue-400' : 'text-gray-400'} />
-                                            <span className={`text-sm font-medium ${theme === 'light' ? 'text-blue-300' : 'text-gray-400'}`}>Light</span>
+                                            <span className={`text-sm font-medium ${theme === 'light' ? 'text-blue-300' : 'text-gray-400'}`}>{t('settings.light')}</span>
                                         </button>
                                     </div>
                                 </div>
@@ -322,7 +322,7 @@ export function SettingsPage() {
                             {/* ── Sicurezza ── */}
                             <AccordionSection
                                 icon={<Shield size={18} />}
-                                title="Sicurezza"
+                                title={t('settings.securitySection')}
                                 sectionKey="security"
                                 openSections={openSections}
                                 onToggle={toggleSection}
@@ -334,28 +334,28 @@ export function SettingsPage() {
 
                                 {/* Auto-Lock */}
                                 <div className="p-4 space-y-3">
-                                    <p className="text-sm font-medium text-gray-300">Auto-Lock</p>
+                                    <p className="text-sm font-medium text-gray-300">{t('settings.autoLock')}</p>
                                     <p className="text-sm text-gray-400">
-                                        Automatically lock the app after a period of inactivity. The app also locks faster when you switch to another tab or app.
+                                        {t('settings.autoLockDescription')}
                                     </p>
                                     <select
                                         value={autoLockTimeout}
                                         onChange={(e) => setAutoLockTimeout(Number(e.target.value))}
                                         className="w-full px-3 py-3 bg-slate-900/60 border border-slate-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     >
-                                        <option value={60000}>1 minute</option>
-                                        <option value={120000}>2 minutes</option>
-                                        <option value={300000}>5 minutes (default)</option>
-                                        <option value={600000}>10 minutes</option>
-                                        <option value={900000}>15 minutes</option>
-                                        <option value={1800000}>30 minutes</option>
-                                        <option value={0}>Never (not recommended)</option>
+                                        <option value={60000}>{t('settings.autoLockOptions.1min')}</option>
+                                        <option value={120000}>{t('settings.autoLockOptions.2min')}</option>
+                                        <option value={300000}>{t('settings.autoLockOptions.5min')}</option>
+                                        <option value={600000}>{t('settings.autoLockOptions.10min')}</option>
+                                        <option value={900000}>{t('settings.autoLockOptions.15min')}</option>
+                                        <option value={1800000}>{t('settings.autoLockOptions.30min')}</option>
+                                        <option value={0}>{t('settings.autoLockOptions.never')}</option>
                                     </select>
                                     {autoLockTimeout === 0 && (
                                         <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 flex items-start gap-2">
                                             <AlertTriangle size={18} className="text-yellow-400 flex-shrink-0 mt-0.5" />
                                             <p className="text-sm text-yellow-300">
-                                                Disabling auto-lock is not recommended. Anyone with access to your device could see your passwords.
+                                                {t('settings.autoLockDisabledWarning')}
                                             </p>
                                         </div>
                                     )}
@@ -374,39 +374,39 @@ export function SettingsPage() {
                                     {!isSyncEnabled ? (
                                         <>
                                             <p className="text-sm text-gray-400 mb-4">
-                                                Automatically sync your encrypted data across all your devices using Google Drive.
+                                                {t('settings.sync.syncAutomatically')}
                                             </p>
                                             <button
                                                 onClick={handleEnableSync}
                                                 className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                                             >
                                                 <Cloud size={20} />
-                                                <span>Connect Google Drive</span>
+                                                <span>{t('settings.sync.connectDrive')}</span>
                                             </button>
                                         </>
                                     ) : (
                                         <>
                                             <div className="space-y-3 mb-4">
                                                 <div className="flex items-center justify-between p-3 bg-slate-900/60 border border-slate-700 rounded-lg">
-                                                    <span className="text-sm font-medium text-gray-300">Status:</span>
+                                                    <span className="text-sm font-medium text-gray-300">{t('settings.sync.statusLabel')}</span>
                                                     <span className="flex items-center gap-2">
                                                         {syncStatus?.status === 'synced' && (
-                                                            <><CheckCircle size={16} className="text-green-500" /><span className="text-sm text-green-400">Synced</span></>
+                                                            <><CheckCircle size={16} className="text-green-500" /><span className="text-sm text-green-400">{t('settings.sync.synced')}</span></>
                                                         )}
                                                         {syncStatus?.status === 'syncing' && (
-                                                            <><RefreshCw size={16} className="text-blue-400 animate-spin" /><span className="text-sm text-blue-400">Syncing...</span></>
+                                                            <><RefreshCw size={16} className="text-blue-400 animate-spin" /><span className="text-sm text-blue-400">{t('settings.sync.status.syncing')}</span></>
                                                         )}
                                                         {syncStatus?.status === 'pending' && (
-                                                            <><AlertTriangle size={16} className="text-yellow-400" /><span className="text-sm text-yellow-400">Pending</span></>
+                                                            <><AlertTriangle size={16} className="text-yellow-400" /><span className="text-sm text-yellow-400">{t('settings.sync.pending')}</span></>
                                                         )}
                                                         {syncStatus?.status === 'offline' && (
-                                                            <><XCircle size={16} className="text-slate-400" /><span className="text-sm text-slate-400">Offline</span></>
+                                                            <><XCircle size={16} className="text-slate-400" /><span className="text-sm text-slate-400">{t('settings.sync.offline')}</span></>
                                                         )}
                                                     </span>
                                                 </div>
                                                 {syncStatus?.lastSyncTimestamp > 0 && (
                                                     <div className="flex items-center justify-between p-3 bg-slate-900/60 border border-slate-700 rounded-lg">
-                                                        <span className="text-sm font-medium text-gray-300">Last sync:</span>
+                                                        <span className="text-sm font-medium text-gray-300">{t('settings.sync.lastSyncLabel')}</span>
                                                         <span className="text-sm text-gray-400">
                                                             {new Date(syncStatus.lastSyncTimestamp).toLocaleString()}
                                                         </span>
@@ -420,14 +420,14 @@ export function SettingsPage() {
                                                     className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                                 >
                                                     <RefreshCw size={20} />
-                                                    <span>Sync Now</span>
+                                                    <span>{t('settings.sync.syncNowBtn')}</span>
                                                 </button>
                                                 <button
                                                     onClick={handleDisableSync}
                                                     className="w-full bg-slate-700 hover:bg-slate-600 text-gray-300 py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                                                 >
                                                     <LogOut size={20} />
-                                                    <span>Disconnect</span>
+                                                    <span>{t('settings.sync.disconnectBtn')}</span>
                                                 </button>
                                             </div>
                                         </>
@@ -438,7 +438,7 @@ export function SettingsPage() {
                             {/* ── Dati ── */}
                             <AccordionSection
                                 icon={<HardDrive size={18} />}
-                                title="Dati"
+                                title={t('settings.dataSection')}
                                 sectionKey="data"
                                 openSections={openSections}
                                 onToggle={toggleSection}
@@ -446,10 +446,10 @@ export function SettingsPage() {
                                 {/* Export */}
                                 <div className="p-4 space-y-3">
                                     <p className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                                        <Download size={15} /> Export Database
+                                        <Download size={15} /> {t('settings.export.title')}
                                     </p>
                                     <p className="text-sm text-gray-400">
-                                        Download an encrypted backup of all your profiles.
+                                        {t('settings.export.shortDescription')}
                                     </p>
                                     <button
                                         onClick={handleExport}
@@ -457,9 +457,9 @@ export function SettingsPage() {
                                         className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                     >
                                         {isExporting ? (
-                                            <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div><span>Exporting...</span></>
+                                            <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div><span>{t('settings.export.exporting')}</span></>
                                         ) : (
-                                            <><Download size={20} /><span>Export Database</span></>
+                                            <><Download size={20} /><span>{t('settings.export.button')}</span></>
                                         )}
                                     </button>
                                 </div>
@@ -467,21 +467,21 @@ export function SettingsPage() {
                                 {/* Import */}
                                 <div className="p-4 space-y-3">
                                     <p className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                                        <Upload size={15} /> Import Database
+                                        <Upload size={15} /> {t('settings.import.title')}
                                     </p>
                                     <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 flex items-start gap-2">
                                         <AlertTriangle size={18} className="text-yellow-400 flex-shrink-0 mt-0.5" />
                                         <p className="text-sm text-yellow-300">
-                                            <strong>Warning:</strong> Importing will replace all current data. Make sure to export first.
+                                            {t('settings.import.warningShort')}
                                         </p>
                                     </div>
                                     <label className="block">
                                         <input type="file" accept=".json" onChange={handleImport} disabled={isImporting} className="hidden" />
                                         <div className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 px-4 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-center gap-2">
                                             {isImporting ? (
-                                                <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div><span>Importing...</span></>
+                                                <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div><span>{t('settings.import.importing')}</span></>
                                             ) : (
-                                                <><Upload size={20} /><span>Choose File to Import</span></>
+                                                <><Upload size={20} /><span>{t('settings.import.button')}</span></>
                                             )}
                                         </div>
                                     </label>
@@ -507,17 +507,17 @@ export function SettingsPage() {
                                 {/* Delete All */}
                                 <div className="p-4 space-y-3">
                                     <p className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                                        <Trash2 size={15} /> Delete All Data
+                                        <Trash2 size={15} /> {t('settings.deleteAll.title')}
                                     </p>
                                     <p className="text-sm text-gray-400">
-                                        Permanently delete all profiles and reset the app. This action cannot be undone.
+                                        {t('settings.deleteAll.description')}
                                     </p>
                                     <button
                                         onClick={() => setShowDeleteConfirm(true)}
                                         className="w-full bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                                     >
                                         <Trash2 size={20} />
-                                        <span>Delete All Data</span>
+                                        <span>{t('settings.deleteAll.button')}</span>
                                     </button>
                                 </div>
 
@@ -526,9 +526,9 @@ export function SettingsPage() {
                                     <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 flex items-start gap-3">
                                         <Shield size={18} className="text-blue-400 flex-shrink-0 mt-0.5" />
                                         <div className="flex-1">
-                                            <h3 className="font-semibold text-blue-200 mb-1 text-sm">Security Note</h3>
+                                            <h3 className="font-semibold text-blue-200 mb-1 text-sm">{t('settings.security.title')}</h3>
                                             <p className="text-sm text-blue-300">
-                                                Your exported backup is encrypted with your master password. Keep it safe — it's required to import on any device.
+                                                {t('settings.security.shortDescription')}
                                             </p>
                                         </div>
                                     </div>
@@ -557,23 +557,23 @@ export function SettingsPage() {
                     <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full">
                         <div className="flex items-center gap-3 mb-4 text-red-400">
                             <AlertTriangle size={24} />
-                            <h3 className="text-lg font-bold text-white">Confirm Deletion</h3>
+                            <h3 className="text-lg font-bold text-white">{t('settings.deleteAll.confirmTitle')}</h3>
                         </div>
                         <p className="text-gray-300 mb-6">
-                            Are you sure you want to delete all data? This will permanently remove all profiles and reset the app. This action cannot be undone.
+                            {t('settings.deleteAll.confirmMessage')}
                         </p>
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setShowDeleteConfirm(false)}
                                 className="flex-1 border border-slate-600 text-gray-300 hover:bg-slate-700 py-3 px-4 rounded-lg font-medium transition-colors"
                             >
-                                Cancel
+                                {t('common.cancel')}
                             </button>
                             <button
                                 onClick={handleDeleteAll}
                                 className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-lg font-medium transition-colors"
                             >
-                                Delete All
+                                {t('settings.deleteAll.deleteAllBtn')}
                             </button>
                         </div>
                     </div>

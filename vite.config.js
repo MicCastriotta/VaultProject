@@ -8,11 +8,12 @@ function cspPlugin() {
   // Nota: frame-ancestors non funziona nei meta tag (limitazione spec) — impostarlo via HTTP header lato server
   const PROD_CSP = [
     "default-src 'self'",
-    "script-src 'self' 'wasm-unsafe-eval'",       // wasm-unsafe-eval richiesto da hash-wasm (PBKDF2); più stretto di unsafe-eval
+    "script-src 'self' 'wasm-unsafe-eval' https://apis.google.com",  // wasm-unsafe-eval per hash-wasm; apis.google.com per Google Drive Picker
     "style-src 'self' 'unsafe-inline'",           // Tailwind richiede inline styles
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
     "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://api.pwnedpasswords.com",
+    "frame-src https://content.googleapis.com https://docs.google.com",  // Google Drive Picker usa iframe da questi domini
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -39,6 +40,7 @@ function cspPlugin() {
             "img-src 'self' data: blob:",
             "font-src 'self' data:",
             "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://api.pwnedpasswords.com",
+            "frame-src https://content.googleapis.com https://docs.google.com",  // Google Drive Picker
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",

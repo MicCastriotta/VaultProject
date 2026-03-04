@@ -9,7 +9,14 @@
     "error": "Error",
     "success": "Success",
     "warning": "Warning",
-    "close": "Close"
+    "close": "Close",
+    "next": "Next"
+  },
+  "nav": {
+    "vault": "Vault",
+    "generator": "Generator",
+    "health": "Health",
+    "settings": "Settings"
   },
   "auth": {
     "login": "Login",
@@ -34,12 +41,75 @@
     "authenticating": "Authenticating...",
     "unlockBiometric": "Unlock with Biometrics",
     "passwordRequired": "Password is required",
-    "wrongPassword": "Wrong password"
+    "wrongPassword": "Wrong password",
+    "requiredField": "Required field",
+    "unexpectedError": "Unexpected error"
+  },
+  "login": {
+    "welcomeBack": "Welcome Back!",
+    "enterPassword": "Enter your password",
+    "unlocking": "Unlocking...",
+    "unlockVault": "Unlock Vault",
+    "biometricHint": "Biometric verification will be requested automatically after your password",
+    "e2eEncryption": "End-to-End Encryption"
+  },
+  "signup": {
+    "letsBegin": "Let's begin!",
+    "choosePasswordHint": "Choose a password that you will remember. In case of loss it will not be possible to recover the data!",
+    "passwordStrength": "Password strength",
+    "enterPasswordPlaceholder": "Enter password",
+    "confirmPasswordPlaceholder": "Confirm password",
+    "creating": "Creating...",
+    "start": "Start",
+    "passwordTooShort": "Password too short (min 5 characters)",
+    "setupFailed": "Setup failed",
+    "strength": {
+      "veryWeak": "Very Weak!",
+      "weak": "Weak!",
+      "medium": "Medium!",
+      "strong": "Strong!",
+      "veryStrong": "Very Strong!"
+    }
+  },
+  "tutorial": {
+    "skip": "Skip",
+    "next": "Next",
+    "getStarted": "Get Started",
+    "masterPassword": {
+      "title": "Master Password",
+      "description": "Choose a single password that will be used to encrypt all your web accounts and credit, debit or prepaid cards."
+    },
+    "zeroKnowledge": {
+      "title": "Zero Knowledge",
+      "description": "No plaintext data is ever saved. Security is further strengthened by biometric authentication or two-factor authentication."
+    },
+    "backupRestore": {
+      "title": "Backup & Restore",
+      "description": "Backup or restore your encrypted database at any time — ideal in case of device change or loss."
+    }
   },
   "settings": {
     "title": "Settings",
     "language": "Language",
     "selectLanguage": "Select Language",
+    "interface": "Interface",
+    "securitySection": "Security",
+    "dataSection": "Data",
+    "theme": "Theme",
+    "dark": "Dark",
+    "light": "Light",
+    "autoLock": "Auto-Lock",
+    "autoLockDescription": "Automatically lock the app after a period of inactivity. The app also locks faster when you switch to another tab or app.",
+    "autoLockDisabledWarning": "Disabling auto-lock is not recommended. Anyone with access to your device could see your passwords.",
+    "autoLockOptions": {
+      "1min": "1 minute",
+      "2min": "2 minutes",
+      "5min": "5 minutes (default)",
+      "10min": "10 minutes",
+      "15min": "15 minutes",
+      "30min": "30 minutes",
+      "never": "Never (not recommended)"
+    },
     "sync": {
       "title": "Google Drive Sync",
       "enable": "Enable Sync",
@@ -57,22 +127,39 @@
         "offline": "Offline"
       },
       "lastSync": "Last sync",
-      "account": "Account"
+      "account": "Account",
+      "connectDrive": "Connect Google Drive",
+      "syncAutomatically": "Automatically sync your encrypted data across all your devices using Google Drive.",
+      "statusLabel": "Status:",
+      "lastSyncLabel": "Last sync:",
+      "synced": "Synced",
+      "pending": "Pending",
+      "offline": "Offline",
+      "syncNowBtn": "Sync Now",
+      "disconnectBtn": "Disconnect",
+      "syncedDirection": "Synced successfully ({{direction}})",
+      "syncErrorMsg": "Sync error: {{error}}"
     },
     "export": {
       "title": "Export Database",
       "description": "Download an encrypted backup of all your profiles. The file will contain all your data in encrypted format.",
+      "shortDescription": "Download an encrypted backup of all your profiles.",
       "button": "Export Database",
       "exporting": "Exporting...",
       "success": "Backup shared successfully!",
-      "error": "Export failed"
+      "successDownload": "Database exported successfully! Check your downloads.",
+      "successClipboard": "Backup copied to clipboard! Paste it in a text file to save.",
+      "error": "Export failed",
+      "allMethodsFailed": "All export methods failed. Please try on desktop browser."
     },
     "import": {
       "title": "Import Database",
       "warning": "Warning: Importing will replace all current data. Make sure to export first if you want to keep your current profiles.",
+      "warningShort": "Warning: Importing will replace all current data. Make sure to export first.",
       "button": "Choose File to Import",
       "importing": "Importing...",
       "success": "Database imported successfully!",
+      "successFull": "Import successful! Config: {{config}}, Profiles: {{profiles}}. Logging out...",
       "error": "Import failed",
       "invalidFile": "Invalid backup file"
     },
@@ -82,11 +169,13 @@
       "button": "Delete All Data",
       "confirmTitle": "Confirm Deletion",
       "confirmMessage": "Are you sure you want to delete all data? This will permanently remove all profiles and reset the app. This action cannot be undone.",
-      "success": "All data deleted successfully"
+      "success": "All data deleted successfully",
+      "deleteAllBtn": "Delete All"
     },
     "security": {
       "title": "Security Note",
-      "description": "Your exported backup file is encrypted with your master password. Keep your password safe - it's required to import the data on any device."
+      "description": "Your exported backup file is encrypted with your master password. Keep your password safe - it's required to import the data on any device.",
+      "shortDescription": "Your exported backup is encrypted with your master password. Keep it safe — it's required to import on any device."
     },
     "biometric": {
       "title": "Biometric Authentication",
@@ -95,29 +184,62 @@
       "disable": "Disable Biometric",
       "setup": "Setup Biometric",
       "enabled": "Enabled",
-      "notAvailable": "Biometric authentication not available on this device"
+      "notAvailable": "Biometric authentication not available on this device",
+      "deviceNoSupport": "Your device doesn't support Face ID, Touch ID, Windows Hello, or fingerprint authentication.",
+      "enabledDescription": "Quick unlock is enabled using {{type}}. You can still use your password anytime.",
+      "disabledDescription": "Enable {{type}} for quick and secure access without typing your password.",
+      "note": "Note: Your encrypted data remains protected by your master password. Biometric authentication provides convenient access on this device only.",
+      "enabling": "Enabling...",
+      "disabling": "Disabling...",
+      "disableConfirm": "Are you sure you want to disable {{type}}? You'll need to use your password to unlock.",
+      "enableBtn": "Enable {{type}}",
+      "disableBtn": "Disable {{type}}",
+      "enableError": "Failed to enable biometric authentication",
+      "disableError": "Failed to disable biometric authentication"
     }
   },
   "profiles": {
     "title": "Profiles",
+    "vault": "Your Vault",
     "addNew": "Add New Profile",
     "search": "Search profiles...",
+    "searchPlaceholder": "Search...",
     "noProfiles": "No profiles yet",
     "noProfilesDescription": "Add your first profile to get started",
     "edit": "Edit",
     "delete": "Delete",
     "deleteConfirm": "Are you sure you want to delete this profile?",
     "deleteSuccess": "Profile deleted successfully",
+    "details": "Details",
+    "lastModified": "Last modified:",
+    "deleteTitle": "Delete Profile?",
+    "deleteMessage": "Are you sure you want to delete this profile? This action cannot be undone.",
+    "show": "Show",
+    "hide": "Hide",
+    "sort": {
+      "alphaAsc": "A → Z",
+      "alphaDesc": "Z → A",
+      "dateAsc": "Oldest First",
+      "dateDesc": "Newest First"
+    },
     "fields": {
       "name": "Name",
       "username": "Username",
       "email": "Email",
       "password": "Password",
-      "website": "Website",
+      "website": "Web Site",
       "notes": "Notes",
       "category": "Category",
       "totpSecret": "TOTP Secret",
-      "totpCode": "2FA Code"
+      "totpCode": "2FA Code",
+      "usernameEmail": "Username / Email",
+      "otpSecret": "OTP Secret Key",
+      "cardNumber": "Card Number",
+      "expiration": "Expiration",
+      "cvv": "CVV",
+      "cardOwner": "Card Owner",
+      "pin": "PIN",
+      "comments": "Comments"
     }
   },
   "profileForm": {
@@ -125,13 +247,124 @@
     "editProfile": "Edit Profile",
     "saveSuccess": "Profile saved successfully!",
     "saveError": "Error saving profile",
-    "requiredField": "This field is required"
+    "requiredField": "This field is required",
+    "titleRequired": "Title is required",
+    "profileNotFound": "Profile not found",
+    "failedToLoad": "Failed to load profile",
+    "failedToSave": "Failed to save profile",
+    "saving": "Saving...",
+    "saveProfile": "Save Profile",
+    "account": "Account",
+    "card": "Card",
+    "brandIcon": "Brand Icon",
+    "changeIcon": "Change Icon",
+    "chooseIcon": "+ Choose Icon",
+    "titleLabel": "Title",
+    "twoFactor": "Two-Factor Authentication (2FA)",
+    "twoFactorHint": "Add your 2FA secret key manually or scan a QR code",
+    "remove2fa": "Remove",
+    "base32Placeholder": "Enter Base32 secret key...",
+    "scanQR": "Scan QR Code",
+    "secretKey": "Secret Key",
+    "additionalNotes": "Additional notes..."
   },
   "messages": {
     "copied": "Copied to clipboard!",
     "copyError": "Failed to copy",
     "networkError": "Network error. Please check your connection.",
     "unknownError": "An unknown error occurred"
+  },
+  "generator": {
+    "title": "Password Generator",
+    "generate": "Generate",
+    "pressGenerate": "Press \"Generate\" to create a password",
+    "mode": {
+      "password": "Password",
+      "passphrase": "Passphrase"
+    },
+    "length": "Length",
+    "characters": "Characters",
+    "lowercase": "Lowercase",
+    "uppercase": "Uppercase",
+    "numbers": "Numbers",
+    "symbols": "Symbols",
+    "words": "Words",
+    "separator": "Separator",
+    "capitalizeWords": "Capitalize words",
+    "capitalizeExample": "Word vs word",
+    "recent": "Recent ({{count}})",
+    "clear": "Clear",
+    "entropy": "{{bits}} bit entropy",
+    "strength": {
+      "veryWeak": "Very Weak",
+      "weak": "Weak",
+      "fair": "Fair",
+      "strong": "Strong",
+      "veryStrong": "Very Strong",
+      "excellent": "Excellent"
+    }
+  },
+  "health": {
+    "title": "Password Health",
+    "analyzing": "Analyzing passwords...",
+    "lastChecked": "Last checked: {{time}}",
+    "reanalyze": "Re-analyze",
+    "noAccounts": "No web accounts with passwords to analyze.",
+    "accountsAnalyzed_one": "{{count}} account analyzed",
+    "accountsAnalyzed_other": "{{count}} accounts analyzed",
+    "issuesFound_one": "{{count}} issue found",
+    "issuesFound_other": "{{count}} issues found",
+    "checkingBreaches": "Checking breaches...",
+    "offline": "You're offline",
+    "offlineMessage": "Breach check requires an internet connection. Duplicate and weak password analysis is available offline.",
+    "compromised": "Compromised Passwords",
+    "reused": "Reused Passwords",
+    "weak": "Weak Passwords",
+    "checking": "Checking...",
+    "noCompromised": "No compromised passwords found",
+    "noReused": "No reused passwords",
+    "noWeak": "No weak passwords",
+    "foundInBreaches_one": "Found in {{count}} breach",
+    "foundInBreaches_other": "Found in {{count}} breaches",
+    "samePasswordOn": "Same password used on {{count}} accounts:",
+    "allClear": "All passwords look good!",
+    "allClearMessage": "No compromised, reused, or weak passwords detected.",
+    "hibpInfo": "Breach data is checked via HaveIBeenPwned using k-anonymity. Your passwords are never sent over the network — only the first 5 characters of the SHA-1 hash are transmitted.",
+    "score": {
+      "excellent": "Excellent",
+      "good": "Good",
+      "fair": "Fair",
+      "needsWork": "Needs Work",
+      "critical": "Critical",
+      "noData": "No data"
+    },
+    "time": {
+      "justNow": "just now",
+      "minuteAgo": "1 minute ago",
+      "minutesAgo": "{{count}} minutes ago",
+      "hourAgo": "1 hour ago",
+      "hoursAgo": "{{count}} hours ago"
+    },
+    "strength": {
+      "empty": "Empty",
+      "veryWeak": "Very Weak",
+      "weak": "Weak",
+      "fair": "Fair",
+      "strong": "Strong",
+      "veryStrong": "Very Strong"
+    },
+    "chars": "chars"
+  },
+  "install": {
+    "title": "Install OwnVault",
+    "subtitle": "Quick access from the Home screen",
+    "button": "Install",
+    "iosStep1Prefix": "Tap",
+    "iosStep1Share": "Share",
+    "iosStep1Suffix": "in the browser bar",
+    "iosStep2Prefix": "Select",
+    "iosStep2AddHome": "Add to Home Screen",
+    "iosBrowserHint": "↓ bottom bar in Safari"
   },
   "import": {
     "menuTitle": "Import Legacy Database",
@@ -143,7 +376,7 @@
     },
     "step1": {
       "title": "Select SQLite Database",
-      "description": "Upload the database file (.db, .sqlite) from your old SafeProfiles app",
+      "description": "Upload the database file (.db, .sqlite, .db3) from your old SafeProfiles app",
       "selectFile": "Click to select database file",
       "fileSelected": "File selected"
     },
@@ -177,7 +410,7 @@
       "finish": "Go to Profiles"
     },
     "errors": {
-      "invalidFileType": "Invalid file type. Select a .db, .sqlite or .sqlite3 file",
+      "invalidFileType": "Invalid file type. Select a .db, .db3, .sqlite or .sqlite3 file",
       "fileTooLarge": "File too large (max 50MB)",
       "noFileSelected": "No file selected",
       "noPassword": "Enter password",

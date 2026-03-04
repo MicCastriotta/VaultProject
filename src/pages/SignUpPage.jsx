@@ -1,15 +1,17 @@
-﻿/**
+/**
  * SignUp Page
  * Prima volta: crea password master
  */
 
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 import { cryptoService } from '../services/cryptoService';
 import { Eye, EyeOff, Lock } from 'lucide-react';
 
 export function SignUpPage() {
     const { setupMasterPassword } = useAuth();
+    const { t } = useTranslation();
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -22,12 +24,12 @@ export function SignUpPage() {
     const version = __APP_VERSION__;
 
     const strengthConfig = {
-        Blank: { progress: 0, color: 'bg-gray-300', text: '' },
-        VeryWeak: { progress: 25, color: 'bg-red-500', text: 'Very Weak!' },
-        Weak: { progress: 25, color: 'bg-orange-500', text: 'Weak!' },
-        Medium: { progress: 50, color: 'bg-orange-400', text: 'Medium!' },
-        Strong: { progress: 75, color: 'bg-blue-500', text: 'Strong!' },
-        VeryStrong: { progress: 100, color: 'bg-green-500', text: 'Very Strong!' }
+        Blank: { progress: 0, color: 'bg-gray-300', textKey: '' },
+        VeryWeak: { progress: 25, color: 'bg-red-500', textKey: 'signup.strength.veryWeak' },
+        Weak: { progress: 25, color: 'bg-orange-500', textKey: 'signup.strength.weak' },
+        Medium: { progress: 50, color: 'bg-orange-400', textKey: 'signup.strength.medium' },
+        Strong: { progress: 75, color: 'bg-blue-500', textKey: 'signup.strength.strong' },
+        VeryStrong: { progress: 100, color: 'bg-green-500', textKey: 'signup.strength.veryStrong' }
     };
 
     const currentStrength = strengthConfig[strength] || strengthConfig.Blank;
@@ -36,19 +38,18 @@ export function SignUpPage() {
         e.preventDefault();
         setError('');
 
-        // Validazione
         if (!password || !confirmPassword) {
-            setError('Required field');
+            setError(t('auth.requiredField'));
             return;
         }
 
         if (password !== confirmPassword) {
-            setError('Passwords do not match');
+            setError(t('auth.passwordMismatch'));
             return;
         }
 
         if (password.length < 5) {
-            setError('Password too short (min 5 characters)');
+            setError(t('signup.passwordTooShort'));
             return;
         }
 
@@ -58,11 +59,11 @@ export function SignUpPage() {
             const result = await setupMasterPassword(password);
 
             if (!result.success) {
-                setError(result.error || 'Setup failed');
+                setError(result.error || t('signup.setupFailed'));
             }
             // Se successo, AuthContext reindirizza automaticamente
         } catch (err) {
-            setError('Unexpected error');
+            setError(t('auth.unexpectedError'));
         } finally {
             setIsLoading(false);
         }
@@ -80,14 +81,14 @@ export function SignUpPage() {
                         </div>
                     </div>
                     <h1 className="text-3xl font-bold text-white mb-2 tracking-wide">🔐 OwnVault</h1>
-                    <p className="text-gray-400 text-sm">Let's begin!</p>
+                    <p className="text-gray-400 text-sm">{t('signup.letsBegin')}</p>
                 </div>
 
                 {/* Form Glass Card */}
                 <div className="glass rounded-3xl p-8 border border-slate-800 shadow-2xl">
                     <div className="mb-6">
                         <p className="text-gray-300 text-sm text-center">
-                            Choose a password that you will remember. In case of loss it will not be possible to recover the data!
+                            {t('signup.choosePasswordHint')}
                         </p>
                     </div>
 
@@ -95,7 +96,7 @@ export function SignUpPage() {
                         {/* Password Strength */}
                         {password && (
                             <div className="space-y-2">
-                                <label className="text-xs text-gray-400 font-medium">Password strength</label>
+                                <label className="text-xs text-gray-400 font-medium">{t('signup.passwordStrength')}</label>
                                 <div className="flex gap-2">
                                     <div className="flex-1 bg-slate-800/50 rounded-full h-2.5 overflow-hidden border border-slate-700">
                                         <div
@@ -108,7 +109,7 @@ export function SignUpPage() {
                                         currentStrength.progress < 75 ? 'text-orange-400' :
                                             'text-accent'
                                     }`}>
-                                    {currentStrength.text}
+                                    {currentStrength.textKey ? t(currentStrength.textKey) : ''}
                                 </p>
                             </div>
                         )}
@@ -116,7 +117,7 @@ export function SignUpPage() {
                         {/* Password Input */}
                         <div className="space-y-2">
                             <label className="text-xs text-gray-400 font-medium">
-                                Master Password
+                                {t('auth.masterPassword')}
                             </label>
                             <div className="relative">
                                 <input
@@ -124,7 +125,7 @@ export function SignUpPage() {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="w-full px-4 py-3 bg-slate-800/70 text-gray-200 border border-slate-700 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent placeholder-gray-500"
-                                    placeholder="Enter password"
+                                    placeholder={t('signup.enterPasswordPlaceholder')}
                                     disabled={isLoading}
                                 />
                                 <button
@@ -140,7 +141,7 @@ export function SignUpPage() {
                         {/* Confirm Password */}
                         <div className="space-y-2">
                             <label className="text-xs text-gray-400 font-medium">
-                                Confirm Password
+                                {t('auth.confirmPassword')}
                             </label>
                             <div className="relative">
                                 <input
@@ -148,7 +149,7 @@ export function SignUpPage() {
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     className="w-full px-4 py-3 bg-slate-800/70 text-gray-200 border border-slate-700 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent placeholder-gray-500"
-                                    placeholder="Confirm password"
+                                    placeholder={t('signup.confirmPasswordPlaceholder')}
                                     disabled={isLoading}
                                 />
                                 <button
@@ -178,10 +179,10 @@ export function SignUpPage() {
                             {isLoading ? (
                                 <div className="flex items-center justify-center gap-2">
                                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                    <span>Creating...</span>
+                                    <span>{t('signup.creating')}</span>
                                 </div>
                             ) : (
-                                'Start'
+                                t('signup.start')
                             )}
                         </button>
                     </form>
@@ -189,7 +190,7 @@ export function SignUpPage() {
 
                 {/* Footer */}
                 <div className="mt-6 text-center text-xs text-gray-500">
-                    End-to-End Encryption • v{version}
+                    {t('login.e2eEncryption')} • v{version}
                 </div>
             </div>
         </div>
