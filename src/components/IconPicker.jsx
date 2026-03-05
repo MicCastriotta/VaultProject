@@ -61,7 +61,7 @@ export function IconPicker({
                     <Search size={18} className="icon-picker__search-icon" />
                     <input
                         type="text"
-                        placeholder="Cerca servizio (Spotify, Netflix, GitHub...)"
+                        placeholder="Cerca servizio (Spotify, Netflix, Instagram...)"
                         value={query}
                         onChange={e => setQuery(e.target.value)}
                         autoFocus

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint src/"
   },
   "dependencies": {
     "dexie": "^3.2.4",
@@ -25,10 +26,15 @@
     "sql.js": "^1.13.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.3",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.17",
+    "eslint": "^9.39.3",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-security": "^4.0.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "vite": "^5.1.0",

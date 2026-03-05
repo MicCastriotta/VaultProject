@@ -96,14 +96,7 @@ function AppRoutes() {
     } = useAuth();
     const location = useLocation();
 
-    if (location.pathname === '/privacy') {
-        return (
-            <Suspense fallback={<PageLoader />}>
-                <PrivacyPage />
-            </Suspense>
-        );
-    }
-
+    // Hook chiamato prima di qualsiasi return anticipato (Rules of Hooks)
     const [tutorialDone, setTutorialDone] = useState(
         () => localStorage.getItem('tutorialCompleted') === 'true'
     );
@@ -111,6 +104,14 @@ function AppRoutes() {
     function completeTutorial() {
         localStorage.setItem('tutorialCompleted', 'true');
         setTutorialDone(true);
+    }
+
+    if (location.pathname === '/privacy') {
+        return (
+            <Suspense fallback={<PageLoader />}>
+                <PrivacyPage />
+            </Suspense>
+        );
     }
 
     if (isLoading) {

@@ -51,7 +51,8 @@
     "unlocking": "Unlocking...",
     "unlockVault": "Unlock Vault",
     "biometricHint": "Biometric verification will be requested automatically after your password",
-    "e2eEncryption": "End-to-End Encryption"
+    "e2eEncryption": "End-to-End Encryption",
+    "storageWarning": "Data is stored in this device's browser. Clearing browser cache or storage may cause irreversible loss of all your data."
   },
   "signup": {
     "letsBegin": "Let's begin!",
@@ -61,7 +62,7 @@
     "confirmPasswordPlaceholder": "Confirm password",
     "creating": "Creating...",
     "start": "Start",
-    "passwordTooShort": "Password too short (min 5 characters)",
+    "passwordTooShort": "Password too short (min 10 characters)",
     "setupFailed": "Setup failed",
     "strength": {
       "veryWeak": "Very Weak!",
@@ -85,7 +86,7 @@
     },
     "backupRestore": {
       "title": "Backup & Restore",
-      "description": "Backup or restore your encrypted database at any time — ideal in case of device change or loss."
+      "description": "Your data is encrypted and saved only on this device. You can back up manually by exporting the database from settings, or enable automatic sync with Google Drive."
     }
   },
   "settings": {
