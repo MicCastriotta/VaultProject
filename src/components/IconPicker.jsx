@@ -12,20 +12,18 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, X } from 'lucide-react';
-import { getBrandIcons, FALLBACK_ICONS, suggestIconFromTitle } from '../icons/brandIcons';
+import { getBrandIcons, FALLBACK_ICONS } from '../icons/brandIcons';
 import './IconPicker.css';
 
 export function IconPicker({
     onSelect,
     onClose,
     selectedSlug = null,
-    suggestFromTitle = null
 }) {
     const [query, setQuery] = useState('');
     const [showFallbacks, setShowFallbacks] = useState(false);
     const [allIcons, setAllIcons] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [suggestedIcon, setSuggestedIcon] = useState(null);
 
     // Carica il catalogo icone in modo lazy (dynamic import)
     useEffect(() => {
@@ -34,13 +32,6 @@ export function IconPicker({
             setIsLoading(false);
         });
     }, []);
-
-    // Auto-suggest dall'URL/titolo
-    useEffect(() => {
-        if (suggestFromTitle) {
-            suggestIconFromTitle(suggestFromTitle).then(setSuggestedIcon);
-        }
-    }, [suggestFromTitle]);
 
     // Ricerca live con debounce implicito (useMemo)
     const searchResults = useMemo(() => {
@@ -61,12 +52,6 @@ export function IconPicker({
         onSelect(icon);
         onClose?.();
     }, [onSelect, onClose]);
-
-    const handleSuggestedClick = useCallback(() => {
-        if (suggestedIcon) {
-            handleSelect(suggestedIcon);
-        }
-    }, [suggestedIcon, handleSelect]);
 
     return (
         <div className="icon-picker">
@@ -103,28 +88,6 @@ export function IconPicker({
                     </button>
                 )}
             </div>
-
-            {/* Auto-suggest */}
-            {suggestedIcon && !query && (
-                <div className="icon-picker__suggest">
-                    <div className="icon-picker__suggest-label">
-                        💡 Icona suggerita
-                    </div>
-                    <button
-                        onClick={handleSuggestedClick}
-                        className={`icon-picker__result-btn ${selectedSlug === suggestedIcon.slug ? 'icon-picker__result-btn--selected' : ''
-                            }`}
-                        title={suggestedIcon.name}
-                    >
-                        <svg
-                            viewBox="0 0 24 24"
-                            dangerouslySetInnerHTML={{ __html: suggestedIcon.svg }}
-                            className="icon-picker__result-svg"
-                        />
-                        <span className="icon-picker__result-name">{suggestedIcon.name}</span>
-                    </button>
-                </div>
-            )}
 
             {/* Results Grid */}
             <div className="icon-picker__grid">
