@@ -419,5 +419,29 @@
       "decryptionFailed": "Decryption failed. Check password and file.",
       "importFailed": "Import failed"
     }
+  },
+  "syncConflict": {
+    "title": "Sync Conflict",
+    "subtitle": "Local and cloud data differ. Choose which version to keep.",
+    "cloudVersion": "Cloud Version",
+    "localVersion": "Device Version",
+    "profiles": "profiles",
+    "lastModifiedFrom": "Last modified from: {{device}}",
+    "warning": "Warning: the version not chosen will be overwritten. This cannot be undone.",
+    "useCloud": "Use Cloud Version",
+    "keepLocal": "Keep Device Version"
+  },
+  "privacy": {
+    "link": "Privacy Policy",
+    "title": "Privacy Policy & Disclaimer",
+    "intro": "OwnVault is a password manager that runs entirely in the user's browser. The application does not require an account and does not collect personal data.",
+    "storage": "All data entered is stored exclusively on the user's device using the browser's local storage technologies (IndexedDB) and is stored in encrypted form. No information is sent to or stored on servers owned by the application author.",
+    "noTracking": "The application does not use cookies, tracking tools, or analytics services.",
+    "thirdPartiesIntro": "Some optional features may communicate with third-party services. In particular:",
+    "hibp": "the compromised password check uses the HaveIBeenPwned API via the k-anonymity model, which sends only a hash prefix of the password and never the password itself;",
+    "gdrive": "the optional cloud sync feature can save an encrypted backup to the user's Google Drive via Google APIs. Data is sent already encrypted and is not accessible to the application author.",
+    "userControl": "Data remains under the full control of the user. Clearing browser data, using private browsing mode, or changing devices may result in the loss of saved information.",
+    "disclaimer": "This software is provided \"as is\", without warranties of any kind. The author is not responsible for any data loss, unauthorized access, or damages arising from the use of the application.",
+    "acceptance": "By using the application, the user accepts these terms."
   }
 }

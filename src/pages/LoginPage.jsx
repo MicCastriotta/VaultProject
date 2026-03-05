@@ -118,6 +118,15 @@ export function LoginPage() {
                 {/* Footer */}
                 <div className="mt-6 text-center text-xs text-gray-500">
                     {t('login.e2eEncryption')} • v{version}
+                    <span className="mx-2">•</span>
+                    <a
+                        href="/privacy"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-gray-300 underline underline-offset-2 transition-colors"
+                    >
+                        {t('privacy.link')}
+                    </a>
                 </div>
             </div>
         </div>

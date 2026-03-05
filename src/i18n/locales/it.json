@@ -419,5 +419,29 @@
       "decryptionFailed": "Decifratura fallita. Verifica la password e il file.",
       "importFailed": "Importazione fallita"
     }
+  },
+  "syncConflict": {
+    "title": "Conflitto di sincronizzazione",
+    "subtitle": "I dati locali e cloud sono diversi. Scegli quale versione mantenere.",
+    "cloudVersion": "Versione Cloud",
+    "localVersion": "Versione Dispositivo",
+    "profiles": "profili",
+    "lastModifiedFrom": "Ultima modifica da: {{device}}",
+    "warning": "Attenzione: la versione non scelta verrà sovrascritta. L'operazione non può essere annullata.",
+    "useCloud": "Usa versione Cloud",
+    "keepLocal": "Mantieni versione Dispositivo"
+  },
+  "privacy": {
+    "link": "Privacy Policy",
+    "title": "Privacy Policy e Disclaimer",
+    "intro": "OwnVault è un password manager che funziona interamente nel browser dell'utente. L'applicazione non richiede account e non raccoglie dati personali.",
+    "storage": "Tutti i dati inseriti vengono salvati esclusivamente sul dispositivo dell'utente tramite tecnologie di storage locale del browser (IndexedDB) e sono memorizzati in forma criptata. Nessuna informazione viene inviata o conservata su server dell'autore dell'applicazione.",
+    "noTracking": "L'applicazione non utilizza cookie, strumenti di tracciamento o servizi di analytics.",
+    "thirdPartiesIntro": "Alcune funzionalità opzionali possono comunicare con servizi di terze parti. In particolare:",
+    "hibp": "il controllo delle password compromesse utilizza l'API di HaveIBeenPwned tramite il modello k-anonymity, che invia solo un prefisso hash della password e non la password stessa;",
+    "gdrive": "la sincronizzazione cloud opzionale può salvare un backup cifrato nel Google Drive dell'utente tramite le API di Google. I dati vengono inviati già criptati e non sono accessibili all'autore dell'applicazione.",
+    "userControl": "I dati restano sotto il pieno controllo dell'utente. La cancellazione dei dati del browser, l'utilizzo della modalità privata o il cambio di dispositivo possono causare la perdita delle informazioni salvate.",
+    "disclaimer": "Questo software è fornito \"così com'è\", senza garanzie di alcun tipo. L'autore non è responsabile per eventuali perdite di dati, accessi non autorizzati o danni derivanti dall'utilizzo dell'applicazione.",
+    "acceptance": "Utilizzando l'applicazione l'utente accetta queste condizioni."
   }
 }

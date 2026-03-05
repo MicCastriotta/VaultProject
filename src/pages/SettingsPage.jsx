@@ -547,7 +547,6 @@ export function SettingsPage() {
                     cloudData={syncConflict.cloudData}
                     localData={syncConflict.localData}
                     onResolve={handleConflictResolution}
-                    onClose={() => setSyncConflict(null)}
                 />
             )}
 
