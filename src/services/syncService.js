@@ -68,54 +68,46 @@ class SyncService {
             // 3. Export dati locali
             const localData = await databaseService.exportData();
 
+            const now = Date.now();
+
             // 4. Prepara payload sync
             const syncData = {
                 version: 2,
                 lastModified: new Date().toISOString(),
                 deviceId: this.deviceId,
                 deviceName: this.deviceName,
-                syncTimestamp: Date.now(),
+                syncTimestamp: now,
                 ...localData
             };
 
             let fileId;
 
             if (file) {
-                // File esiste già → verifica se cloud è più recente
+                // File esiste già → confronta contenuto (non timestamp: syncData è appena creato)
                 const cloudData = await googleDriveService.downloadFile(file.id);
 
-                if (cloudData.syncTimestamp > syncData.syncTimestamp) {
-                    // Cloud più recente → chiedi all'utente
-                    const shouldImport = await this.askConflictResolution(cloudData, syncData);
+                const hasLocalProfiles = localData.profiles.length > 0;
+                const hasCloudProfiles = (cloudData.profiles?.length || 0) > 0;
 
-                    if (shouldImport) {
-                        // Importa da cloud
-                        await databaseService.importData(cloudData);
-                        fileId = file.id;
-                    } else {
-                        // Sovrascrivi cloud con locale
-                        await googleDriveService.updateFile(file.id, syncData);
-                        fileId = file.id;
-                    }
+                if (!hasLocalProfiles) {
+                    // Locale vuoto → scarica cloud senza chiedere
+                    await databaseService.importData(cloudData);
+                    fileId = file.id;
+                    this.notifyListeners('synced', { direction: 'download', conflict: false });
+                } else if (!hasCloudProfiles) {
+                    // Cloud vuoto → upload locale senza chiedere
+                    await googleDriveService.updateFile(file.id, syncData);
+                    fileId = file.id;
                 } else {
-                    // Locale più recente → upload
-                    if (localData.profiles.length === 0) {
+                    // Entrambi hanno dati → chiedi all'utente
+                    const shouldImport = await this.askConflictResolution(cloudData, localData);
+                    if (shouldImport) {
                         await databaseService.importData(cloudData);
-
-                        await databaseService.updateSyncConfig({
-                            lastSyncTimestamp: cloudData.syncTimestamp,
-                            lastLocalModification: cloudData.syncTimestamp
-                        });
-
                         fileId = file.id;
-
-                        this.notifyListeners('synced', { direction: 'download', conflict: false });
-
                     } else {
                         await googleDriveService.updateFile(file.id, syncData);
                         fileId = file.id;
                     }
-
                 }
             } else {
                 // Nessun file esistente → crea nuovo
@@ -127,8 +119,8 @@ class SyncService {
             await databaseService.saveSyncConfig({
                 enabled: true,
                 googleDriveFileId: fileId,
-                lastSyncTimestamp: Date.now(),
-                lastLocalModification: Date.now(),
+                lastSyncTimestamp: now,
+                lastLocalModification: now,
                 deviceId: this.deviceId,
                 deviceName: this.deviceName,
                 conflictStrategy: 'ask' // 'ask', 'local-wins', 'cloud-wins'

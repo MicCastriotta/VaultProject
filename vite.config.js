@@ -8,11 +8,11 @@ function cspPlugin() {
   // Nota: frame-ancestors non funziona nei meta tag (limitazione spec) — impostarlo via HTTP header lato server
   const PROD_CSP = [
     "default-src 'self'",
-    "script-src 'self' 'wasm-unsafe-eval' https://apis.google.com",  // wasm-unsafe-eval per hash-wasm; apis.google.com per Google Drive Picker
+    "script-src 'self' 'wasm-unsafe-eval' https://apis.google.com https://accounts.google.com",  // wasm-unsafe-eval per hash-wasm; apis.google.com per Drive Picker; accounts.google.com per GIS (gsi/client)
     "style-src 'self' 'unsafe-inline'",           // Tailwind richiede inline styles
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://api.pwnedpasswords.com",
+    "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://api.pwnedpasswords.com",
     "frame-src https://content.googleapis.com https://docs.google.com",  // Google Drive Picker usa iframe da questi domini
     "object-src 'none'",
     "base-uri 'self'",
@@ -32,14 +32,19 @@ function cspPlugin() {
     // Dev: header HTTP sul server di sviluppo
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
+        // COOP: same-origin-allow-popups permette al popup OAuth di Google
+        // di comunicare con window.opener (necessario per il flusso OAuth)
+        // Nota produzione: impostare questo header a livello server (nginx/apache/hosting)
+        res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+
         if (req.url === '/' || req.url === '/index.html') {
           res.setHeader('Content-Security-Policy', [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://apis.google.com https://www.googleapis.com",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://apis.google.com https://www.googleapis.com https://accounts.google.com",
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob:",
             "font-src 'self' data:",
-            "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://api.pwnedpasswords.com",
+            "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://api.pwnedpasswords.com",
             "frame-src https://content.googleapis.com https://docs.google.com",  // Google Drive Picker
             "object-src 'none'",
             "base-uri 'self'",

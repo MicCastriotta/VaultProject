@@ -4,7 +4,7 @@
  */
 
 import { lazy, Suspense, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -39,6 +39,7 @@ function UpdateBanner() {
 }
 
 // Pagine caricate al volo (lazy) per ridurre il bundle iniziale
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage').then(m => ({ default: m.PrivacyPage })));
 const TutorialPage = lazy(() => import('./pages/TutorialPage').then(m => ({ default: m.TutorialPage })));
 const SignUpPage = lazy(() => import('./pages/SignUpPage').then(m => ({ default: m.SignUpPage })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
@@ -93,6 +94,15 @@ function AppRoutes() {
         enableBiometric,
         skipBiometricSetup
     } = useAuth();
+    const location = useLocation();
+
+    if (location.pathname === '/privacy') {
+        return (
+            <Suspense fallback={<PageLoader />}>
+                <PrivacyPage />
+            </Suspense>
+        );
+    }
 
     const [tutorialDone, setTutorialDone] = useState(
         () => localStorage.getItem('tutorialCompleted') === 'true'
