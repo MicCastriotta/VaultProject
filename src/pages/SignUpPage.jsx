@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SignUp Page
  * Prima volta: crea password master
  */
@@ -43,12 +43,13 @@ export function SignUpPage() {
             return;
         }
 
+        // eslint-disable-next-line security/detect-possible-timing-attacks -- validazione UI, non confronto crittografico
         if (password !== confirmPassword) {
             setError(t('auth.passwordMismatch'));
             return;
         }
 
-        if (password.length < 5) {
+        if (password.length < 10) {
             setError(t('signup.passwordTooShort'));
             return;
         }

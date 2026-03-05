@@ -181,7 +181,7 @@ Funzionalità da implementare:
 - [x] Backup automatico
 - [ ] Tema dark/light
 - [ ] Completamento struttura grafica
-- [ ] PWA
+- [x] PWA
 - [x] Multi-lingua
 - [ ] Logging centralizzato
 

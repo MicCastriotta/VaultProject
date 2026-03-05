@@ -47,69 +47,78 @@ export function TutorialPage({ onDone }) {
 
     return (
         <div
-            className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex flex-col items-center justify-between px-6 py-12 select-none"
+            className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex flex-col items-center px-6 py-12 md:justify-center md:px-4 md:py-8 select-none"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
         >
-            {/* Skip button */}
-            <div className="w-full flex justify-end">
-                <button
-                    onClick={onDone}
-                    className="text-sm text-gray-400 hover:text-gray-200 transition px-2 py-1"
-                >
-                    {t('tutorial.skip')}
-                </button>
-            </div>
+            {/*
+              Mobile: inner div occupa tutta l'altezza (flex-1) e distribuisce
+                      i figli con justify-between (skip in alto, controls in basso).
+              Desktop: inner div diventa una glass card centrata di larghezza fissa.
+            */}
+            <div className="flex flex-col justify-between flex-1 w-full max-w-sm md:flex-initial md:glass md:rounded-3xl md:p-8 md:border md:border-slate-800 md:shadow-2xl md:justify-normal md:gap-8">
 
-            {/* Slide content */}
-            <div className="flex-1 flex flex-col items-center justify-center text-center gap-8 max-w-sm w-full">
-                {/* Icon */}
-                <div
-                    className={`w-28 h-28 rounded-3xl bg-gradient-to-br ${slide.iconColor} flex items-center justify-center shadow-2xl`}
-                >
-                    <Icon className="w-14 h-14 text-white" strokeWidth={1.5} />
+                {/* Skip button */}
+                <div className="flex justify-end">
+                    <button
+                        onClick={onDone}
+                        className="text-sm text-gray-400 hover:text-gray-200 transition px-2 py-1"
+                    >
+                        {t('tutorial.skip')}
+                    </button>
                 </div>
 
-                {/* Text */}
-                <div className="space-y-4">
-                    <h2 className="text-2xl font-bold text-white tracking-wide">
-                        {t(slide.titleKey)}
-                    </h2>
-                    <p className="text-gray-400 text-base leading-relaxed">
-                        {t(slide.descKey)}
-                    </p>
-                </div>
-            </div>
+                {/* Slide content */}
+                <div className="flex-1 md:flex-initial flex flex-col items-center justify-center text-center gap-8">
+                    {/* Icon */}
+                    <div
+                        className={`w-28 h-28 rounded-3xl bg-gradient-to-br ${slide.iconColor} flex items-center justify-center shadow-2xl`}
+                    >
+                        <Icon className="w-14 h-14 text-white" strokeWidth={1.5} />
+                    </div>
 
-            {/* Bottom controls */}
-            <div className="w-full max-w-sm flex items-center justify-between">
-                {/* Dot indicators */}
-                <div className="flex gap-2">
-                    {SLIDES.map((_, i) => (
-                        <button
-                            key={i}
-                            onClick={() => setCurrent(i)}
-                            className={`rounded-full transition-all ${
-                                i === current
-                                    ? 'w-6 h-2.5 bg-blue-500'
-                                    : 'w-2.5 h-2.5 bg-slate-600 hover:bg-slate-500'
-                            }`}
-                        />
-                    ))}
+                    {/* Text */}
+                    <div className="space-y-4">
+                        <h2 className="text-2xl font-bold text-white tracking-wide">
+                            {t(slide.titleKey)}
+                        </h2>
+                        <p className="text-gray-400 text-base leading-relaxed">
+                            {t(slide.descKey)}
+                        </p>
+                    </div>
                 </div>
 
-                {/* Next / Get Started */}
-                <button
-                    onClick={handleNext}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold text-sm transition-all shadow-lg ${
-                        isLast
-                            ? 'bg-gradient-to-r from-brand to-blue-500 text-white shadow-blue-900/40'
-                            : 'bg-slate-800 text-gray-200 hover:bg-slate-700'
-                    }`}
-                >
-                    {isLast ? t('tutorial.getStarted') : t('tutorial.next')}
-                    <ChevronRight size={16} />
-                </button>
+                {/* Bottom controls */}
+                <div className="flex items-center justify-between">
+                    {/* Dot indicators */}
+                    <div className="flex gap-2">
+                        {SLIDES.map((_, i) => (
+                            <button
+                                key={i}
+                                onClick={() => setCurrent(i)}
+                                className={`rounded-full transition-all ${
+                                    i === current
+                                        ? 'w-6 h-2.5 bg-blue-500'
+                                        : 'w-2.5 h-2.5 bg-slate-600 hover:bg-slate-500'
+                                }`}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Next / Get Started */}
+                    <button
+                        onClick={handleNext}
+                        className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold text-sm transition-all shadow-lg ${
+                            isLast
+                                ? 'bg-gradient-to-r from-brand to-blue-500 text-white shadow-blue-900/40'
+                                : 'bg-slate-800 text-gray-200 hover:bg-slate-700'
+                        }`}
+                    >
+                        {isLast ? t('tutorial.getStarted') : t('tutorial.next')}
+                        <ChevronRight size={16} />
+                    </button>
+                </div>
+
             </div>
         </div>
     );

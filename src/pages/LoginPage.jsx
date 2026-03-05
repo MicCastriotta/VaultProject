@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Lock } from 'lucide-react';
+import { Eye, EyeOff, Lock, AlertTriangle } from 'lucide-react';
 
 export function LoginPage() {
     const { login, biometricEnabled } = useAuth();
@@ -115,8 +115,16 @@ export function LoginPage() {
                     </form>
                 </div>
 
+                {/* Avviso storage browser */}
+                <div className="mt-4 flex items-start gap-2 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
+                    <AlertTriangle size={14} className="text-amber-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-gray-400 leading-relaxed">
+                        {t('login.storageWarning')}
+                    </p>
+                </div>
+
                 {/* Footer */}
-                <div className="mt-6 text-center text-xs text-gray-500">
+                <div className="mt-4 text-center text-xs text-gray-500">
                     {t('login.e2eEncryption')} • v{version}
                     <span className="mx-2">•</span>
                     <a

@@ -15,7 +15,7 @@ import { OTPDisplay } from '../components/OTPDisplay';
 import { QRScanner } from '../components/QRScanner';
 import { IconPicker } from '../components/IconPicker';
 import { validators } from '../services/securityUtils';
-import { getIconBySlug } from '../icons/brandIcons';
+import { getIconBySlug, suggestIconFromTitle } from '../icons/brandIcons';
 
 import { IconRenderer } from '../components/IconRenderer';
 
@@ -50,6 +50,7 @@ export function ProfileFormPage() {
     const [showQRScanner, setShowQRScanner] = useState(false);
     const [cardType, setCardType] = useState(null);
     const [showIconPicker, setShowIconPicker] = useState(false);
+    const [isIconAutoSet, setIsIconAutoSet] = useState(false); // true = icona impostata automaticamente dal titolo
 
     useEffect(() => {
         if (!formData.icon) { setIconName(''); return; }
@@ -325,6 +326,36 @@ export function ProfileFormPage() {
                             </div>
                         )}
 
+                        {/* Title (common) */}
+                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                                {t('profileForm.titleLabel')} *
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.title}
+                                onChange={(e) => {
+                                    const title = e.target.value;
+                                    setFormData(prev => ({ ...prev, title }));
+                                    // Auto-suggerisci icona se non impostata o se era già auto-suggerita
+                                    if (category === 'WEB' && (!formData.icon || isIconAutoSet)) {
+                                        suggestIconFromTitle(title).then(icon => {
+                                            if (icon) {
+                                                setFormData(prev => ({ ...prev, icon: icon.slug }));
+                                                setIsIconAutoSet(true);
+                                            } else if (isIconAutoSet) {
+                                                // Nessun match: rimuovi l'icona auto-impostata
+                                                setFormData(prev => ({ ...prev, icon: null }));
+                                                setIsIconAutoSet(false);
+                                            }
+                                        });
+                                    }
+                                }}
+                                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-500"
+                                placeholder="e.g. Facebook, Gmail, Netflix..."
+                            />
+                        </div>
+
                         {/* Icon Picker Section (only for WEB) */}
                         {category === 'WEB' && (
                             <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
@@ -360,7 +391,7 @@ export function ProfileFormPage() {
                                             </div>
                                             <button
                                                 type="button"
-                                                onClick={() => setFormData(prev => ({ ...prev, icon: null }))}
+                                                onClick={() => { setFormData(prev => ({ ...prev, icon: null })); setIsIconAutoSet(false); }}
                                                 className="text-red-400 hover:text-red-300 p-2"
                                             >
                                                 <Trash2 size={18} />
@@ -384,31 +415,17 @@ export function ProfileFormPage() {
                                             <IconPicker
                                                 onSelect={(icon) => {
                                                     setFormData(prev => ({ ...prev, icon: icon.slug }));
+                                                    setIsIconAutoSet(false);
                                                     setShowIconPicker(false);
                                                 }}
                                                 onClose={() => setShowIconPicker(false)}
                                                 selectedSlug={formData.icon}
-                                                suggestFromTitle={formData.website || formData.title}
                                             />
                                         </div>
                                     </div>
                                 )}
                             </div>
                         )}
-
-                        {/* Title (common) */}
-                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                                {t('profileForm.titleLabel')} *
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.title}
-                                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-500"
-                                placeholder="e.g. Facebook, Gmail, Mastercard..."
-                            />
-                        </div>
 
                         {/* WEB Fields */}
                         {category === 'WEB' && (

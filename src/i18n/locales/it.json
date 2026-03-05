@@ -51,7 +51,8 @@
     "unlocking": "Sblocco in corso...",
     "unlockVault": "Sblocca Vault",
     "biometricHint": "La verifica biometrica verrà richiesta automaticamente dopo la password",
-    "e2eEncryption": "Crittografia End-to-End"
+    "e2eEncryption": "Crittografia End-to-End",
+    "storageWarning": "I dati sono salvati nel browser di questo dispositivo. Cancellare la cache o lo storage del browser senza un backup può causare la perdita irreversibile di tutti di dati."
   },
   "signup": {
     "letsBegin": "Iniziamo!",
@@ -61,7 +62,7 @@
     "confirmPasswordPlaceholder": "Conferma password",
     "creating": "Creazione...",
     "start": "Inizia",
-    "passwordTooShort": "Password troppo corta (min 5 caratteri)",
+    "passwordTooShort": "Password troppo corta (min 10 caratteri)",
     "setupFailed": "Configurazione fallita",
     "strength": {
       "veryWeak": "Molto Debole!",
@@ -85,7 +86,7 @@
     },
     "backupRestore": {
       "title": "Backup & Ripristino",
-      "description": "Esegui il backup o ripristina il database cifrato in qualsiasi momento — ideale in caso di cambio o perdita del dispositivo."
+      "description": "I tuoi dati sono cifrati e salvati solo su questo dispositivo. Puoi eseguire un backup manuale esportando il database dalle impostazioni, oppure abilitare la sincronizzazione automatica con Google Drive."
     }
   },
   "settings": {
