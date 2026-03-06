@@ -303,13 +303,13 @@ class LegacyImportService {
             website: legacyProfile.Website || legacyProfile.website || legacyProfile.Url || legacyProfile.url || '',
             note: legacyProfile.Note || legacyProfile.note || '',
             secretKey: legacyProfile.SecretKey || legacyProfile.secretKey || legacyProfile.TotpSecret || legacyProfile.totpSecret || '', // ← TOTP
-            numberCard: legacyProfile.CardNumber || legacyProfile.cardNumber || '', // ← Card
+            numberCard: legacyProfile.NumberCard || legacyProfile.CardNumber || legacyProfile.cardNumber || '', // ← Card
             owner: legacyProfile.Owner || legacyProfile.owner || legacyProfile.CardHolder || legacyProfile.cardHolder || '',
             deadline: legacyProfile.Deadline || legacyProfile.deadline || legacyProfile.ExpiryDate || legacyProfile.expiryDate || '',
             cvv: legacyProfile.Cvv || legacyProfile.CVV || legacyProfile.cvv || '',
             pin: legacyProfile.Pin || legacyProfile.PIN || legacyProfile.pin || '',
-            category: this.mapCategory(legacyProfile.Category || legacyProfile.category),
-            lastModified: new Date().toISOString()
+            category: this.mapCategory(legacyProfile.Category),
+            lastModified: new Date(legacyProfile.Lastmodified || legacyProfile.lastmodified).toISOString()
         };
     }
 
@@ -317,13 +317,12 @@ class LegacyImportService {
      * Mappa le categorie legacy alle nuove
      */
     mapCategory(legacyCategory) {
-        if (!legacyCategory) return 'WEB';
-
+        
         const categoryMap = {
             'WEB': 'WEB',
-            'CARD': 'card',
+            'CARD': 'CARD',
             '0': 'WEB',
-            '1': 'card'
+            '1': 'CARD'
         };
 
         return categoryMap[legacyCategory] || 'WEB';

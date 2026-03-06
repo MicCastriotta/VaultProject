@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
+import { syncService } from '../services/syncService';
 import { Plus, Search, ArrowUpDown, User, CreditCard, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { IconRenderer } from '../components/IconRenderer';
@@ -50,6 +51,16 @@ export function MainPage() {
     }, []);
 
     useEffect(() => {
+        const handleSyncEvent = (event, data) => {
+            if (event === 'synced' && data.direction === 'download') {
+                loadProfiles();
+            }
+        };
+        syncService.addListener(handleSyncEvent);
+        return () => syncService.removeListener(handleSyncEvent);
+    }, []);
+
+    useEffect(() => {
         localStorage.setItem('profileSortOrder', sortBy);
     }, [sortBy]);
 
@@ -68,8 +79,7 @@ export function MainPage() {
 
                         return {
                             id: p.id,
-                            ...data,
-                            updatedAt: p.updatedAt
+                            ...data
                         };
                     } catch {
                         return null;
@@ -102,9 +112,9 @@ export function MainPage() {
             case SORT_OPTIONS.ALPHA_DESC:
                 return (b.title || '').localeCompare(a.title || '');
             case SORT_OPTIONS.DATE_ASC:
-                return new Date(a.updatedAt) - new Date(b.updatedAt);
+                return new Date(a.lastModified) - new Date(b.lastModified);
             case SORT_OPTIONS.DATE_DESC:
-                return new Date(b.updatedAt) - new Date(a.updatedAt);
+                return new Date(b.lastModified) - new Date(a.lastModified);
             default:
                 return 0;
         }
@@ -119,7 +129,7 @@ export function MainPage() {
         ) {
             groupKey = profile.title?.[0]?.toUpperCase() || '#';
         } else {
-            const date = new Date(profile.updatedAt);
+            const date = new Date(profile.lastModified);
 
             // Raggruppamento per giorno (puoi cambiarlo in mese se vuoi)
             groupKey = date.toLocaleDateString();
