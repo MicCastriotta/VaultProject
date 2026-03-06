@@ -18,6 +18,7 @@ import { validators } from '../services/securityUtils';
 import { getIconBySlug, suggestIconFromTitle } from '../icons/brandIcons';
 
 import { IconRenderer } from '../components/IconRenderer';
+import { healthCache } from '../services/healthCacheService';
 
 export function ProfileFormPage() {
     const navigate = useNavigate();
@@ -237,8 +238,9 @@ export function ProfileFormPage() {
 
             await databaseService.saveProfile(profileToSave);
 
-            // Aggiorna HMAC dopo la scrittura
+            // Aggiorna HMAC e invalida cache health dopo la scrittura
             await refreshHMAC();
+            healthCache.clear();
 
             await syncService.triggerSync();
 

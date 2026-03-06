@@ -5,6 +5,7 @@ import { legacyImportService } from '../services/legacyImportService';
 import { cryptoService } from '../services/cryptoService';
 import { databaseService } from '../services/databaseService';
 import { useAuth } from '../contexts/AuthContext';
+import { healthCache } from '../services/healthCacheService';
 import {
     Upload,
     Lock,
@@ -195,6 +196,7 @@ const ImportPage = () => {
             }
             legacyImportService.cleanup();
             await refreshHMAC();
+            healthCache.clear();
         }
     };
 
@@ -226,7 +228,7 @@ const ImportPage = () => {
                 </p>
             </div>
 
-            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
+            <div className="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center">
                 <input
                     type="file"
                     id="db-file"
@@ -275,7 +277,7 @@ const ImportPage = () => {
                 <button
                     onClick={handleNextToPassword}
                     disabled={!selectedFile}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="flex-1 sm:flex-none px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-medium"
                 >
                     {t('common.next')}
                     <ArrowRight className="w-4 h-4" />
@@ -318,7 +320,7 @@ const ImportPage = () => {
                         value={legacyPassword}
                         onChange={(e) => setLegacyPassword(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && handleDecryptAndPreview()}
-                        className="w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                        className="w-full px-4 py-3 pr-12 bg-slate-900/60 border border-slate-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder={t('import.step2.passwordPlaceholder')}
                         autoFocus
                     />
@@ -341,10 +343,10 @@ const ImportPage = () => {
                 </div>
             )}
 
-            <div className="flex justify-between">
+            <div className="flex gap-3">
                 <button
                     onClick={() => setCurrentStep(1)}
-                    className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                    className="flex-1 px-4 py-3 border border-slate-600 text-gray-300 rounded-lg hover:bg-slate-700 flex items-center justify-center gap-2 font-medium"
                 >
                     <ArrowLeft className="w-4 h-4" />
                     {t('common.back')}
@@ -352,7 +354,7 @@ const ImportPage = () => {
                 <button
                     onClick={handleDecryptAndPreview}
                     disabled={!legacyPassword.trim() || isDecrypting}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-medium"
                 >
                     {isDecrypting ? (
                         <>
@@ -406,7 +408,7 @@ const ImportPage = () => {
                         {previewData.profiles.slice(0, 10).map((profile, idx) => (
                             <div
                                 key={idx}
-                                className="p-3 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700"
+                                className="p-3 bg-slate-900/60 rounded border border-slate-700"
                             >
                                 <p className="font-medium text-sm">{profile.title}</p>
                                 <p className="text-xs text-gray-500">{profile.username}</p>
@@ -428,10 +430,10 @@ const ImportPage = () => {
                 </p>
             </div>
 
-            <div className="flex justify-between">
+            <div className="flex gap-3">
                 <button
                     onClick={() => setCurrentStep(2)}
-                    className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                    className="flex-1 px-4 py-3 border border-slate-600 text-gray-300 rounded-lg hover:bg-slate-700 flex items-center justify-center gap-2 font-medium"
                 >
                     <ArrowLeft className="w-4 h-4" />
                     {t('common.back')}
@@ -439,7 +441,7 @@ const ImportPage = () => {
                 <button
                     onClick={handleImport}
                     disabled={isImporting}
-                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-medium"
                 >
                     {isImporting ? (
                         <>
@@ -508,7 +510,7 @@ const ImportPage = () => {
             <div className="flex justify-end">
                 <button
                     onClick={handleFinish}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                    className="flex-1 sm:flex-none px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 font-medium"
                 >
                     {t('import.step4.finish')}
                 </button>
@@ -521,37 +523,39 @@ const ImportPage = () => {
     // ========================================
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4">
-            <div className="max-w-2xl mx-auto">
+        <div className="h-full flex flex-col">
+            <div className="max-w-2xl mx-auto w-full flex flex-col flex-1 min-h-0 p-4 sm:p-6">
+
+                {/* Header */}
+                <div className="flex items-center gap-3 mb-5">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="p-2 text-gray-400 hover:bg-slate-700 rounded-lg transition-colors flex-shrink-0"
+                    >
+                        <ArrowLeft size={24} />
+                    </button>
+                    <h1 className="text-xl font-bold text-white">{t('import.menuTitle')}</h1>
+                </div>
+
                 {/* Progress bar */}
-                <div className="mb-8">
+                <div className="mb-5">
                     <div className="flex items-center justify-between mb-2">
                         {[1, 2, 3, 4].map((step) => (
-                            <div
-                                key={step}
-                                className={`flex items-center ${step < 4 ? 'flex-1' : ''
-                                    }`}
-                            >
-                                <div
-                                    className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${currentStep >= step
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
-                                        }`}
-                                >
+                            <div key={step} className={`flex items-center ${step < 4 ? 'flex-1' : ''}`}>
+                                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+                                    currentStep >= step
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-slate-700 text-gray-400'
+                                }`}>
                                     {step}
                                 </div>
                                 {step < 4 && (
-                                    <div
-                                        className={`flex-1 h-1 mx-2 ${currentStep > step
-                                                ? 'bg-blue-600'
-                                                : 'bg-gray-300 dark:bg-gray-600'
-                                            }`}
-                                    />
+                                    <div className={`flex-1 h-1 mx-1.5 ${currentStep > step ? 'bg-blue-600' : 'bg-slate-700'}`} />
                                 )}
                             </div>
                         ))}
                     </div>
-                    <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                    <div className="flex justify-between text-xs text-gray-500">
                         <span>{t('import.steps.file')}</span>
                         <span>{t('import.steps.password')}</span>
                         <span>{t('import.steps.preview')}</span>
@@ -559,25 +563,31 @@ const ImportPage = () => {
                     </div>
                 </div>
 
-                {/* Content card */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
-                    {currentStep === 1 && renderStep1()}
-                    {currentStep === 2 && renderStep2()}
-                    {currentStep === 3 && renderStep3()}
-                    {currentStep === 4 && renderStep4()}
+                {/* Contenuto scorrevole */}
+                <div className="flex-1 overflow-y-auto">
+                    <div className="pb-6">
+                        {/* Content card */}
+                        <div className="bg-slate-800 border border-slate-700 rounded-xl p-5">
+                            {currentStep === 1 && renderStep1()}
+                            {currentStep === 2 && renderStep2()}
+                            {currentStep === 3 && renderStep3()}
+                            {currentStep === 4 && renderStep4()}
+                        </div>
+
+                        {/* Cancel button */}
+                        {currentStep < 4 && (
+                            <div className="text-center mt-5">
+                                <button
+                                    onClick={() => navigate(-1)}
+                                    className="text-sm text-gray-500 hover:text-gray-300 transition-colors"
+                                >
+                                    {t('common.cancel')}
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                {/* Cancel button */}
-                {currentStep < 4 && (
-                    <div className="text-center mt-6">
-                        <button
-                            onClick={() => navigate(-1)}
-                            className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                        >
-                            {t('common.cancel')}
-                        </button>
-                    </div>
-                )}
             </div>
         </div>
     );

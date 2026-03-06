@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
 import { useAuth } from '../contexts/AuthContext';
+import { healthCache } from '../services/healthCacheService';
 import {
     ArrowLeft,
     Edit2,
@@ -77,6 +78,7 @@ export function ProfileDetailPage() {
         try {
             await databaseService.deleteProfile(parseInt(id));
             await refreshHMAC();
+            healthCache.clear();
             navigate('/');
         } catch (err) {
             console.error('Delete failed:', err);
