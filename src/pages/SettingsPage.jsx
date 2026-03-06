@@ -33,7 +33,6 @@ import {
     Coffee
 } from 'lucide-react';
 import { syncService } from '../services/syncService';
-import { SyncConflictDialog } from '../components/SyncConflictDialog';
 import { BiometricSettingsSection } from '../components/BiometricSettingsSection';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { useTranslation } from 'react-i18next';
@@ -237,7 +236,6 @@ export function SettingsPage() {
     const [message, setMessage] = useState(null);
     const [syncStatus, setSyncStatus] = useState(null);
     const [isSyncEnabled, setIsSyncEnabled] = useState(false);
-    const [syncConflict, setSyncConflict] = useState(null);
     const [showDonation, setShowDonation] = useState(false);
 
     function toggleSection(key) {
@@ -252,14 +250,9 @@ export function SettingsPage() {
     useEffect(() => {
         loadSyncStatus();
 
-        const handleSyncEvent = (event, data) => {
-            if (event === 'conflict') {
-                setSyncConflict(data);
-            } else if (event === 'synced') {
+        const handleSyncEvent = (event) => {
+            if (event === 'synced') {
                 loadSyncStatus();
-                setMessage({ type: 'success', text: t('settings.sync.syncedDirection', { direction: data.direction }) });
-            } else if (event === 'error') {
-                setMessage({ type: 'error', text: t('settings.sync.syncErrorMsg', { error: data.error }) });
             }
         };
 
@@ -302,17 +295,8 @@ export function SettingsPage() {
     async function handleSyncNow() {
         try {
             await syncService.sync();
-            setMessage({ type: 'success', text: t('settings.sync.syncSuccess') });
         } catch (error) {
             console.error('Error syncing:', error);
-            setMessage({ type: 'error', text: 'Sync failed: ' + error.message });
-        }
-    }
-
-    function handleConflictResolution(useCloud) {
-        if (syncConflict?.resolve) {
-            syncConflict.resolve(useCloud);
-            setSyncConflict(null);
         }
     }
 
@@ -757,14 +741,6 @@ export function SettingsPage() {
             {showDonation && <DonationModal onClose={() => setShowDonation(false)} />}
 
             {/* Conflict Dialog */}
-            {syncConflict && (
-                <SyncConflictDialog
-                    cloudData={syncConflict.cloudData}
-                    localData={syncConflict.localData}
-                    onResolve={handleConflictResolution}
-                />
-            )}
-
             {/* Delete Confirmation Modal */}
             {showDeleteConfirm && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
