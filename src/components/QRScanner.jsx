@@ -43,7 +43,11 @@ export function QRScanner({ isOpen, onClose, onScan }) {
                                 setScanError(t('qrScanner.noSecret'));
                                 return;
                             }
-                            html5QrCode.stop().catch(() => {});
+                            // Ferma e azzera prima di chiudere:
+                            // il cleanup dell'useEffect troverà null e non chiamerà stop() di nuovo
+                            const scanner = html5QrCode;
+                            html5QrCode = null;
+                            scanner.stop().catch(() => {});
                             onScan(secret);
                             onClose();
                         } catch {
