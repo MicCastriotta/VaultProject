@@ -146,6 +146,13 @@ input:focus, textarea:focus, select:focus {
     outline: none;
 }
 
+/* QR Scanner - forzare il video a riempire il container */
+#qr-video-container video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover;
+}
+
 @supports (padding: env(safe-area-inset-bottom)) {
     .safe-bottom {
         padding-bottom: env(safe-area-inset-bottom);

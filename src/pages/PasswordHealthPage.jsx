@@ -182,6 +182,10 @@ export function PasswordHealthPage() {
                 .map(p => ({ ...p, strength: getPasswordStrength(p.password) }));
             setWeakPasswords(weak);
 
+            // Mostra subito i risultati locali: l'utente vede la pagina
+            // mentre il check HIBP (lento) procede in background con la sua progress bar
+            setIsLoading(false);
+
             // 4. Check HIBP se online, poi salva in cache con i dati completi
             if (navigator.onLine) {
                 const pwnedProfiles = await runHIBPCheck(decrypted, dupes, weak);
@@ -200,7 +204,6 @@ export function PasswordHealthPage() {
 
         } catch (error) {
             console.error('Error loading profiles for health check:', error);
-        } finally {
             setIsLoading(false);
         }
     }

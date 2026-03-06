@@ -1,220 +1,189 @@
 /**
  * QR Code Scanner Component
- * Permette di scansionare QR code per estrarre il secret OTP
+ * Scansiona QR code per estrarre il secret OTP (otpauth://)
+ * Usa Html5Qrcode (low-level API) per controllo completo sull'UI
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
-import { X, Camera, AlertCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Html5Qrcode } from 'html5-qrcode';
+import { X, Camera, AlertCircle, Loader } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export function QRScanner({ isOpen, onClose, onScan }) {
-    const scannerRef = useRef(null);
-    const [error, setError] = useState('');
-    const [permissionStatus, setPermissionStatus] = useState('pending'); // pending, granted, denied
+    const { t } = useTranslation();
+    const [status, setStatus] = useState('loading'); // loading | scanning | error
+    const [errorType, setErrorType] = useState('');  // permission | notfound | generic
+    const [scanError, setScanError] = useState('');
 
     useEffect(() => {
         if (!isOpen) return;
 
-        let scanner = null;
-        let isCleanedUp = false;
+        setStatus('loading');
+        setErrorType('');
+        setScanError('');
 
-        const requestCameraPermission = async () => {
+        let html5QrCode = null;
+        let stopped = false;
+
+        const start = async () => {
             try {
-                // Richiedi esplicitamente i permessi della fotocamera
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment' } 
-                });
-                
-                // Ferma lo stream subito dopo aver ottenuto i permessi
-                stream.getTracks().forEach(track => track.stop());
-                
-                setPermissionStatus('granted');
-                return true;
-            } catch (err) {
-                console.error('Camera permission error:', err);
-                setPermissionStatus('denied');
-                
-                if (err.name === 'NotAllowedError') {
-                    setError('Camera access denied. Please allow camera access in your browser settings.');
-                } else if (err.name === 'NotFoundError') {
-                    setError('No camera found on this device.');
-                } else if (err.name === 'NotSupportedError') {
-                    setError('Camera access is not supported. Please use HTTPS.');
-                } else {
-                    setError('Unable to access camera. Please check your browser permissions.');
-                }
-                return false;
-            }
-        };
-
-        const initScanner = async () => {
-            // Prima richiedi i permessi
-            const hasPermission = await requestCameraPermission();
-            
-            if (!hasPermission || isCleanedUp) {
-                return;
-            }
-
-            // Aspetta che il DOM sia pronto
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            // Verifica che l'elemento esista
-            const element = document.getElementById('qr-reader');
-            if (!element || isCleanedUp) {
-                console.error('QR reader element not found');
-                return;
-            }
-
-            try {
-                scanner = new Html5QrcodeScanner(
-                    'qr-reader',
-                    {
-                        fps: 10,
-                        qrbox: { width: 250, height: 250 },
-                        aspectRatio: 1.0,
-                        showTorchButtonIfSupported: true,
-                        rememberLastUsedCamera: true,
-                        supportedScanTypes: [],
-                        videoConstraints: {
-                            facingMode: { ideal: "environment" }  // Fotocamera posteriore su mobile
+                html5QrCode = new Html5Qrcode('qr-video-container');
+                await html5QrCode.start(
+                    { facingMode: 'environment' },
+                    { fps: 10, qrbox: { width: 220, height: 220 } },
+                    (decodedText) => {
+                        try {
+                            const url = new URL(decodedText);
+                            if (url.protocol !== 'otpauth:') {
+                                setScanError(t('qrScanner.invalidQR'));
+                                return;
+                            }
+                            const secret = url.searchParams.get('secret');
+                            if (!secret) {
+                                setScanError(t('qrScanner.noSecret'));
+                                return;
+                            }
+                            html5QrCode.stop().catch(() => {});
+                            onScan(secret);
+                            onClose();
+                        } catch {
+                            setScanError(t('qrScanner.invalidQR'));
                         }
                     },
-                    false
+                    () => {} // errori di frame senza QR: normali, ignora
                 );
-
-                scanner.render(onScanSuccess, onScanError);
+                if (!stopped) setStatus('scanning');
             } catch (err) {
-                console.error('Scanner initialization error:', err);
-                setError('Unable to initialize scanner');
+                if (stopped) return;
+                if (err.name === 'NotAllowedError') {
+                    setErrorType('permission');
+                } else if (err.name === 'NotFoundError') {
+                    setErrorType('notfound');
+                } else {
+                    setErrorType('generic');
+                }
+                setStatus('error');
             }
         };
 
-        const onScanSuccess = (decodedText) => {
-            try {
-                // Parse otpauth://totp/... URL
-                const url = new URL(decodedText);
-                
-                if (url.protocol !== 'otpauth:') {
-                    setError('Invalid QR code format. Please scan a valid 2FA QR code.');
-                    return;
-                }
-
-                // Estrai il secret dai parametri URL
-                const secret = url.searchParams.get('secret');
-                
-                if (!secret) {
-                    setError('Secret key not found in QR code');
-                    return;
-                }
-
-                // Chiama callback con il secret
-                onScan(secret);
-                
-                // Chiudi lo scanner
-                if (scanner) {
-                    scanner.clear().catch(console.error);
-                }
-                onClose();
-            } catch (err) {
-                console.error('QR parse error:', err);
-                setError('Invalid QR code. Please scan a valid 2FA QR code.');
-            }
-        };
-
-        const onScanError = (err) => {
-            // Ignora errori di scanning continui (quando non trova il QR)
-            if (err && typeof err === 'string' && err.includes('NotFoundException')) {
-                return;
-            }
-            // Non loggare altri errori comuni
-        };
-
-        initScanner();
+        start();
 
         return () => {
-            isCleanedUp = true;
-            if (scanner) {
-                scanner.clear().catch(console.error);
+            stopped = true;
+            if (html5QrCode) {
+                html5QrCode.stop().catch(() => {});
             }
         };
-    }, [isOpen, onClose, onScan]);
+    }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/90 z-50 flex flex-col">
+        <div className="fixed inset-0 bg-black z-50 flex flex-col">
+
             {/* Header */}
-            <div className="bg-primary text-white px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center justify-between px-4 py-3.5 bg-slate-900 border-b border-slate-700 flex-shrink-0">
                 <div className="flex items-center gap-3">
-                    <Camera size={24} />
-                    <h2 className="text-lg font-bold">Scan QR Code</h2>
+                    <Camera size={20} className="text-blue-400" />
+                    <h2 className="text-base font-semibold text-white">{t('qrScanner.title')}</h2>
                 </div>
                 <button
                     onClick={onClose}
-                    className="p-2 hover:bg-primary-dark rounded-lg transition-colors"
+                    className="p-2 text-gray-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
                 >
-                    <X size={24} />
+                    <X size={20} />
                 </button>
             </div>
 
-            {/* Scanner Container */}
-            <div className="flex-1 flex flex-col items-center justify-center p-4">
-                <div className="w-full max-w-md">
-                    {permissionStatus === 'pending' && (
-                        <div className="bg-white rounded-lg p-6 text-center">
-                            <Camera className="mx-auto mb-4 text-primary" size={48} />
-                            <h3 className="text-lg font-bold mb-2">Camera Permission Required</h3>
-                            <p className="text-gray-600 text-sm">
-                                Requesting camera access...
+            {/* Body */}
+            <div className="flex-1 flex flex-col items-center justify-center p-6 gap-5">
+
+                {status === 'error' ? (
+                    /* Stato errore */
+                    <div className="w-full max-w-sm flex flex-col items-center gap-5 text-center">
+                        <div className="w-16 h-16 rounded-full bg-red-900/30 border border-red-700/50 flex items-center justify-center">
+                            <AlertCircle size={30} className="text-red-400" />
+                        </div>
+
+                        <div>
+                            <h3 className="text-white font-semibold mb-1.5">
+                                {errorType === 'permission' ? t('qrScanner.permissionDeniedTitle') :
+                                 errorType === 'notfound'  ? t('qrScanner.noCameraTitle') :
+                                 t('qrScanner.errorTitle')}
+                            </h3>
+                            <p className="text-gray-400 text-sm">
+                                {errorType === 'permission' ? t('qrScanner.permissionDeniedMsg') :
+                                 errorType === 'notfound'  ? t('qrScanner.noCameraMsg') :
+                                 t('qrScanner.errorMsg')}
                             </p>
                         </div>
-                    )}
 
-                    {permissionStatus === 'denied' && (
-                        <div className="bg-white rounded-lg p-6 text-center">
-                            <AlertCircle className="mx-auto mb-4 text-red-500" size={48} />
-                            <h3 className="text-lg font-bold mb-2 text-red-700">Camera Access Denied</h3>
-                            <p className="text-gray-600 text-sm mb-4">
-                                {error || 'Please allow camera access in your browser settings to scan QR codes.'}
-                            </p>
-                            <div className="space-y-2 text-left text-xs text-gray-500 bg-gray-50 p-4 rounded">
-                                <p className="font-semibold">How to enable camera:</p>
-                                <ul className="list-disc list-inside space-y-1">
-                                    <li>Chrome/Edge: Click the camera icon in the address bar</li>
-                                    <li>Safari: Settings → Safari → Camera → Allow</li>
-                                    <li>Firefox: Click the permissions icon next to the URL</li>
+                        {errorType === 'permission' && (
+                            <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 text-left w-full">
+                                <p className="text-xs font-semibold text-gray-300 mb-2">{t('qrScanner.howToEnable')}</p>
+                                <ul className="text-xs text-gray-400 space-y-1.5 list-disc list-inside">
+                                    <li>{t('qrScanner.enableChrome')}</li>
+                                    <li>{t('qrScanner.enableSafari')}</li>
+                                    <li>{t('qrScanner.enableFirefox')}</li>
                                 </ul>
                             </div>
-                            <button
-                                onClick={onClose}
-                                className="mt-4 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
-                            >
-                                Close
-                            </button>
-                        </div>
-                    )}
+                        )}
 
-                    {permissionStatus === 'granted' && (
-                        <>
-                            <div id="qr-reader" className="rounded-lg overflow-hidden" />
-                            
-                            {error && !error.includes('Camera access denied') && (
-                                <div className="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                                    {error}
+                        <button
+                            onClick={onClose}
+                            className="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors"
+                        >
+                            {t('common.close')}
+                        </button>
+                    </div>
+
+                ) : (
+                    /* Stato loading / scanning */
+                    <div className="w-full max-w-xs flex flex-col items-center gap-5">
+
+                        {/* Viewfinder */}
+                        <div className="relative w-64 h-64">
+                            {/* Il div che html5-qrcode usa per iniettare il video */}
+                            <div
+                                id="qr-video-container"
+                                className="w-full h-full rounded-xl overflow-hidden bg-slate-900"
+                            />
+
+                            {/* Overlay loading */}
+                            {status === 'loading' && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-900 rounded-xl">
+                                    <Loader size={32} className="text-blue-400 animate-spin" />
+                                    <p className="text-gray-500 text-xs">{t('qrScanner.requestingCamera')}</p>
                                 </div>
                             )}
 
-                            <div className="mt-6 text-white text-center space-y-2">
-                                <p className="text-sm opacity-90">
-                                    Position the QR code within the frame
-                                </p>
-                                <p className="text-xs opacity-75">
-                                    The scanner will automatically detect and read the code
-                                </p>
+                            {/* Corner brackets */}
+                            {status === 'scanning' && (
+                                <div className="absolute inset-0 pointer-events-none">
+                                    <div className="absolute top-3 left-3 w-7 h-7 border-t-2 border-l-2 border-blue-400 rounded-tl" />
+                                    <div className="absolute top-3 right-3 w-7 h-7 border-t-2 border-r-2 border-blue-400 rounded-tr" />
+                                    <div className="absolute bottom-3 left-3 w-7 h-7 border-b-2 border-l-2 border-blue-400 rounded-bl" />
+                                    <div className="absolute bottom-3 right-3 w-7 h-7 border-b-2 border-r-2 border-blue-400 rounded-br" />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Istruzione */}
+                        {status === 'scanning' && (
+                            <p className="text-gray-400 text-sm text-center leading-relaxed">
+                                {t('qrScanner.instruction')}
+                            </p>
+                        )}
+
+                        {/* Errore scansione (QR non valido) */}
+                        {scanError && (
+                            <div className="w-full bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm text-red-300 text-center">
+                                {scanError}
                             </div>
-                        </>
-                    )}
-                </div>
+                        )}
+                    </div>
+                )}
+
             </div>
         </div>
     );

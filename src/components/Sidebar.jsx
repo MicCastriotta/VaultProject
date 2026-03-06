@@ -67,7 +67,10 @@ export function Sidebar() {
             </aside>
 
             {/* MOBILE BOTTOM NAV */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 flex justify-around py-2 safe-bottom z-50">
+            <nav
+                className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 flex justify-around z-50"
+                style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+            >
                 {navItems.map(item => {
                     const Icon = item.icon;
                     const isActive = location.pathname === item.path;
@@ -76,14 +79,12 @@ export function Sidebar() {
                         <button
                             key={item.path}
                             onClick={() => navigate(item.path)}
-                            className={`flex flex-col items-center text-xs transition-all
-                ${isActive
-                                    ? 'text-blue-400'
-                                    : 'text-gray-400'
-                                }`}
+                            className={`flex flex-col items-center gap-1 flex-1 py-3 px-2 text-xs transition-all active:opacity-60 ${
+                                isActive ? 'text-blue-400' : 'text-gray-400'
+                            }`}
                         >
-                            <Icon size={20} />
-                            <span className="mt-1">{item.label}</span>
+                            <Icon size={24} />
+                            <span>{item.label}</span>
                         </button>
                     );
                 })}

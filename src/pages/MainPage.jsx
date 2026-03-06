@@ -243,7 +243,7 @@ export function MainPage() {
                                                     <button
                                                         key={profile.id}
                                                         onClick={() => navigate(`/profile/${profile.id}`)}
-                                                        className="w-full flex justify-between items-center p-4 rounded-2xl bg-slate-800/60 border border-slate-700 hover:bg-slate-800 transition"
+                                                        className="w-full flex justify-between items-center p-4 rounded-2xl bg-slate-800/60 border border-slate-700 hover:bg-slate-800 active:scale-[0.97] active:opacity-75 transition-all duration-150"
                                                     >
                                                         <div className="flex items-center gap-4">
                                                             <div 
@@ -291,8 +291,8 @@ export function MainPage() {
                 {/* FAB */}
                 <button
                     onClick={() => navigate('/profile/new')}
-                    className="fixed right-6 bg-green-500 text-black p-4 rounded-full shadow-lg hover:opacity-90 transition z-[9999]"
-                    style={{ bottom: '3.5rem' }}
+                    className="fixed right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-500 active:scale-95 transition-all z-[9999]"
+                    style={{ bottom: '5.5rem' }}
 
                 >
                     <Plus size={28} />

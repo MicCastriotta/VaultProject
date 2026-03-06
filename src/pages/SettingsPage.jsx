@@ -24,7 +24,13 @@ import {
     Moon,
     ChevronDown,
     Monitor,
-    HardDrive
+    HardDrive,
+    Heart,
+    Mail,
+    Copy,
+    Check,
+    CreditCard,
+    Coffee
 } from 'lucide-react';
 import { syncService } from '../services/syncService';
 import { SyncConflictDialog } from '../components/SyncConflictDialog';
@@ -59,6 +65,166 @@ function AccordionSection({ icon, title, sectionKey, openSections, onToggle, chi
     );
 }
 
+const PAYPAL_ME = 'https://paypal.me/MicheleCastriotta';
+const BANK_INFO = {
+    beneficiary: 'Michele Castriotta',
+    iban: 'IT49N0366901600264292569202',
+    ibanRaw: 'IT49N0366901600264292569202',
+    bic: 'REVOITM2',
+};
+const PRESET_AMOUNTS = [1, 3, 5];
+
+function DonationModal({ onClose }) {
+    const { t } = useTranslation();
+    const [selectedAmount, setSelectedAmount] = useState(3);
+    const [customAmount, setCustomAmount] = useState('');
+    const [amountError, setAmountError] = useState(false);
+    const [showBank, setShowBank] = useState(false);
+    const [copiedField, setCopiedField] = useState(null);
+
+    function getAmount() {
+        if (customAmount !== '') {
+            const val = parseFloat(customAmount.replace(',', '.'));
+            return isNaN(val) || val < 1 ? null : val;
+        }
+        return selectedAmount;
+    }
+
+    function handlePayPal() {
+        const amount = getAmount();
+        if (!amount) { setAmountError(true); return; }
+        setAmountError(false);
+        window.open(`${PAYPAL_ME}/${amount}`, '_blank', 'noopener,noreferrer');
+    }
+
+    async function copyToClipboard(text, field) {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedField(field);
+            setTimeout(() => setCopiedField(null), 2000);
+        } catch {
+            // fallback silenzioso
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+            <div className="bg-slate-800 border border-slate-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto">
+                {/* Header modale */}
+                <div className="flex items-center justify-between p-5 border-b border-slate-700">
+                    <div className="flex items-center gap-2">
+                        <Coffee size={20} className="text-amber-400" />
+                        <h2 className="text-lg font-bold text-white">{t('support.modal.title')}</h2>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 text-gray-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                    >
+                        <XCircle size={20} />
+                    </button>
+                </div>
+
+                <div className="p-5 space-y-5">
+                    <p className="text-sm text-gray-400">{t('support.modal.subtitle')}</p>
+
+                    {/* Selettore importo */}
+                    <div>
+                        <p className="text-sm font-medium text-gray-300 mb-2">{t('support.modal.chooseAmount')}</p>
+                        <div className="flex gap-2 mb-2">
+                            {PRESET_AMOUNTS.map(amt => (
+                                <button
+                                    key={amt}
+                                    onClick={() => { setSelectedAmount(amt); setCustomAmount(''); setAmountError(false); }}
+                                    className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition-all border-2 ${
+                                        selectedAmount === amt && customAmount === ''
+                                            ? 'border-amber-500 bg-amber-500/15 text-amber-300'
+                                            : 'border-slate-600 text-gray-300 hover:border-slate-500'
+                                    }`}
+                                >
+                                    {amt}€
+                                </button>
+                            ))}
+                        </div>
+                        <input
+                            type="number"
+                            min="1"
+                            step="0.5"
+                            value={customAmount}
+                            onChange={e => { setCustomAmount(e.target.value); setSelectedAmount(null); setAmountError(false); }}
+                            placeholder={t('support.modal.customPlaceholder')}
+                            className={`w-full px-3 py-2.5 bg-slate-900/60 border rounded-lg text-gray-200 text-sm placeholder-gray-500 focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-colors ${
+                                amountError ? 'border-red-500' : 'border-slate-600'
+                            }`}
+                        />
+                        {amountError && (
+                            <p className="text-xs text-red-400 mt-1">{t('support.modal.invalidAmount')}</p>
+                        )}
+                    </div>
+
+                    {/* PayPal */}
+                    <div className="bg-slate-900/50 border border-slate-700 rounded-xl p-4 space-y-3">
+                        <p className="text-sm font-semibold text-gray-200 flex items-center gap-2">
+                            <span className="text-blue-400 font-bold text-base">P</span>
+                            {t('support.modal.paypalTitle')}
+                        </p>
+                        <p className="text-xs text-gray-400">{t('support.modal.paypalNote')}</p>
+                        <button
+                            onClick={handlePayPal}
+                            className="w-full bg-[#0070ba] hover:bg-[#003087] text-white py-3 px-4 rounded-lg font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+                        >
+                            <span className="font-bold text-base leading-none">P</span>
+                            {t('support.modal.paypalButton')}
+                        </button>
+                    </div>
+
+                    {/* Bonifico */}
+                    <div className="bg-slate-900/50 border border-slate-700 rounded-xl overflow-hidden">
+                        <button
+                            onClick={() => setShowBank(v => !v)}
+                            className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-700/30 transition-colors"
+                        >
+                            <span className="text-sm font-semibold text-gray-200 flex items-center gap-2">
+                                <CreditCard size={16} className="text-green-400" />
+                                {t('support.modal.bankTitle')}
+                            </span>
+                            <ChevronDown
+                                size={16}
+                                className={`text-gray-400 transition-transform duration-200 ${showBank ? 'rotate-180' : ''}`}
+                            />
+                        </button>
+                        {showBank && (
+                            <div className="px-4 pb-4 space-y-3 border-t border-slate-700 pt-3">
+                                {[
+                                    { label: t('support.modal.beneficiary'), value: BANK_INFO.beneficiary, copyVal: BANK_INFO.beneficiary, field: 'name' },
+                                    { label: t('support.modal.iban'), value: BANK_INFO.iban, copyVal: BANK_INFO.ibanRaw, field: 'iban' },
+                                    { label: t('support.modal.bic'), value: BANK_INFO.bic, copyVal: BANK_INFO.bic, field: 'bic' },
+                                ].map(({ label, value, copyVal, field }) => (
+                                    <div key={field} className="flex items-center justify-between gap-3 bg-slate-800/60 rounded-lg px-3 py-2.5">
+                                        <div className="min-w-0">
+                                            <p className="text-xs text-gray-500 mb-0.5">{label}</p>
+                                            <p className="text-sm text-gray-200 font-mono break-all">{value}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => copyToClipboard(copyVal, field)}
+                                            className="flex-shrink-0 p-1.5 text-gray-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors"
+                                            title={t('support.modal.copy')}
+                                        >
+                                            {copiedField === field
+                                                ? <Check size={15} className="text-green-400" />
+                                                : <Copy size={15} />
+                                            }
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export function SettingsPage() {
     const navigate = useNavigate();
     const { logout, autoLockTimeout, setAutoLockTimeout } = useAuth();
@@ -72,6 +238,7 @@ export function SettingsPage() {
     const [syncStatus, setSyncStatus] = useState(null);
     const [isSyncEnabled, setIsSyncEnabled] = useState(false);
     const [syncConflict, setSyncConflict] = useState(null);
+    const [showDonation, setShowDonation] = useState(false);
 
     function toggleSection(key) {
         setOpenSections(prev => {
@@ -305,15 +472,11 @@ export function SettingsPage() {
                                             <span className={`text-sm font-medium ${theme === 'dark' ? 'text-blue-300' : 'text-gray-400'}`}>{t('settings.dark')}</span>
                                         </button>
                                         <button
-                                            onClick={() => setTheme('light')}
-                                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                                                theme === 'light'
-                                                    ? 'border-blue-500 bg-blue-500/10'
-                                                    : 'border-slate-700 hover:border-slate-500'
-                                            }`}
+                                            disabled
+                                            className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-slate-700 opacity-35 cursor-not-allowed"
                                         >
-                                            <Sun size={22} className={theme === 'light' ? 'text-blue-400' : 'text-gray-400'} />
-                                            <span className={`text-sm font-medium ${theme === 'light' ? 'text-blue-300' : 'text-gray-400'}`}>{t('settings.light')}</span>
+                                            <Sun size={22} className="text-gray-400" />
+                                            <span className="text-sm font-medium text-gray-400">{t('settings.light')}</span>
                                         </button>
                                     </div>
                                 </div>
@@ -535,11 +698,63 @@ export function SettingsPage() {
                                 </div>
                             </AccordionSection>
 
+                            {/* ── Supporta il progetto ── */}
+                            <AccordionSection
+                                icon={<Heart size={18} className="text-rose-400" />}
+                                title={t('support.title')}
+                                sectionKey="support"
+                                openSections={openSections}
+                                onToggle={toggleSection}
+                            >
+                                {/* Banner gratuito */}
+                                <div className="p-4">
+                                    <div className="rounded-xl bg-gradient-to-br from-rose-900/25 to-amber-900/20 border border-rose-500/25 p-4 space-y-1.5">
+                                        <p className="font-semibold text-rose-200 text-sm">{t('support.sectionSubtitle')}</p>
+                                        <p className="text-sm text-gray-400 leading-relaxed">{t('support.sectionDescription')}</p>
+                                    </div>
+                                </div>
+
+                                {/* Contatti */}
+                                <div className="p-4 space-y-3">
+                                    <p className="text-sm font-medium text-gray-300 flex items-center gap-2">
+                                        <Mail size={15} className="text-blue-400" />
+                                        {t('support.contactTitle')}
+                                    </p>
+                                    <p className="text-sm text-gray-400">{t('support.contactDescription')}</p>
+                                    <a
+                                        href="mailto:ingegnere.castriotta@gmail.com"
+                                        className="w-full bg-slate-700 hover:bg-slate-600 text-gray-200 py-3 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <Mail size={16} />
+                                        {t('support.contactButton')}
+                                    </a>
+                                </div>
+
+                                {/* Donazione */}
+                                <div className="p-4 space-y-3">
+                                    <p className="text-sm font-medium text-gray-300 flex items-center gap-2">
+                                        <Coffee size={15} className="text-amber-400" />
+                                        {t('support.donateTitle')}
+                                    </p>
+                                    <p className="text-sm text-gray-400">{t('support.donateDescription')}</p>
+                                    <button
+                                        onClick={() => setShowDonation(true)}
+                                        className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white py-3 px-4 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-900/30"
+                                    >
+                                        <Heart size={16} />
+                                        {t('support.donateButton')}
+                                    </button>
+                                </div>
+                            </AccordionSection>
+
                         </div>
                     </div>
 
                 </div>
             </div>
+
+            {/* Donation Modal */}
+            {showDonation && <DonationModal onClose={() => setShowDonation(false)} />}
 
             {/* Conflict Dialog */}
             {syncConflict && (
