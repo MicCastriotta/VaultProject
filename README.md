@@ -184,6 +184,7 @@ Funzionalità da implementare:
 - [x] PWA
 - [x] Multi-lingua
 - [ ] Logging centralizzato
+- [ ] Aggiunta campi personalizzati nella creazione di un profilo
 
 ## Struttura del Progetto
 
