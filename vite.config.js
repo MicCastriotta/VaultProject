@@ -101,7 +101,7 @@ export default defineConfig({
         short_name: 'OwnVault',
         description: 'OwnVault. Your Keys. Your Control',
         theme_color: '#0f172a',
-        background_color: '#ffffff',
+        background_color: '#1e293b',
         display: 'standalone',
         icons: [
           {

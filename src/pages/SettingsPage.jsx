@@ -226,7 +226,7 @@ function DonationModal({ onClose }) {
 
 export function SettingsPage() {
     const navigate = useNavigate();
-    const { logout, autoLockTimeout, setAutoLockTimeout } = useAuth();
+    const { logout, resetAll, autoLockTimeout, setAutoLockTimeout } = useAuth();
     const { t } = useTranslation();
     const { theme, setTheme } = useTheme();
     const [openSections, setOpenSections] = useState(new Set());
@@ -381,9 +381,11 @@ export function SettingsPage() {
 
     async function handleDeleteAll() {
         try {
-            await databaseService.deleteAllData();
             setShowDeleteConfirm(false);
-            logout();
+            const result = await resetAll();
+            if (!result.success) {
+                setMessage({ type: 'error', text: 'Delete failed: ' + result.error });
+            }
         } catch (error) {
             console.error('Delete error:', error);
             setMessage({ type: 'error', text: 'Delete failed: ' + error.message });

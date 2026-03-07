@@ -139,7 +139,8 @@
       "syncNowBtn": "Sincronizza Ora",
       "disconnectBtn": "Disconnetti",
       "syncedDirection": "Sincronizzato con successo ({{direction}})",
-      "syncErrorMsg": "Errore di sincronizzazione: {{error}}"
+      "syncErrorMsg": "Errore di sincronizzazione: {{error}}",
+      "reauthNeeded": "Sync Google Drive: sessione scaduta. Vai in Impostazioni per riconnetterti."
     },
     "export": {
       "title": "Esporta Database",

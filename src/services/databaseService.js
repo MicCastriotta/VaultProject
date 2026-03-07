@@ -195,6 +195,7 @@ class DatabaseService {
     async deleteAllData() {
         await db.config.clear();
         await db.profiles.clear();
+        await db.syncConfig.clear();
     }
 
     /**

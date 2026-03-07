@@ -27,10 +27,7 @@ function UpdateBanner() {
     return (
         <div className="fixed top-0 left-0 right-0 z-[9999] bg-blue-600 text-white px-4 py-3 flex items-center justify-between gap-4 shadow-lg">
             <span className="text-sm">
-                Nuova versione disponibile
-                {typeof __APP_VERSION__ !== 'undefined' && __APP_VERSION__
-                    ? ` — v${__APP_VERSION__}`
-                    : ''}
+                Nuova versione disponibile                
             </span>
             <button
                 onClick={() => updateServiceWorker(true)}
@@ -84,6 +81,8 @@ function SyncLaunchCheck() {
                 setSyncToast({ type: 'success', text: t('settings.sync.syncedDirection', { direction: data.direction }) });
             } else if (event === 'error') {
                 setSyncToast({ type: 'error', text: t('settings.sync.syncErrorMsg', { error: data.error }) });
+            } else if (event === 'reauth_needed') {
+                setSyncToast({ type: 'error', text: t('settings.sync.reauthNeeded') });
             }
         };
 
