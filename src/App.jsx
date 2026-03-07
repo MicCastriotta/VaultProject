@@ -3,15 +3,19 @@
  * Gestisce routing e protezione route
  */
 
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { useTranslation } from 'react-i18next';
+import { CheckCircle, AlertTriangle } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { IntegrityWarningBanner } from './components/IntegrityWarningBanner';
 import { BiometricSetupDialog } from './components/BiometricSetupDialog';
+import { SyncConflictDialog } from './components/SyncConflictDialog';
 import { AppLayout } from './layouts/AppLayout';
 import { InstallPrompt } from './components/InstallPrompt';
+import { syncService } from './services/syncService';
 
 /* global __APP_VERSION__ */
 
@@ -65,6 +69,67 @@ const PageLoader = () => (
 );
 
 /**
+ * Gestione globale sync: check all'avvio, dialog conflitto, toast notifiche.
+ */
+function SyncLaunchCheck() {
+    const { t } = useTranslation();
+    const [syncConflict, setSyncConflict] = useState(null);
+    const [syncToast, setSyncToast] = useState(null);
+
+    useEffect(() => {
+        const handleSyncEvent = (event, data) => {
+            if (event === 'conflict') {
+                setSyncConflict(data);
+            } else if (event === 'synced') {
+                setSyncToast({ type: 'success', text: t('settings.sync.syncedDirection', { direction: data.direction }) });
+            } else if (event === 'error') {
+                setSyncToast({ type: 'error', text: t('settings.sync.syncErrorMsg', { error: data.error }) });
+            }
+        };
+
+        syncService.addListener(handleSyncEvent);
+        syncService.checkSyncOnLaunch().catch(console.error);
+
+        return () => syncService.removeListener(handleSyncEvent);
+    }, []);
+
+    useEffect(() => {
+        if (!syncToast) return;
+        const timer = setTimeout(() => setSyncToast(null), 3500);
+        return () => clearTimeout(timer);
+    }, [syncToast]);
+
+    function handleConflictResolution(useCloud) {
+        if (syncConflict?.resolve) {
+            syncConflict.resolve(useCloud);
+            setSyncConflict(null);
+        }
+    }
+
+    return (
+        <>
+            {syncConflict && (
+                <SyncConflictDialog
+                    cloudData={syncConflict.cloudData}
+                    localData={syncConflict.localData}
+                    onResolve={handleConflictResolution}
+                />
+            )}
+            {syncToast && (
+                <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9998] px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium whitespace-nowrap
+                    ${syncToast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+                    {syncToast.type === 'success'
+                        ? <CheckCircle size={16} />
+                        : <AlertTriangle size={16} />
+                    }
+                    {syncToast.text}
+                </div>
+            )}
+        </>
+    );
+}
+
+/**
  * Shell statico per le route autenticate.
  * AppLayout (sidebar + sfondo) rimane montato durante le navigazioni;
  * solo il contenuto interno sospende.
@@ -72,6 +137,7 @@ const PageLoader = () => (
 function AppShell({ showBiometricSetup, enableBiometric, skipBiometricSetup }) {
     return (
         <AppLayout>
+            <SyncLaunchCheck />
             {showBiometricSetup && (
                 <BiometricSetupDialog
                     onEnable={enableBiometric}

@@ -200,6 +200,8 @@ class SyncService {
             // 1. Export dati locali
             const localData = await databaseService.exportData();
             const localTimestamp = syncConfig.lastLocalModification || Date.now();
+            // Correggi exportDate: usa lastLocalModification, non l'ora corrente
+            localData.exportDate = new Date(localTimestamp).toISOString();
 
             // 2. Download da cloud
             const cloudData = await googleDriveService.downloadFile(
@@ -307,21 +309,17 @@ class SyncService {
     }
 
     /**
-     * Check sync all'avvio dell'app
+     * Check sync all'avvio dell'app (dopo login).
+     * Se il cloud è più recente del dispositivo, chiede all'utente
+     * quale versione mantenere e agisce di conseguenza.
      */
     async checkSyncOnLaunch() {
         const syncConfig = await databaseService.getSyncConfig();
 
-        if (!syncConfig?.enabled) {
-            return;
-        }
-
-        if (!googleDriveService.isOnline()) {
-            return;
-        }
+        if (!syncConfig?.enabled) return;
+        if (!googleDriveService.isOnline()) return;
 
         try {
-            // Download cloud version
             const cloudData = await googleDriveService.downloadFile(
                 syncConfig.googleDriveFileId
             );
@@ -329,13 +327,53 @@ class SyncService {
             const localTimestamp = syncConfig.lastLocalModification || 0;
             const cloudTimestamp = cloudData.syncTimestamp || 0;
 
-            if (cloudTimestamp > localTimestamp) {
-                // Cloud più recente → notifica disponibilità aggiornamento
-                this.notifyListeners('update-available', {
-                    cloudData,
-                    cloudTimestamp,
-                    localTimestamp
+            // Nessuna differenza → già sincronizzato
+            if (cloudTimestamp <= localTimestamp) return;
+
+            // Cloud più recente → confronta contenuto
+            const localData = await databaseService.exportData();
+            // Correggi exportDate: usa lastLocalModification, non l'ora corrente
+            localData.exportDate = localTimestamp
+                ? new Date(localTimestamp).toISOString()
+                : localData.exportDate;
+
+            const hasLocalProfiles = (localData.profiles?.length || 0) > 0;
+            const hasCloudProfiles = (cloudData.profiles?.length || 0) > 0;
+
+            if (!hasLocalProfiles && hasCloudProfiles) {
+                // Locale vuoto → auto-import senza chiedere
+                await databaseService.importData(cloudData);
+                await databaseService.updateSyncConfig({
+                    lastSyncTimestamp: cloudTimestamp,
+                    lastLocalModification: cloudTimestamp
                 });
+                this.notifyListeners('synced', { direction: 'download', conflict: false });
+                return;
+            }
+
+            // Entrambi hanno dati → chiedi all'utente
+            const shouldImport = await this.askConflictResolution(cloudData, localData);
+
+            if (shouldImport) {
+                await databaseService.importData(cloudData);
+                await databaseService.updateSyncConfig({
+                    lastSyncTimestamp: cloudTimestamp,
+                    lastLocalModification: cloudTimestamp
+                });
+                this.notifyListeners('synced', { direction: 'download', conflict: true });
+            } else {
+                // Mantieni locale → re-upload per allineare il cloud
+                const syncData = {
+                    version: 2,
+                    lastModified: new Date().toISOString(),
+                    deviceId: this.deviceId,
+                    deviceName: this.deviceName,
+                    syncTimestamp: Date.now(),
+                    ...localData
+                };
+                await googleDriveService.updateFile(syncConfig.googleDriveFileId, syncData);
+                await databaseService.updateSyncConfig({ lastSyncTimestamp: Date.now() });
+                this.notifyListeners('synced', { direction: 'upload', conflict: true });
             }
         } catch (error) {
             console.error('Error checking sync on launch:', error);
