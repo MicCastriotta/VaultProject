@@ -20,20 +20,25 @@ import { syncService } from './services/syncService';
 /* global __APP_VERSION__ */
 
 function UpdateBanner() {
-    const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW();
+    const { t } = useTranslation();
+    const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW({
+        onRegisteredSW(_swUrl, r) {
+            r.update(); // check immediato
+            // iOS Safari non fa polling automatico: forziamo un check ogni ora
+            setInterval(() => r.update(), 60 * 60 * 1000);
+        }
+    });
 
     if (!needRefresh) return null;
 
     return (
         <div className="fixed top-0 left-0 right-0 z-[9999] bg-blue-600 text-white px-4 py-3 flex items-center justify-between gap-4 shadow-lg">
-            <span className="text-sm">
-                Nuova versione disponibile                
-            </span>
+            <span className="text-sm">{t('pwa.updateAvailable')}</span>
             <button
                 onClick={() => updateServiceWorker(true)}
                 className="bg-white text-blue-600 text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors flex-shrink-0"
             >
-                Aggiorna
+                {t('pwa.update')}
             </button>
         </div>
     );

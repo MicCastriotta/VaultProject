@@ -357,6 +357,10 @@
     },
     "chars": "car."
   },
+  "pwa": {
+    "updateAvailable": "Nuova versione disponibile",
+    "update": "Aggiorna"
+  },
   "install": {
     "title": "Installa OwnVault",
     "subtitle": "Accesso rapido dalla schermata Home",

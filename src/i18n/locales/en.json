@@ -357,6 +357,10 @@
     },
     "chars": "chars"
   },
+  "pwa": {
+    "updateAvailable": "New version available",
+    "update": "Update"
+  },
   "install": {
     "title": "Install OwnVault",
     "subtitle": "Quick access from the Home screen",
