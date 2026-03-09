@@ -108,11 +108,21 @@ class GoogleDriveService {
      * Login con Google (richiede popup)
      */
     async signIn() {
+        // init() deve essere già completata (pre-caricata al mount della pagina)
+        // in modo che requestAccessToken venga chiamata nel user-gesture context.
+        // Se non è ancora pronta, la carichiamo ora (desktop path di fallback).
         await this.init();
 
         return new Promise((resolve, reject) => {
+            // Timeout di sicurezza: su iOS standalone il popup non riesce a
+            // fare postMessage back e la callback non arriva mai → freeze.
+            const timeout = setTimeout(() => {
+                reject(new Error('Google Sign-In timeout: il popup non ha risposto. Riprova dal browser (non dalla PWA installata) oppure usa un dispositivo desktop.'));
+            }, 120_000); // 2 minuti
+
             try {
                 this.tokenClient.callback = async (response) => {
+                    clearTimeout(timeout);
                     if (response.error !== undefined) {
                         reject(response);
                         return;
@@ -136,6 +146,7 @@ class GoogleDriveService {
                     this.tokenClient.requestAccessToken({ prompt: '' });
                 }
             } catch (error) {
+                clearTimeout(timeout);
                 reject(error);
             }
         });
