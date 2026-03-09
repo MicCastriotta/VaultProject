@@ -19,6 +19,31 @@ class GoogleDriveService {
         this.tokenClient = null;
     }
 
+    /** Salva il token in localStorage con timestamp di scadenza */
+    cacheToken(accessToken, expiresIn) {
+        const expiresAt = Date.now() + ((expiresIn - 60) * 1000); // 1 min di margine
+        localStorage.setItem('ownvault_google_token', accessToken);
+        localStorage.setItem('ownvault_google_token_expires', String(expiresAt));
+    }
+
+    /** Restituisce il token in cache se ancora valido, null altrimenti */
+    loadCachedToken() {
+        const token = localStorage.getItem('ownvault_google_token');
+        const expires = parseInt(localStorage.getItem('ownvault_google_token_expires') || '0', 10);
+        if (token && Date.now() < expires) {
+            return token;
+        }
+        localStorage.removeItem('ownvault_google_token');
+        localStorage.removeItem('ownvault_google_token_expires');
+        return null;
+    }
+
+    /** Rimuove il token dalla cache */
+    clearCachedToken() {
+        localStorage.removeItem('ownvault_google_token');
+        localStorage.removeItem('ownvault_google_token_expires');
+    }
+
     /**
      * Inizializza Google API
      */
@@ -95,7 +120,8 @@ class GoogleDriveService {
 
                     this.accessToken = response.access_token;
                     this.isSignedIn = true;
-                                        
+                    this.cacheToken(response.access_token, response.expires_in || 3600);
+
                     resolve({
                         accessToken: this.accessToken
                     });
@@ -127,11 +153,21 @@ class GoogleDriveService {
 
         this.accessToken = null;
         this.isSignedIn = false;
+        this.clearCachedToken();
     }
 
     async restoreSession() {
         await this.init();
 
+        // Usa il token in cache se ancora valido: evita il popup Google ad ogni riavvio
+        const cached = this.loadCachedToken();
+        if (cached) {
+            this.accessToken = cached;
+            this.isSignedIn = true;
+            return true;
+        }
+
+        // Nessun token valido in cache → chiedi a Google (può mostrare UI se la sessione è scaduta)
         return new Promise((resolve, reject) => {
             this.tokenClient.callback = (response) => {
                 if (response.error) {
@@ -143,13 +179,12 @@ class GoogleDriveService {
 
                 this.accessToken = response.access_token;
                 this.isSignedIn = true;
+                this.cacheToken(response.access_token, response.expires_in || 3600);
                 resolve(true);
             };
 
-            // Richiesta silenziosa (NO popup)
-            this.tokenClient.requestAccessToken({
-                prompt: ''
-            });
+            // prompt:'' = silenzioso se la sessione Google è attiva nel browser
+            this.tokenClient.requestAccessToken({ prompt: '' });
         });
     }
 

@@ -226,7 +226,7 @@ function DonationModal({ onClose }) {
 
 export function SettingsPage() {
     const navigate = useNavigate();
-    const { logout, autoLockTimeout, setAutoLockTimeout } = useAuth();
+    const { logout, resetAll, autoLockTimeout, setAutoLockTimeout } = useAuth();
     const { t } = useTranslation();
     const { theme, setTheme } = useTheme();
     const [openSections, setOpenSections] = useState(new Set());
@@ -272,9 +272,16 @@ export function SettingsPage() {
 
     async function handleEnableSync() {
         try {
-            await syncService.enableSync();
+            const result = await syncService.enableSync();
             await loadSyncStatus();
-            setMessage({ type: 'success', text: t('settings.sync.enableSuccess') });
+            if (result.cryptoChanged) {
+                // importData ha sostituito la cryptoConfig in DB: la DEK in memoria è
+                // ora obsoleta. Forziamo il re-login così login() ri-deriva la chiave
+                // corretta dalla nuova config cloud.
+                logout();
+            } else {
+                setMessage({ type: 'success', text: t('settings.sync.enableSuccess') });
+            }
         } catch (error) {
             console.error('Error enabling sync:', error);
             setMessage({ type: 'error', text: 'Failed to enable sync: ' + error.message });
@@ -381,9 +388,11 @@ export function SettingsPage() {
 
     async function handleDeleteAll() {
         try {
-            await databaseService.deleteAllData();
             setShowDeleteConfirm(false);
-            logout();
+            const result = await resetAll();
+            if (!result.success) {
+                setMessage({ type: 'error', text: 'Delete failed: ' + result.error });
+            }
         } catch (error) {
             console.error('Delete error:', error);
             setMessage({ type: 'error', text: 'Delete failed: ' + error.message });

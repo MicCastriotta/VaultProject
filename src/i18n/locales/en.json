@@ -139,7 +139,8 @@
       "syncNowBtn": "Sync Now",
       "disconnectBtn": "Disconnect",
       "syncedDirection": "Synced successfully ({{direction}})",
-      "syncErrorMsg": "Sync error: {{error}}"
+      "syncErrorMsg": "Sync error: {{error}}",
+      "reauthNeeded": "Google Drive Sync: session expired. Go to Settings to reconnect."
     },
     "export": {
       "title": "Export Database",
@@ -355,6 +356,10 @@
       "veryStrong": "Very Strong"
     },
     "chars": "chars"
+  },
+  "pwa": {
+    "updateAvailable": "New version available",
+    "update": "Update"
   },
   "install": {
     "title": "Install OwnVault",

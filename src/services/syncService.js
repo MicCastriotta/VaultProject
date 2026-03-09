@@ -81,6 +81,7 @@ class SyncService {
             };
 
             let fileId;
+            let cryptoChanged = false;
 
             if (file) {
                 // File esiste già → confronta contenuto (non timestamp: syncData è appena creato)
@@ -93,6 +94,7 @@ class SyncService {
                     // Locale vuoto → scarica cloud senza chiedere
                     await databaseService.importData(cloudData);
                     fileId = file.id;
+                    cryptoChanged = true; // importData ha sostituito la cryptoConfig: serve re-login
                     this.notifyListeners('synced', { direction: 'download', conflict: false });
                 } else if (!hasCloudProfiles) {
                     // Cloud vuoto → upload locale senza chiedere
@@ -104,6 +106,7 @@ class SyncService {
                     if (shouldImport) {
                         await databaseService.importData(cloudData);
                         fileId = file.id;
+                        cryptoChanged = true; // importData ha sostituito la cryptoConfig: serve re-login
                     } else {
                         await googleDriveService.updateFile(file.id, syncData);
                         fileId = file.id;
@@ -129,7 +132,7 @@ class SyncService {
             // 6. Notifica listeners
             this.notifyListeners('enabled');
 
-            return { success: true, userInfo };
+            return { success: true, userInfo, cryptoChanged };
         } catch (error) {
             console.error('Error enabling sync:', error);
             throw error;
