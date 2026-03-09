@@ -272,9 +272,16 @@ export function SettingsPage() {
 
     async function handleEnableSync() {
         try {
-            await syncService.enableSync();
+            const result = await syncService.enableSync();
             await loadSyncStatus();
-            setMessage({ type: 'success', text: t('settings.sync.enableSuccess') });
+            if (result.cryptoChanged) {
+                // importData ha sostituito la cryptoConfig in DB: la DEK in memoria è
+                // ora obsoleta. Forziamo il re-login così login() ri-deriva la chiave
+                // corretta dalla nuova config cloud.
+                logout();
+            } else {
+                setMessage({ type: 'success', text: t('settings.sync.enableSuccess') });
+            }
         } catch (error) {
             console.error('Error enabling sync:', error);
             setMessage({ type: 'error', text: 'Failed to enable sync: ' + error.message });
