@@ -33,6 +33,7 @@ import {
     Coffee
 } from 'lucide-react';
 import { syncService } from '../services/syncService';
+import { googleDriveService } from '../services/googledriveService';
 import { BiometricSettingsSection } from '../components/BiometricSettingsSection';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { useTranslation } from 'react-i18next';
@@ -246,6 +247,13 @@ export function SettingsPage() {
             return next;
         });
     }
+
+    // Pre-carica GIS in background: quando l'utente cliccherà "Connetti",
+    // init() sarà già completata e requestAccessToken verrà chiamata
+    // all'interno del user-gesture context (fix freeze su mobile).
+    useEffect(() => {
+        googleDriveService.init().catch(() => {});
+    }, []);
 
     useEffect(() => {
         loadSyncStatus();

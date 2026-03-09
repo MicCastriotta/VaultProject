@@ -244,49 +244,49 @@ export function MainPage() {
                                 <div className="space-y-6">
                                     {sortedGroupKeys.map(group => (
                                         <div key={group}>
-                                            <h3 className="text-xs font-semibold text-gray-500 mb-3 px-1">
+                                            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-[.1em] mb-1 px-1 pt-2">
                                                 {group}
                                             </h3>
 
-                                            <div className="space-y-4">
+                                            <div className="space-y-2">
                                                 {groupedProfiles[group].map(profile => (
                                                     <button
                                                         key={profile.id}
                                                         onClick={() => navigate(`/profile/${profile.id}`)}
-                                                        className="w-full flex justify-between items-center p-4 rounded-2xl bg-slate-800/60 border border-slate-700 hover:bg-slate-800 active:scale-[0.97] active:opacity-75 transition-all duration-150"
+                                                        className="w-full flex items-center gap-3 px-4 py-[14px] rounded-[14px] bg-slate-800/65 border-slate-600/50 hover:bg-slate-800 active:scale-[0.99] transition-all duration-150"
                                                     >
-                                                        <div className="flex items-center gap-4">
-                                                            <div 
-                                                                className="w-10 h-10 flex items-center justify-center rounded-lg"
-                                                                style={{
-                                                                    backgroundColor: iconColors[profile.icon]
-                                                                        ? `${iconColors[profile.icon]}20`
-                                                                        : 'rgba(59, 130, 246, 0.1)'
-                                                                }}
-                                                            >
-                                                                {profile.icon && profile.category === 'WEB' ? (
-                                                                    <IconRenderer
-                                                                        slug={profile.icon}
-                                                                        size={20}
-                                                                        useHex={true}
-                                                                        fallback="generic"
-                                                                    />
-                                                                ) : profile.category === 'CARD' ? (
-                                                                    <CreditCard size={20} />
-                                                                ) : (
-                                                                    <User size={20} />
-                                                                )}
-                                                            </div>
-
-                                                            <div className="text-left">
-                                                                <p className="font-semibold">{profile.title}</p>
-                                                                {profile.note && (
-                                                                    <p className="text-sm text-gray-400">
-                                                                        {profile.note}
-                                                                    </p>
-                                                                )}
-                                                            </div>
+                                                        <div
+                                                            className="w-[42px] h-[42px] flex items-center justify-center rounded-[11px] flex-shrink-0"
+                                                            style={{
+                                                                backgroundColor: iconColors[profile.icon]
+                                                                    ? `${iconColors[profile.icon]}20`
+                                                                    : 'rgba(59, 130, 246, 0.1)'
+                                                            }}
+                                                        >
+                                                            {profile.icon && profile.category === 'WEB' ? (
+                                                                <IconRenderer
+                                                                    slug={profile.icon}
+                                                                    size={22}
+                                                                    useHex={true}
+                                                                    fallback="generic"
+                                                                />
+                                                            ) : profile.category === 'CARD' ? (
+                                                                <CreditCard size={22} />
+                                                            ) : (
+                                                                <User size={22} />
+                                                            )}
                                                         </div>
+
+                                                        <div className="flex-1 min-w-0 text-left">
+                                                            <p className="font-semibold text-[15px] text-white">{profile.title}</p>
+                                                            {profile.note && (
+                                                                <p className="text-[13px] text-slate-500 truncate">
+                                                                    {profile.note}
+                                                                </p>
+                                                            )}
+                                                        </div>
+
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" className="flex-shrink-0"><polyline points="9 18 15 12 9 6"/></svg>
                                                     </button>
                                                 ))}
                                             </div>
