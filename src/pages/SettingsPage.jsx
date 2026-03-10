@@ -237,6 +237,7 @@ export function SettingsPage() {
     const [message, setMessage] = useState(null);
     const [syncStatus, setSyncStatus] = useState(null);
     const [isSyncEnabled, setIsSyncEnabled] = useState(false);
+    const [syncStatusLoaded, setSyncStatusLoaded] = useState(false);
     const [showDonation, setShowDonation] = useState(false);
 
     function toggleSection(key) {
@@ -275,6 +276,8 @@ export function SettingsPage() {
             setIsSyncEnabled(status.enabled);
         } catch (error) {
             console.error('Error loading sync status:', error);
+        } finally {
+            setSyncStatusLoaded(true);
         }
     }
 
@@ -535,7 +538,11 @@ export function SettingsPage() {
                                 onToggle={toggleSection}
                             >
                                 <div className="p-4">
-                                    {!isSyncEnabled ? (
+                                    {!syncStatusLoaded ? (
+                                        <div className="flex items-center justify-center py-4">
+                                            <RefreshCw size={20} className="text-gray-500 animate-spin" />
+                                        </div>
+                                    ) : !isSyncEnabled ? (
                                         <>
                                             <p className="text-sm text-gray-400 mb-4">
                                                 {t('settings.sync.syncAutomatically')}

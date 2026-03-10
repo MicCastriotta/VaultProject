@@ -28,8 +28,26 @@ export function QRScanner({ isOpen, onClose, onScan }) {
         const start = async () => {
             try {
                 html5QrCode = new Html5Qrcode('qr-video-container');
+
+                // iOS Safari non gestisce bene { facingMode: 'environment' } come constraint diretto.
+                // Enumeriamo prima le camere e usiamo l'ID del dispositivo (più affidabile su iOS).
+                let cameraIdOrConstraint = { facingMode: 'environment' };
+                try {
+                    const cameras = await Html5Qrcode.getCameras();
+                    if (cameras && cameras.length > 0) {
+                        // Preferisci fotocamera posteriore per label, altrimenti l'ultima (di solito quella posteriore)
+                        const back = cameras.find(c => /back|rear|environment|posteriore/i.test(c.label))
+                            || cameras[cameras.length - 1];
+                        cameraIdOrConstraint = back.id;
+                    }
+                } catch {
+                    // Se getCameras() fallisce, cade sul constraint facingMode
+                }
+
+                if (stopped) return;
+
                 await html5QrCode.start(
-                    { facingMode: 'environment' },
+                    cameraIdOrConstraint,
                     { fps: 10, qrbox: { width: 220, height: 220 } },
                     (decodedText) => {
                         try {
