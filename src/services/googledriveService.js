@@ -17,6 +17,7 @@ class GoogleDriveService {
         this.gapiLoaded = false;
         this.gisLoaded = false;
         this.tokenClient = null;
+        this._initPromise = null; // Guard contro chiamate concorrenti a init()
     }
 
     /** Salva il token in localStorage con timestamp di scadenza */
@@ -45,16 +46,40 @@ class GoogleDriveService {
     }
 
     /**
-     * Inizializza Google API
+     * Inizializza Google API.
+     * Tutte le chiamate concorrenti condividono la stessa Promise (evita race condition
+     * dove il secondo chiamante trova il <script> già in DOM ma window.gapi ancora undefined).
      */
     async init() {
-        if (this.gapiLoaded && this.gisLoaded) {
-            return; // Già inizializzato
-        }
+        if (this.gapiLoaded && this.gisLoaded) return;
 
+        // Se c'è già un init in corso, aspetta quello invece di avviarne un altro
+        if (this._initPromise) return this._initPromise;
+
+        this._initPromise = this._doInit().finally(() => {
+            this._initPromise = null;
+        });
+
+        return this._initPromise;
+    }
+
+    async _doInit() {
         try {
             // Carica GAPI (Google API)
             await this.loadScript('https://apis.google.com/js/api.js');
+
+            // loadScript può risolvere subito se il <script> esiste già in DOM,
+            // ma window.gapi potrebbe non essere ancora pronto: attendiamo esplicitamente.
+            if (!window.gapi) {
+                await new Promise((resolve, reject) => {
+                    const deadline = Date.now() + 10_000;
+                    const check = setInterval(() => {
+                        if (window.gapi) { clearInterval(check); resolve(); }
+                        else if (Date.now() > deadline) { clearInterval(check); reject(new Error('GAPI load timeout')); }
+                    }, 50);
+                });
+            }
+
             await new Promise((resolve) => {
                 window.gapi.load('client', resolve);
             });
