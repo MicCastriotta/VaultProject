@@ -142,7 +142,11 @@
       "disconnectBtn": "Disconnetti",
       "syncedDirection": "Sincronizzato con successo ({{direction}})",
       "syncErrorMsg": "Errore di sincronizzazione: {{error}}",
-      "reauthNeeded": "Sync Google Drive: sessione scaduta. Vai in Impostazioni per riconnetterti."
+      "reauthNeeded": "Sync Google Drive: sessione scaduta. Vai in Impostazioni per riconnetterti.",
+      "reauthModalTitle": "Sessione Google Drive scaduta",
+      "reauthModalDesc": "La sessione di sincronizzazione con Google Drive è scaduta. Vuoi riconnetterti ora?",
+      "reconnecting": "Connessione in corso...",
+      "dismiss": "Ignora"
     },
     "export": {
       "title": "Esporta Database",

@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Lock, AlertTriangle } from 'lucide-react';
+import { Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
 export function LoginPage() {
     const { login, biometricEnabled } = useAuth();
@@ -50,11 +50,13 @@ export function LoginPage() {
                 {/* Header con icona */}
                 <div className="text-center mb-10">
                     <div className="flex items-center justify-center mb-6">
-                        <div className="w-20 h-20 bg-gradient-to-br from-brand to-blue-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-900/40">
-                            <Lock className="w-12 h-12 text-white" />
-                        </div>
+                        <img
+                            src="/icons/appicon.png"
+                            alt="OwnVault"
+                            className="w-24 h-24 object-contain drop-shadow-lg"
+                        />
                     </div>
-                    <h1 className="text-3xl font-bold text-white mb-2 tracking-wide">🔐 OwnVault</h1>
+                    <h1 className="text-3xl font-bold text-white mb-2 tracking-wide">OwnVault</h1>
                     <p className="text-gray-400 text-sm">{t('login.welcomeBack')}</p>
                 </div>
 
