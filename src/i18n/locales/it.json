@@ -363,6 +363,11 @@
     },
     "chars": "car."
   },
+  "storage": {
+    "title": "Storage",
+    "used": "Usati",
+    "total": "Totale"
+  },
   "pwa": {
     "updateAvailable": "Nuova versione disponibile",
     "update": "Aggiorna"

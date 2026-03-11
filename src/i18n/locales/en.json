@@ -363,6 +363,11 @@
     },
     "chars": "chars"
   },
+  "storage": {
+    "title": "Storage",
+    "used": "Used",
+    "total": "Total"
+  },
   "pwa": {
     "updateAvailable": "New version available",
     "update": "Update"
