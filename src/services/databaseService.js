@@ -362,21 +362,29 @@ class DatabaseService {
     }
 
     /**
-     * Recupera configurazione sync
+     * Recupera configurazione sync.
+     * Apre esplicitamente la connessione al DB prima di leggere:
+     * evita race condition in cui Dexie non ha ancora completato
+     * l'apertura/upgrade del DB al momento della lettura.
      */
     async getSyncConfig() {
+        if (!db.isOpen()) {
+            await db.open();
+        }
         return await db.syncConfig.get('sync');
     }
 
     /**
-     * Aggiorna solo alcuni campi della sync config
+     * Aggiorna solo alcuni campi della sync config.
+     * NON chiamare dopo importData (che svuota la tabella): usare saveSyncConfig direttamente.
      */
     async updateSyncConfig(updates) {
-        const current = await this.getSyncConfig() || {};
-        await this.saveSyncConfig({
-            ...current,
-            ...updates
-        });
+        const current = await this.getSyncConfig();
+        if (!current) {
+            console.warn('updateSyncConfig: nessun record sync esistente, skip');
+            return;
+        }
+        await this.saveSyncConfig({ ...current, ...updates });
     }
 
     /**

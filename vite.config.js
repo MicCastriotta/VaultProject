@@ -92,7 +92,7 @@ export default defineConfig({
     cspPlugin(), // Aggiunge CSP headers durante lo sviluppo
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', 'icons/appicon.png', 'icons/landscape.png'],
       devOptions: {
         enabled: true
       },
@@ -113,6 +113,14 @@ export default defineConfig({
             src: '/icons/icon-512x512.png',
             sizes: '512x512',
             type: 'image/png'
+          }
+        ],
+        screenshots: [
+          {
+            src: '/icons/portrait.png',
+            sizes: '614x768',
+            type: 'image/png',
+            form_factor: 'narrow'
           }
         ]
       },

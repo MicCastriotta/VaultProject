@@ -94,6 +94,18 @@ class GoogleDriveService {
             // Carica GIS (Google Identity Services)
             await this.loadScript('https://accounts.google.com/gsi/client');
 
+            // loadScript può risolvere subito se il tag <script> esiste già in DOM,
+            // ma window.google potrebbe non essere ancora pronto: attendiamo esplicitamente.
+            if (!window.google) {
+                await new Promise((resolve, reject) => {
+                    const deadline = Date.now() + 10_000;
+                    const check = setInterval(() => {
+                        if (window.google) { clearInterval(check); resolve(); }
+                        else if (Date.now() > deadline) { clearInterval(check); reject(new Error('GIS load timeout')); }
+                    }, 50);
+                });
+            }
+
             this.tokenClient = window.google.accounts.oauth2.initTokenClient({
                 client_id: GOOGLE_CLIENT_ID,
                 scope: SCOPES,
@@ -209,7 +221,8 @@ class GoogleDriveService {
                 if (response.error) {
                     this.isSignedIn = false;
                     this.accessToken = null;
-                    reject(response);
+                    // Wrap con messaggio riconoscibile per il syncService
+                    reject(new Error(`Not signed in to Google Drive: ${response.error}`));
                     return;
                 }
 
