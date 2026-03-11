@@ -375,14 +375,16 @@ class DatabaseService {
     }
 
     /**
-     * Aggiorna solo alcuni campi della sync config
+     * Aggiorna solo alcuni campi della sync config.
+     * NON chiamare dopo importData (che svuota la tabella): usare saveSyncConfig direttamente.
      */
     async updateSyncConfig(updates) {
-        const current = await this.getSyncConfig() || {};
-        await this.saveSyncConfig({
-            ...current,
-            ...updates
-        });
+        const current = await this.getSyncConfig();
+        if (!current) {
+            console.warn('updateSyncConfig: nessun record sync esistente, skip');
+            return;
+        }
+        await this.saveSyncConfig({ ...current, ...updates });
     }
 
     /**

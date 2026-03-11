@@ -260,7 +260,9 @@ class SyncService {
                     // Importa da cloud
                     await databaseService.importData(cloudData);
 
-                    await databaseService.updateSyncConfig({
+                    // importData svuota la tabella syncConfig: re-salva il config completo con i nuovi timestamp
+                    await databaseService.saveSyncConfig({
+                        ...syncConfig,
                         lastSyncTimestamp: cloudTimestamp,
                         lastLocalModification: cloudTimestamp
                     });
@@ -359,7 +361,9 @@ class SyncService {
             if (!hasLocalProfiles && hasCloudProfiles) {
                 // Locale vuoto → auto-import senza chiedere
                 await databaseService.importData(cloudData);
-                await databaseService.updateSyncConfig({
+                // importData svuota la tabella syncConfig: re-salva il config completo con i nuovi timestamp
+                await databaseService.saveSyncConfig({
+                    ...syncConfig,
                     lastSyncTimestamp: cloudTimestamp,
                     lastLocalModification: cloudTimestamp
                 });
@@ -372,7 +376,9 @@ class SyncService {
 
             if (shouldImport) {
                 await databaseService.importData(cloudData);
-                await databaseService.updateSyncConfig({
+                // importData svuota la tabella syncConfig: re-salva il config completo con i nuovi timestamp
+                await databaseService.saveSyncConfig({
+                    ...syncConfig,
                     lastSyncTimestamp: cloudTimestamp,
                     lastLocalModification: cloudTimestamp
                 });
