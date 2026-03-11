@@ -259,8 +259,9 @@ export function SettingsPage() {
     useEffect(() => {
         loadSyncStatus();
 
+        // Ascolta tutti gli eventi che potrebbero cambiare lo stato del sync
         const handleSyncEvent = (event) => {
-            if (event === 'synced') {
+            if (['synced', 'enabled', 'disabled', 'reauth_needed', 'error'].includes(event)) {
                 loadSyncStatus();
             }
         };
@@ -274,10 +275,21 @@ export function SettingsPage() {
             const status = await syncService.getSyncStatus();
             setSyncStatus(status);
             setIsSyncEnabled(status.enabled);
+            setSyncStatusLoaded(true);
         } catch (error) {
             console.error('Error loading sync status:', error);
-        } finally {
-            setSyncStatusLoaded(true);
+            // Retry dopo 800ms: gestisce race condition all'apertura del DB
+            setTimeout(async () => {
+                try {
+                    const status = await syncService.getSyncStatus();
+                    setSyncStatus(status);
+                    setIsSyncEnabled(status.enabled);
+                } catch (retryErr) {
+                    console.error('Sync status retry failed:', retryErr);
+                } finally {
+                    setSyncStatusLoaded(true);
+                }
+            }, 800);
         }
     }
 
@@ -545,14 +557,19 @@ export function SettingsPage() {
                                     ) : !isSyncEnabled ? (
                                         <>
                                             <p className="text-sm text-gray-400 mb-4">
-                                                {t('settings.sync.syncAutomatically')}
+                                                {syncStatus?.wasEnabled
+                                                    ? t('settings.sync.sessionLost')
+                                                    : t('settings.sync.syncAutomatically')}
                                             </p>
                                             <button
                                                 onClick={handleEnableSync}
                                                 className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                                             >
                                                 <Cloud size={20} />
-                                                <span>{t('settings.sync.connectDrive')}</span>
+                                                <span>{syncStatus?.wasEnabled
+                                                    ? t('settings.sync.reconnectDrive')
+                                                    : t('settings.sync.connectDrive')}
+                                                </span>
                                             </button>
                                         </>
                                     ) : (

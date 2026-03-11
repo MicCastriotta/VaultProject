@@ -346,6 +346,7 @@ export function AuthProvider({ children }) {
                 'ownvault_device_id',
                 'ownvault_install_prompt_dismissed',
                 '_sp_sec_rl',
+                'ownvault_sync_enabled_flag',
             ];
             keysToRemove.forEach(k => localStorage.removeItem(k));
 

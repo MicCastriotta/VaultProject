@@ -190,23 +190,6 @@ export function ProfileDetailPage() {
                     {/* WEB Fields */}
                     {profile.category === 'WEB' && (
                         <>
-                            {profile.website && (
-                                <DetailField
-                                    label={t('profiles.fields.website')}
-                                    value={profile.website}
-                                    onCopy={() => handleCopy(profile.website, 'website')}
-                                    copied={copiedField === 'website'}
-                                    action={
-                                        <button
-                                            onClick={openWebsite}
-                                            className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
-                                        >
-                                            <ExternalLink size={20} />
-                                        </button>
-                                    }
-                                />
-                            )}
-
                             {profile.username && (
                                 <DetailField
                                     label={t('profiles.fields.usernameEmail')}
@@ -223,6 +206,23 @@ export function ProfileDetailPage() {
                                     onCopy={() => handleCopy(profile.password, 'password')}
                                     copied={copiedField === 'password'}
                                     masked
+                                />
+                            )}
+
+                            {profile.website && (
+                                <DetailField
+                                    label={t('profiles.fields.website')}
+                                    value={profile.website}
+                                    onCopy={() => handleCopy(profile.website, 'website')}
+                                    copied={copiedField === 'website'}
+                                    action={
+                                        <button
+                                            onClick={openWebsite}
+                                            className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+                                        >
+                                            <ExternalLink size={20} />
+                                        </button>
+                                    }
                                 />
                             )}
 

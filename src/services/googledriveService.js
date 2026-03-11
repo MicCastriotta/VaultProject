@@ -209,7 +209,8 @@ class GoogleDriveService {
                 if (response.error) {
                     this.isSignedIn = false;
                     this.accessToken = null;
-                    reject(response);
+                    // Wrap con messaggio riconoscibile per il syncService
+                    reject(new Error(`Not signed in to Google Drive: ${response.error}`));
                     return;
                 }
 

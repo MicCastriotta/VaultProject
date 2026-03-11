@@ -118,7 +118,10 @@ class SyncService {
                 fileId = file.id;
             }
 
-            // 5. Salva config sync
+            // 5. Salva flag localStorage (persiste anche se IndexedDB viene svuotato)
+            localStorage.setItem('ownvault_sync_enabled_flag', 'true');
+
+            // 6. Salva config sync
             await databaseService.saveSyncConfig({
                 enabled: true,
                 googleDriveFileId: fileId,
@@ -151,6 +154,9 @@ class SyncService {
             await databaseService.saveSyncConfig({
                 enabled: false
             });
+
+            // Rimuovi flag localStorage
+            localStorage.removeItem('ownvault_sync_enabled_flag');
 
             // Notifica listeners
             this.notifyListeners('disabled');
@@ -320,7 +326,11 @@ class SyncService {
         const syncConfig = await databaseService.getSyncConfig();
 
         if (!syncConfig?.enabled) return;
-        if (!googleDriveService.isOnline()) return;
+        if (!googleDriveService.isOnline()) {
+            // Offline ma sync configurato: notifica comunque che è abilitato
+            this.notifyListeners('enabled');
+            return;
+        }
 
         try {
             const cloudData = await googleDriveService.downloadFile(
@@ -330,8 +340,11 @@ class SyncService {
             const localTimestamp = syncConfig.lastLocalModification || 0;
             const cloudTimestamp = cloudData.syncTimestamp || 0;
 
-            // Nessuna differenza → già sincronizzato
-            if (cloudTimestamp <= localTimestamp) return;
+            // Nessuna differenza → già sincronizzato, notifica stato attivo
+            if (cloudTimestamp <= localTimestamp) {
+                this.notifyListeners('enabled');
+                return;
+            }
 
             // Cloud più recente → confronta contenuto
             const localData = await databaseService.exportData();
@@ -380,6 +393,11 @@ class SyncService {
             }
         } catch (error) {
             console.error('Error checking sync on launch:', error);
+            // Se l'errore è di autenticazione (token scaduto/revocato), notifica l'utente
+            const msg = error?.message || '';
+            if (msg.includes('Not signed in') || msg.includes('auth') || error?.error === 'access_denied') {
+                this.notifyListeners('reauth_needed');
+            }
         }
     }
 
@@ -440,7 +458,8 @@ class SyncService {
         if (!syncConfig?.enabled) {
             return {
                 enabled: false,
-                status: 'disabled'
+                status: 'disabled',
+                wasEnabled: localStorage.getItem('ownvault_sync_enabled_flag') === 'true'
             };
         }
 

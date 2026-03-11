@@ -130,6 +130,8 @@
       "lastSync": "Last sync",
       "account": "Account",
       "connectDrive": "Connect Google Drive",
+      "reconnectDrive": "Reconnect Google Drive",
+      "sessionLost": "Google Drive connection was lost (browser cache may have been cleared). Reconnect to resume automatic sync.",
       "syncAutomatically": "Automatically sync your encrypted data across all your devices using Google Drive.",
       "statusLabel": "Status:",
       "lastSyncLabel": "Last sync:",

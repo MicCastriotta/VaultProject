@@ -432,19 +432,7 @@ export function ProfileFormPage() {
                         {/* WEB Fields */}
                         {category === 'WEB' && (
                             <>
-                                <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        {t('profiles.fields.website')}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.website}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
-                                        className="w-full px-3 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-500"
-                                        placeholder="https://..."
-                                    />
-                                </div>
-
+                                
                                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
                                         {t('profiles.fields.usernameEmail')}
@@ -478,6 +466,19 @@ export function ProfileFormPage() {
                                             <RefreshCw size={20} />
                                         </button>
                                     </div>
+                                </div>
+
+                                <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        {t('profiles.fields.website')}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.website}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
+                                        className="w-full px-3 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-500"
+                                        placeholder="https://..."
+                                    />
                                 </div>
 
                                 {/* OTP Section */}

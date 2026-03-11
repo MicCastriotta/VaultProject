@@ -362,9 +362,15 @@ class DatabaseService {
     }
 
     /**
-     * Recupera configurazione sync
+     * Recupera configurazione sync.
+     * Apre esplicitamente la connessione al DB prima di leggere:
+     * evita race condition in cui Dexie non ha ancora completato
+     * l'apertura/upgrade del DB al momento della lettura.
      */
     async getSyncConfig() {
+        if (!db.isOpen()) {
+            await db.open();
+        }
         return await db.syncConfig.get('sync');
     }
 

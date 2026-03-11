@@ -130,6 +130,8 @@
       "lastSync": "Ultima sincronizzazione",
       "account": "Account",
       "connectDrive": "Connetti Google Drive",
+      "reconnectDrive": "Riconnetti Google Drive",
+      "sessionLost": "La connessione con Google Drive è stata persa (la cache del browser potrebbe essere stata svuotata). Riconnettiti per riprendere la sincronizzazione automatica.",
       "syncAutomatically": "Sincronizza automaticamente i tuoi dati cifrati su tutti i dispositivi tramite Google Drive.",
       "statusLabel": "Stato:",
       "lastSyncLabel": "Ultima sincronizzazione:",
