@@ -42,3 +42,4 @@ lerna-debug.log*
 dev-dist
 *.tsbuildinfo
 /.vs
+ownvault-demo.html

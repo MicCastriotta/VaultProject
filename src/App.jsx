@@ -7,7 +7,7 @@ import { lazy, Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Cloud } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { IntegrityWarningBanner } from './components/IntegrityWarningBanner';
@@ -20,23 +20,25 @@ import { syncService } from './services/syncService';
 /* global __APP_VERSION__ */
 
 function UpdateBanner() {
-    const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW();
+    const { t } = useTranslation();
+    const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW({
+        onRegisteredSW(_swUrl, r) {
+            r.update(); // check immediato
+            // iOS Safari non fa polling automatico: forziamo un check ogni ora
+            setInterval(() => r.update(), 60 * 60 * 1000);
+        }
+    });
 
     if (!needRefresh) return null;
 
     return (
         <div className="fixed top-0 left-0 right-0 z-[9999] bg-blue-600 text-white px-4 py-3 flex items-center justify-between gap-4 shadow-lg">
-            <span className="text-sm">
-                Nuova versione disponibile
-                {typeof __APP_VERSION__ !== 'undefined' && __APP_VERSION__
-                    ? ` — v${__APP_VERSION__}`
-                    : ''}
-            </span>
+            <span className="text-sm">{t('pwa.updateAvailable')}</span>
             <button
                 onClick={() => updateServiceWorker(true)}
                 className="bg-white text-blue-600 text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors flex-shrink-0"
             >
-                Aggiorna
+                {t('pwa.update')}
             </button>
         </div>
     );
@@ -72,9 +74,9 @@ const PageLoader = () => (
  * Gestione globale sync: check all'avvio, dialog conflitto, toast notifiche.
  */
 function SyncLaunchCheck() {
-    const { t } = useTranslation();
+    const { t } = useTranslation();    
     const [syncConflict, setSyncConflict] = useState(null);
-    const [syncToast, setSyncToast] = useState(null);
+    const [syncToast, setSyncToast] = useState(null);    
 
     useEffect(() => {
         const handleSyncEvent = (event, data) => {
@@ -84,6 +86,8 @@ function SyncLaunchCheck() {
                 setSyncToast({ type: 'success', text: t('settings.sync.syncedDirection', { direction: data.direction }) });
             } else if (event === 'error') {
                 setSyncToast({ type: 'error', text: t('settings.sync.syncErrorMsg', { error: data.error }) });
+            } else if (event === 'reauth_needed') {
+                setSyncToast({ type: 'error', text: t('settings.sync.reauthNeeded') });
             }
         };
 
@@ -104,7 +108,7 @@ function SyncLaunchCheck() {
             syncConflict.resolve(useCloud);
             setSyncConflict(null);
         }
-    }
+    }    
 
     return (
         <>
@@ -114,7 +118,7 @@ function SyncLaunchCheck() {
                     localData={syncConflict.localData}
                     onResolve={handleConflictResolution}
                 />
-            )}
+            )}            
             {syncToast && (
                 <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9998] px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium whitespace-nowrap
                     ${syncToast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
@@ -247,11 +251,48 @@ function AppRoutes() {
     );
 }
 
+/**
+ * Splash screen in-app per Android (e qualsiasi piattaforma che non supporti
+ * apple-touch-startup-image). Mostrata una sola volta per sessione.
+ */
+function SplashScreen({ onDone }) {
+    const [fading, setFading] = useState(false);
+
+    useEffect(() => {
+        const fadeTimer = setTimeout(() => setFading(true), 1500);
+        const doneTimer = setTimeout(onDone, 2000); // 1.5s visibile + 0.5s fade
+        return () => { clearTimeout(fadeTimer); clearTimeout(doneTimer); };
+    }, [onDone]);
+
+    return (
+        <div
+            className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950"
+            style={{ transition: 'opacity 0.5s ease', opacity: fading ? 0 : 1 }}
+        >
+            <img
+                src="/icons/portrait.png"
+                alt="OwnVault"
+                className="max-w-full max-h-full object-contain"
+            />
+        </div>
+    );
+}
+
 export function App() {
+    const [showSplash, setShowSplash] = useState(
+        () => !sessionStorage.getItem('ov_splash_shown')
+    );
+
+    function handleSplashDone() {
+        sessionStorage.setItem('ov_splash_shown', '1');
+        setShowSplash(false);
+    }
+
     return (
         <ThemeProvider>
             <AuthProvider>
                 <BrowserRouter>
+                    {showSplash && <SplashScreen onDone={handleSplashDone} />}
                     <UpdateBanner />
                     <InstallPrompt />
                     <AppRoutes />

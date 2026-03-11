@@ -33,6 +33,7 @@ import {
     Coffee
 } from 'lucide-react';
 import { syncService } from '../services/syncService';
+import { googleDriveService } from '../services/googledriveService';
 import { BiometricSettingsSection } from '../components/BiometricSettingsSection';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { useTranslation } from 'react-i18next';
@@ -226,7 +227,7 @@ function DonationModal({ onClose }) {
 
 export function SettingsPage() {
     const navigate = useNavigate();
-    const { logout, autoLockTimeout, setAutoLockTimeout } = useAuth();
+    const { logout, resetAll, autoLockTimeout, setAutoLockTimeout } = useAuth();
     const { t } = useTranslation();
     const { theme, setTheme } = useTheme();
     const [openSections, setOpenSections] = useState(new Set());
@@ -236,6 +237,7 @@ export function SettingsPage() {
     const [message, setMessage] = useState(null);
     const [syncStatus, setSyncStatus] = useState(null);
     const [isSyncEnabled, setIsSyncEnabled] = useState(false);
+    const [syncStatusLoaded, setSyncStatusLoaded] = useState(false);
     const [showDonation, setShowDonation] = useState(false);
 
     function toggleSection(key) {
@@ -247,11 +249,19 @@ export function SettingsPage() {
         });
     }
 
+    // Pre-carica GIS in background: quando l'utente cliccherà "Connetti",
+    // init() sarà già completata e requestAccessToken verrà chiamata
+    // all'interno del user-gesture context (fix freeze su mobile).
+    useEffect(() => {
+        googleDriveService.init().catch(() => {});
+    }, []);
+
     useEffect(() => {
         loadSyncStatus();
 
+        // Ascolta tutti gli eventi che potrebbero cambiare lo stato del sync
         const handleSyncEvent = (event) => {
-            if (event === 'synced') {
+            if (['synced', 'enabled', 'disabled', 'reauth_needed', 'error'].includes(event)) {
                 loadSyncStatus();
             }
         };
@@ -265,16 +275,36 @@ export function SettingsPage() {
             const status = await syncService.getSyncStatus();
             setSyncStatus(status);
             setIsSyncEnabled(status.enabled);
+            setSyncStatusLoaded(true);
         } catch (error) {
             console.error('Error loading sync status:', error);
+            // Retry dopo 800ms: gestisce race condition all'apertura del DB
+            setTimeout(async () => {
+                try {
+                    const status = await syncService.getSyncStatus();
+                    setSyncStatus(status);
+                    setIsSyncEnabled(status.enabled);
+                } catch (retryErr) {
+                    console.error('Sync status retry failed:', retryErr);
+                } finally {
+                    setSyncStatusLoaded(true);
+                }
+            }, 800);
         }
     }
 
     async function handleEnableSync() {
         try {
-            await syncService.enableSync();
+            const result = await syncService.enableSync();
             await loadSyncStatus();
-            setMessage({ type: 'success', text: t('settings.sync.enableSuccess') });
+            if (result.cryptoChanged) {
+                // importData ha sostituito la cryptoConfig in DB: la DEK in memoria è
+                // ora obsoleta. Forziamo il re-login così login() ri-deriva la chiave
+                // corretta dalla nuova config cloud.
+                logout();
+            } else {
+                setMessage({ type: 'success', text: t('settings.sync.enableSuccess') });
+            }
         } catch (error) {
             console.error('Error enabling sync:', error);
             setMessage({ type: 'error', text: 'Failed to enable sync: ' + error.message });
@@ -381,9 +411,11 @@ export function SettingsPage() {
 
     async function handleDeleteAll() {
         try {
-            await databaseService.deleteAllData();
             setShowDeleteConfirm(false);
-            logout();
+            const result = await resetAll();
+            if (!result.success) {
+                setMessage({ type: 'error', text: 'Delete failed: ' + result.error });
+            }
         } catch (error) {
             console.error('Delete error:', error);
             setMessage({ type: 'error', text: 'Delete failed: ' + error.message });
@@ -518,17 +550,26 @@ export function SettingsPage() {
                                 onToggle={toggleSection}
                             >
                                 <div className="p-4">
-                                    {!isSyncEnabled ? (
+                                    {!syncStatusLoaded ? (
+                                        <div className="flex items-center justify-center py-4">
+                                            <RefreshCw size={20} className="text-gray-500 animate-spin" />
+                                        </div>
+                                    ) : !isSyncEnabled ? (
                                         <>
                                             <p className="text-sm text-gray-400 mb-4">
-                                                {t('settings.sync.syncAutomatically')}
+                                                {syncStatus?.wasEnabled
+                                                    ? t('settings.sync.sessionLost')
+                                                    : t('settings.sync.syncAutomatically')}
                                             </p>
                                             <button
                                                 onClick={handleEnableSync}
                                                 className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                                             >
                                                 <Cloud size={20} />
-                                                <span>{t('settings.sync.connectDrive')}</span>
+                                                <span>{syncStatus?.wasEnabled
+                                                    ? t('settings.sync.reconnectDrive')
+                                                    : t('settings.sync.connectDrive')}
+                                                </span>
                                             </button>
                                         </>
                                     ) : (

@@ -81,6 +81,7 @@ class SyncService {
             };
 
             let fileId;
+            let cryptoChanged = false;
 
             if (file) {
                 // File esiste già → confronta contenuto (non timestamp: syncData è appena creato)
@@ -93,6 +94,7 @@ class SyncService {
                     // Locale vuoto → scarica cloud senza chiedere
                     await databaseService.importData(cloudData);
                     fileId = file.id;
+                    cryptoChanged = true; // importData ha sostituito la cryptoConfig: serve re-login
                     this.notifyListeners('synced', { direction: 'download', conflict: false });
                 } else if (!hasCloudProfiles) {
                     // Cloud vuoto → upload locale senza chiedere
@@ -104,6 +106,7 @@ class SyncService {
                     if (shouldImport) {
                         await databaseService.importData(cloudData);
                         fileId = file.id;
+                        cryptoChanged = true; // importData ha sostituito la cryptoConfig: serve re-login
                     } else {
                         await googleDriveService.updateFile(file.id, syncData);
                         fileId = file.id;
@@ -115,7 +118,10 @@ class SyncService {
                 fileId = file.id;
             }
 
-            // 5. Salva config sync
+            // 5. Salva flag localStorage (persiste anche se IndexedDB viene svuotato)
+            localStorage.setItem('ownvault_sync_enabled_flag', 'true');
+
+            // 6. Salva config sync
             await databaseService.saveSyncConfig({
                 enabled: true,
                 googleDriveFileId: fileId,
@@ -129,7 +135,7 @@ class SyncService {
             // 6. Notifica listeners
             this.notifyListeners('enabled');
 
-            return { success: true, userInfo };
+            return { success: true, userInfo, cryptoChanged };
         } catch (error) {
             console.error('Error enabling sync:', error);
             throw error;
@@ -148,6 +154,9 @@ class SyncService {
             await databaseService.saveSyncConfig({
                 enabled: false
             });
+
+            // Rimuovi flag localStorage
+            localStorage.removeItem('ownvault_sync_enabled_flag');
 
             // Notifica listeners
             this.notifyListeners('disabled');
@@ -251,7 +260,9 @@ class SyncService {
                     // Importa da cloud
                     await databaseService.importData(cloudData);
 
-                    await databaseService.updateSyncConfig({
+                    // importData svuota la tabella syncConfig: re-salva il config completo con i nuovi timestamp
+                    await databaseService.saveSyncConfig({
+                        ...syncConfig,
                         lastSyncTimestamp: cloudTimestamp,
                         lastLocalModification: cloudTimestamp
                     });
@@ -317,7 +328,11 @@ class SyncService {
         const syncConfig = await databaseService.getSyncConfig();
 
         if (!syncConfig?.enabled) return;
-        if (!googleDriveService.isOnline()) return;
+        if (!googleDriveService.isOnline()) {
+            // Offline ma sync configurato: notifica comunque che è abilitato
+            this.notifyListeners('enabled');
+            return;
+        }
 
         try {
             const cloudData = await googleDriveService.downloadFile(
@@ -327,8 +342,11 @@ class SyncService {
             const localTimestamp = syncConfig.lastLocalModification || 0;
             const cloudTimestamp = cloudData.syncTimestamp || 0;
 
-            // Nessuna differenza → già sincronizzato
-            if (cloudTimestamp <= localTimestamp) return;
+            // Nessuna differenza → già sincronizzato, notifica stato attivo
+            if (cloudTimestamp <= localTimestamp) {
+                this.notifyListeners('enabled');
+                return;
+            }
 
             // Cloud più recente → confronta contenuto
             const localData = await databaseService.exportData();
@@ -343,7 +361,9 @@ class SyncService {
             if (!hasLocalProfiles && hasCloudProfiles) {
                 // Locale vuoto → auto-import senza chiedere
                 await databaseService.importData(cloudData);
-                await databaseService.updateSyncConfig({
+                // importData svuota la tabella syncConfig: re-salva il config completo con i nuovi timestamp
+                await databaseService.saveSyncConfig({
+                    ...syncConfig,
                     lastSyncTimestamp: cloudTimestamp,
                     lastLocalModification: cloudTimestamp
                 });
@@ -356,7 +376,9 @@ class SyncService {
 
             if (shouldImport) {
                 await databaseService.importData(cloudData);
-                await databaseService.updateSyncConfig({
+                // importData svuota la tabella syncConfig: re-salva il config completo con i nuovi timestamp
+                await databaseService.saveSyncConfig({
+                    ...syncConfig,
                     lastSyncTimestamp: cloudTimestamp,
                     lastLocalModification: cloudTimestamp
                 });
@@ -377,6 +399,11 @@ class SyncService {
             }
         } catch (error) {
             console.error('Error checking sync on launch:', error);
+            // Se l'errore è di autenticazione (token scaduto/revocato), notifica l'utente
+            const msg = error?.message || '';
+            if (msg.includes('Not signed in') || msg.includes('auth') || error?.error === 'access_denied') {
+                this.notifyListeners('reauth_needed');
+            }
         }
     }
 
@@ -437,7 +464,8 @@ class SyncService {
         if (!syncConfig?.enabled) {
             return {
                 enabled: false,
-                status: 'disabled'
+                status: 'disabled',
+                wasEnabled: localStorage.getItem('ownvault_sync_enabled_flag') === 'true'
             };
         }
 

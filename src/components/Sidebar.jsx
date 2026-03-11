@@ -28,9 +28,10 @@ export function Sidebar() {
 
                 <div
                     onClick={() => navigate('/')}
-                    className="text-2xl font-bold mb-10 text-white tracking-wide cursor-pointer"
+                    className="flex items-center gap-3 mb-10 cursor-pointer"
                 >
-                    🔐 OwnVault
+                    <img src="/icons/appicon.png" alt="OwnVault" className="w-9 h-9 object-contain" />
+                    <span className="text-2xl font-bold text-white tracking-wide">OwnVault</span>
                 </div>
 
                 <nav className="space-y-2">

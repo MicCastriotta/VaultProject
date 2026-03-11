@@ -17,19 +17,69 @@ class GoogleDriveService {
         this.gapiLoaded = false;
         this.gisLoaded = false;
         this.tokenClient = null;
+        this._initPromise = null; // Guard contro chiamate concorrenti a init()
+    }
+
+    /** Salva il token in localStorage con timestamp di scadenza */
+    cacheToken(accessToken, expiresIn) {
+        const expiresAt = Date.now() + ((expiresIn - 60) * 1000); // 1 min di margine
+        localStorage.setItem('ownvault_google_token', accessToken);
+        localStorage.setItem('ownvault_google_token_expires', String(expiresAt));
+    }
+
+    /** Restituisce il token in cache se ancora valido, null altrimenti */
+    loadCachedToken() {
+        const token = localStorage.getItem('ownvault_google_token');
+        const expires = parseInt(localStorage.getItem('ownvault_google_token_expires') || '0', 10);
+        if (token && Date.now() < expires) {
+            return token;
+        }
+        localStorage.removeItem('ownvault_google_token');
+        localStorage.removeItem('ownvault_google_token_expires');
+        return null;
+    }
+
+    /** Rimuove il token dalla cache */
+    clearCachedToken() {
+        localStorage.removeItem('ownvault_google_token');
+        localStorage.removeItem('ownvault_google_token_expires');
     }
 
     /**
-     * Inizializza Google API
+     * Inizializza Google API.
+     * Tutte le chiamate concorrenti condividono la stessa Promise (evita race condition
+     * dove il secondo chiamante trova il <script> già in DOM ma window.gapi ancora undefined).
      */
     async init() {
-        if (this.gapiLoaded && this.gisLoaded) {
-            return; // Già inizializzato
-        }
+        if (this.gapiLoaded && this.gisLoaded) return;
 
+        // Se c'è già un init in corso, aspetta quello invece di avviarne un altro
+        if (this._initPromise) return this._initPromise;
+
+        this._initPromise = this._doInit().finally(() => {
+            this._initPromise = null;
+        });
+
+        return this._initPromise;
+    }
+
+    async _doInit() {
         try {
             // Carica GAPI (Google API)
             await this.loadScript('https://apis.google.com/js/api.js');
+
+            // loadScript può risolvere subito se il <script> esiste già in DOM,
+            // ma window.gapi potrebbe non essere ancora pronto: attendiamo esplicitamente.
+            if (!window.gapi) {
+                await new Promise((resolve, reject) => {
+                    const deadline = Date.now() + 10_000;
+                    const check = setInterval(() => {
+                        if (window.gapi) { clearInterval(check); resolve(); }
+                        else if (Date.now() > deadline) { clearInterval(check); reject(new Error('GAPI load timeout')); }
+                    }, 50);
+                });
+            }
+
             await new Promise((resolve) => {
                 window.gapi.load('client', resolve);
             });
@@ -43,6 +93,18 @@ class GoogleDriveService {
 
             // Carica GIS (Google Identity Services)
             await this.loadScript('https://accounts.google.com/gsi/client');
+
+            // loadScript può risolvere subito se il tag <script> esiste già in DOM,
+            // ma window.google potrebbe non essere ancora pronto: attendiamo esplicitamente.
+            if (!window.google) {
+                await new Promise((resolve, reject) => {
+                    const deadline = Date.now() + 10_000;
+                    const check = setInterval(() => {
+                        if (window.google) { clearInterval(check); resolve(); }
+                        else if (Date.now() > deadline) { clearInterval(check); reject(new Error('GIS load timeout')); }
+                    }, 50);
+                });
+            }
 
             this.tokenClient = window.google.accounts.oauth2.initTokenClient({
                 client_id: GOOGLE_CLIENT_ID,
@@ -83,11 +145,21 @@ class GoogleDriveService {
      * Login con Google (richiede popup)
      */
     async signIn() {
+        // init() deve essere già completata (pre-caricata al mount della pagina)
+        // in modo che requestAccessToken venga chiamata nel user-gesture context.
+        // Se non è ancora pronta, la carichiamo ora (desktop path di fallback).
         await this.init();
 
         return new Promise((resolve, reject) => {
+            // Timeout di sicurezza: su iOS standalone il popup non riesce a
+            // fare postMessage back e la callback non arriva mai → freeze.
+            const timeout = setTimeout(() => {
+                reject(new Error('Google Sign-In timeout: il popup non ha risposto. Riprova dal browser (non dalla PWA installata) oppure usa un dispositivo desktop.'));
+            }, 120_000); // 2 minuti
+
             try {
                 this.tokenClient.callback = async (response) => {
+                    clearTimeout(timeout);
                     if (response.error !== undefined) {
                         reject(response);
                         return;
@@ -95,7 +167,8 @@ class GoogleDriveService {
 
                     this.accessToken = response.access_token;
                     this.isSignedIn = true;
-                                        
+                    this.cacheToken(response.access_token, response.expires_in || 3600);
+
                     resolve({
                         accessToken: this.accessToken
                     });
@@ -110,6 +183,7 @@ class GoogleDriveService {
                     this.tokenClient.requestAccessToken({ prompt: '' });
                 }
             } catch (error) {
+                clearTimeout(timeout);
                 reject(error);
             }
         });
@@ -127,29 +201,39 @@ class GoogleDriveService {
 
         this.accessToken = null;
         this.isSignedIn = false;
+        this.clearCachedToken();
     }
 
     async restoreSession() {
         await this.init();
 
+        // Usa il token in cache se ancora valido: evita il popup Google ad ogni riavvio
+        const cached = this.loadCachedToken();
+        if (cached) {
+            this.accessToken = cached;
+            this.isSignedIn = true;
+            return true;
+        }
+
+        // Nessun token valido in cache → chiedi a Google (può mostrare UI se la sessione è scaduta)
         return new Promise((resolve, reject) => {
             this.tokenClient.callback = (response) => {
                 if (response.error) {
                     this.isSignedIn = false;
                     this.accessToken = null;
-                    reject(response);
+                    // Wrap con messaggio riconoscibile per il syncService
+                    reject(new Error(`Not signed in to Google Drive: ${response.error}`));
                     return;
                 }
 
                 this.accessToken = response.access_token;
                 this.isSignedIn = true;
+                this.cacheToken(response.access_token, response.expires_in || 3600);
                 resolve(true);
             };
 
-            // Richiesta silenziosa (NO popup)
-            this.tokenClient.requestAccessToken({
-                prompt: ''
-            });
+            // prompt:'' = silenzioso se la sessione Google è attiva nel browser
+            this.tokenClient.requestAccessToken({ prompt: '' });
         });
     }
 

@@ -13,6 +13,7 @@ import { biometricService } from '../services/biometricService';
 import { RateLimiter, AutoLockTimer, securityLog } from '../services/securityUtils';
 import { hibpService } from '../services/hibpService';
 import { healthCache } from '../services/healthCacheService';
+import { googleDriveService } from '../services/googledriveService';
 import { useRef, useCallback } from 'react';
 
 const AuthContext = createContext();
@@ -333,6 +334,22 @@ export function AuthProvider({ children }) {
             await databaseService.deleteAllData();
             cryptoService.lock();
             healthCache.clear();
+            hibpService.clearCache();
+
+            // Revoca il token Google e pulisce la cache localStorage
+            googleDriveService.signOut();
+
+            // Pulisce tutto il localStorage dell'app
+            const keysToRemove = [
+                'tutorialCompleted',
+                'profileSortOrder',
+                'ownvault_device_id',
+                'ownvault_install_prompt_dismissed',
+                '_sp_sec_rl',
+                'ownvault_sync_enabled_flag',
+            ];
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+
             setIsUnlocked(false);
             setUserExists(false);
             setIntegrityError(null);
