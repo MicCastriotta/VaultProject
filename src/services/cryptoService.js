@@ -16,6 +16,11 @@ const IV_LENGTH = 12; // 96 bit per GCM
 const SALT_LENGTH = 32; // 256 bit
 const HMAC_CONTEXT = 'OwnVault-Integrity-v1'; // Domain separation per HKDF
 
+// Versione algoritmo HMAC — incrementare quando il payload cambia struttura.
+// Su mismatch di versione, il login tratta l'HMAC come "firstRun" e lo rigenera
+// senza mostrare falsi positivi di tamper.
+export const HMAC_VERSION = 2;
+
 class CryptoService {
     constructor() {
         this.dek = null;
@@ -235,24 +240,27 @@ class CryptoService {
 
     /**
      * Calcola HMAC-SHA256 sull'intero stato del database.
-     * 
-     * Payload canonicalizzato:
+     *
+     * Payload v2 (HMAC_VERSION = 2):
      * - cryptoConfig (solo campi crittografici, esclusi timestamps)
      * - profili ordinati per ID (solo campi cifrati, esclusi timestamps)
      * - conteggio profili (protegge contro cancellazioni)
-     * 
-     * L'ordinamento per ID garantisce determinismo:
-     * lo stesso set di dati produce sempre lo stesso HMAC.
+     * - allegati ordinati per ID: {id, profileId, iv, metaIv, metaData}
+     *   (encryptedData escluso: autenticato da AES-GCM, troppo grande per HMAC)
+     * - conteggio allegati (protegge contro cancellazioni silenziose)
+     *
+     * L'ordinamento per ID garantisce determinismo.
      */
-    async computeHMAC(cryptoConfig, profiles) {
+    async computeHMAC(cryptoConfig, profiles, attachments = []) {
         if (!this.integrityKey) {
             throw new Error('Integrity key not available. Unlock first.');
         }
 
         const sortedProfiles = [...profiles].sort((a, b) => a.id - b.id);
+        const sortedAttachments = [...attachments].sort((a, b) => a.id - b.id);
 
         const payload = {
-            v: 1,
+            v: 2,
             crypto: {
                 version: cryptoConfig.version,
                 kdf: cryptoConfig.kdf,
@@ -268,7 +276,15 @@ class CryptoService {
                 category: p.category,
                 version: p.version
             })),
-            profileCount: sortedProfiles.length
+            profileCount: sortedProfiles.length,
+            attachments: sortedAttachments.map(a => ({
+                id: a.id,
+                profileId: a.profileId,
+                iv: a.iv,
+                metaIv: a.metaIv || null,
+                metaData: a.metaData || null
+            })),
+            attachmentCount: sortedAttachments.length
         };
 
         const payloadBytes = new TextEncoder().encode(JSON.stringify(payload));
@@ -284,24 +300,29 @@ class CryptoService {
 
     /**
      * Verifica HMAC salvato contro lo stato attuale del database.
-     * 
+     *
+     * storedRecord: { hmac, version } — ritornato da databaseService.getHMAC()
+     *
      * Ritorna:
      *   { valid: true }                              — integrità verificata
-     *   { valid: true, firstRun: true }              — primo avvio, HMAC non ancora presente
+     *   { valid: true, firstRun: true }              — HMAC assente o versione obsoleta → rigenera
      *   { valid: false, reason: 'HMAC mismatch...' } — MANOMISSIONE RILEVATA
      */
-    async verifyHMAC(storedHmac, cryptoConfig, profiles) {
+    async verifyHMAC(storedRecord, cryptoConfig, profiles, attachments = []) {
         if (!this.integrityKey) {
             return { valid: false, reason: 'Integrity key not available' };
         }
 
-        // Primo avvio dopo aggiornamento: HMAC non esiste ancora
-        if (!storedHmac) {
+        const storedHmac = storedRecord?.hmac ?? null;
+        const storedVersion = storedRecord?.version ?? 0;
+
+        // Primo avvio o HMAC calcolato con algoritmo precedente → rigenera senza falso positivo
+        if (!storedHmac || storedVersion < HMAC_VERSION) {
             return { valid: true, firstRun: true };
         }
 
         try {
-            const expectedHmac = await this.computeHMAC(cryptoConfig, profiles);
+            const expectedHmac = await this.computeHMAC(cryptoConfig, profiles, attachments);
             const isValid = this.constantTimeCompare(storedHmac, expectedHmac);
 
             if (isValid) {
@@ -347,6 +368,91 @@ class CryptoService {
             bytes[i] = binary.charCodeAt(i);
         }
         return bytes;
+    }
+
+    // ========================================
+    // BLOB ENCRYPTION (allegati file)
+    // ========================================
+
+    /**
+     * Cifra un ArrayBuffer (file) con la DEK corrente.
+     *
+     * profileId (blobVersion 2): usato come AAD (Additional Authenticated Data)
+     * per legare crittograficamente il ciphertext al profilo proprietario.
+     * Se il ciphertext viene spostato su un altro profilo, la decifratura fallisce.
+     *
+     * Ritorna { iv: base64, encryptedData: base64, blobVersion: number }.
+     */
+    async encryptBlob(arrayBuffer, profileId = null) {
+        if (!this.isUnlocked || !this.dek) {
+            throw new Error('System locked. Please unlock first.');
+        }
+        const iv = this.generateIV();
+        const key = await crypto.subtle.importKey(
+            'raw', this.dek, { name: 'AES-GCM' }, false, ['encrypt']
+        );
+
+        const encryptParams = { name: 'AES-GCM', iv };
+        if (profileId != null) {
+            encryptParams.additionalData = new TextEncoder().encode(`ownvault-attachment-v2-profile-${profileId}`);
+        }
+
+        const ciphertext = await crypto.subtle.encrypt(encryptParams, key, arrayBuffer);
+        return {
+            iv: this.arrayBufferToBase64(iv),
+            encryptedData: this.arrayBufferToBase64(ciphertext),
+            blobVersion: profileId != null ? 2 : 1
+        };
+    }
+
+    /**
+     * Decifra un blob cifrato con encryptBlob. Ritorna ArrayBuffer.
+     *
+     * blobVersion 2: usa profileId come AAD — deve coincidere con quello usato in encryptBlob.
+     * blobVersion 1 (legacy): nessun AAD.
+     */
+    async decryptBlob(encryptedData, iv, profileId = null, blobVersion = 1) {
+        if (!this.isUnlocked || !this.dek) {
+            throw new Error('System locked. Please unlock first.');
+        }
+        const ivBytes = this.base64ToArrayBuffer(iv);
+        const cipherBytes = this.base64ToArrayBuffer(encryptedData);
+        const key = await crypto.subtle.importKey(
+            'raw', this.dek, { name: 'AES-GCM' }, false, ['decrypt']
+        );
+
+        const decryptParams = { name: 'AES-GCM', iv: ivBytes };
+        if (blobVersion === 2 && profileId != null) {
+            decryptParams.additionalData = new TextEncoder().encode(`ownvault-attachment-v2-profile-${profileId}`);
+        }
+
+        return await crypto.subtle.decrypt(decryptParams, key, cipherBytes);
+    }
+
+    /**
+     * Cifra i metadati di un allegato {fileName, mimeType, size, hash}.
+     * Ritorna { iv: base64, data: base64 } (stesso formato di encryptData).
+     * I metadata non sono mai in chiaro in IndexedDB o nel file di sync.
+     */
+    async encryptAttachmentMeta(meta) {
+        return await this.encryptData(meta);
+    }
+
+    /**
+     * Decifra i metadati di un allegato.
+     * Ritorna { fileName, mimeType, size, hash }.
+     */
+    async decryptAttachmentMeta(encryptedMeta) {
+        return await this.decryptData(encryptedMeta);
+    }
+
+    /**
+     * Calcola hash SHA-256 di un ArrayBuffer per verifica integrità.
+     * Ritorna stringa base64.
+     */
+    async computeFileHash(arrayBuffer) {
+        const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+        return this.arrayBufferToBase64(hashBuffer);
     }
 
     checkPasswordStrength(password) {

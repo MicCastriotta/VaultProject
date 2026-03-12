@@ -363,6 +363,19 @@
     },
     "chars": "chars"
   },
+  "attachment": {
+    "label": "Attachment",
+    "chooseFile": "Choose file",
+    "changeFile": "Change file",
+    "open": "Open",
+    "fileTooLarge": "File too large (max 15 MB)",
+    "invalidType": "Unsupported file type. Use images (JPEG, PNG, WebP) or PDF."
+  },
+  "storage": {
+    "title": "Storage",
+    "used": "Used",
+    "total": "Total"
+  },
   "pwa": {
     "updateAvailable": "New version available",
     "update": "Update"

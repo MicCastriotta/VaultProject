@@ -9,6 +9,7 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
+const DRIVE_FOLDER_NAME = 'OwnVault';
 
 class GoogleDriveService {
     constructor() {
@@ -18,6 +19,7 @@ class GoogleDriveService {
         this.gisLoaded = false;
         this.tokenClient = null;
         this._initPromise = null; // Guard contro chiamate concorrenti a init()
+        this.folderId = null;     // Cache ID cartella OwnVault
     }
 
     /** Salva il token in localStorage con timestamp di scadenza */
@@ -43,6 +45,46 @@ class GoogleDriveService {
     clearCachedToken() {
         localStorage.removeItem('ownvault_google_token');
         localStorage.removeItem('ownvault_google_token_expires');
+    }
+
+    /**
+     * Trova o crea la cartella "OwnVault" su Drive.
+     * Il risultato è cachato in this.folderId per la sessione corrente.
+     * I file già esistenti in root (versioni precedenti) vengono trovati
+     * dalla ricerca normale: questa cartella è usata solo per i nuovi file.
+     */
+    async ensureFolder() {
+        if (this.folderId) return this.folderId;
+        await this.ensureSignedIn();
+
+        // Cerca cartella esistente
+        const resp = await window.gapi.client.drive.files.list({
+            q: `name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+            fields: 'files(id)',
+            spaces: 'drive'
+        });
+        const files = resp.result.files;
+        if (files.length > 0) {
+            this.folderId = files[0].id;
+            return this.folderId;
+        }
+
+        // Crea cartella
+        const createResp = await fetch('https://www.googleapis.com/drive/v3/files', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${this.accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: DRIVE_FOLDER_NAME,
+                mimeType: 'application/vnd.google-apps.folder'
+            })
+        });
+        if (!createResp.ok) throw new Error('Failed to create OwnVault folder on Drive');
+        const folder = await createResp.json();
+        this.folderId = folder.id;
+        return this.folderId;
     }
 
     /**
@@ -201,6 +243,7 @@ class GoogleDriveService {
 
         this.accessToken = null;
         this.isSignedIn = false;
+        this.folderId = null;
         this.clearCachedToken();
     }
 
@@ -212,6 +255,9 @@ class GoogleDriveService {
         if (cached) {
             this.accessToken = cached;
             this.isSignedIn = true;
+            // Sincronizza il token su gapi.client: altrimenti le chiamate
+            // window.gapi.client.drive.* userebbero solo la API key → 403
+            window.gapi.client.setToken({ access_token: cached });
             return true;
         }
 
@@ -264,6 +310,7 @@ class GoogleDriveService {
      */
     async createFile(fileName, content) {
         await this.ensureSignedIn();
+        const folderId = await this.ensureFolder();
 
         const boundary = '-------314159265358979323846';
         const delimiter = "\r\n--" + boundary + "\r\n";
@@ -272,6 +319,7 @@ class GoogleDriveService {
         const metadata = {
             name: fileName,
             mimeType: 'application/json',
+            parents: [folderId]
         };
 
         const multipartRequestBody =
@@ -363,6 +411,121 @@ class GoogleDriveService {
             console.error('Error downloading file:', error);
             throw error;
         }
+    }
+
+    // ========================================
+    // ATTACHMENT BINARY FILES
+    // ========================================
+
+    /**
+     * Carica un allegato come file binario separato su Drive.
+     * Più efficiente dell'inline base64 nel JSON: risparmia ~33% di spazio
+     * e permette upload/download indipendenti dal file JSON principale.
+     *
+     * existingDriveId: se fornito → PATCH (aggiorna), altrimenti → POST (crea)
+     * base64Data: stringa base64 dell'encryptedData
+     * returns: driveFileId (string)
+     */
+    async uploadAttachmentBinary(existingDriveId, base64Data) {
+        await this.ensureSignedIn();
+
+        // Decodifica base64 → Uint8Array per upload binario
+        const binary = atob(base64Data);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+
+        if (existingDriveId) {
+            // PATCH: aggiorna contenuto file esistente
+            const response = await fetch(
+                `https://www.googleapis.com/upload/drive/v3/files/${existingDriveId}?uploadType=media`,
+                {
+                    method: 'PATCH',
+                    headers: {
+                        Authorization: `Bearer ${this.accessToken}`,
+                        'Content-Type': 'application/octet-stream',
+                    },
+                    body: bytes,
+                }
+            );
+            if (!response.ok) throw new Error('Failed to update attachment file');
+            const file = await response.json();
+            return file.id;
+        }
+
+        // POST: crea nuovo file binario con multipart (metadata + contenuto)
+        const folderId = await this.ensureFolder();
+        const boundary = '-------ownvault314159265';
+        const delimiter = `\r\n--${boundary}\r\n`;
+        const closeDelim = `\r\n--${boundary}--`;
+        const fileName = `ownvault-att-${Date.now()}.bin`;
+
+        const metadataStr = JSON.stringify({ name: fileName, mimeType: 'application/octet-stream', parents: [folderId] });
+
+        // Costruisci il body multipart: metadata JSON + binario
+        const metaPart = `${delimiter}Content-Type: application/json\r\n\r\n${metadataStr}${delimiter}Content-Type: application/octet-stream\r\n\r\n`;
+        const metaBytes = new TextEncoder().encode(metaPart);
+        const closeBytes = new TextEncoder().encode(closeDelim);
+
+        const body = new Uint8Array(metaBytes.length + bytes.length + closeBytes.length);
+        body.set(metaBytes, 0);
+        body.set(bytes, metaBytes.length);
+        body.set(closeBytes, metaBytes.length + bytes.length);
+
+        const response = await fetch(
+            'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${this.accessToken}`,
+                    'Content-Type': `multipart/related; boundary="${boundary}"`,
+                },
+                body,
+            }
+        );
+        if (!response.ok) throw new Error('Failed to create attachment file');
+        const file = await response.json();
+        return file.id;
+    }
+
+    /**
+     * Scarica un allegato binario da Drive.
+     * Ritorna la stringa base64 dell'encryptedData.
+     */
+    async downloadAttachmentBinary(driveFileId) {
+        await this.ensureSignedIn();
+
+        const response = await fetch(
+            `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
+            { headers: { Authorization: `Bearer ${this.accessToken}` } }
+        );
+        if (!response.ok) throw new Error('Failed to download attachment binary');
+
+        // Converti ArrayBuffer → base64
+        const buffer = await response.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
+    }
+
+    /**
+     * Lista tutti i file allegati su Drive (nome inizia con "ownvault-att-").
+     * Usato per cleanup di file orfani.
+     * Ritorna array di { id, name }.
+     */
+    async listAttachmentFiles() {
+        await this.ensureSignedIn();
+
+        const response = await window.gapi.client.drive.files.list({
+            q: `name contains 'ownvault-att-' and trashed=false`,
+            fields: 'files(id, name)',
+            spaces: 'drive',
+        });
+        return response.result.files || [];
     }
 
     /**

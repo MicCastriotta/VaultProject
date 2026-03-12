@@ -1,13 +1,85 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
 import { syncService } from '../services/syncService';
-import { Plus, Search, ArrowUpDown, User, CreditCard, LogOut } from 'lucide-react';
+import { Plus, Search, ArrowUpDown, User, CreditCard, LogOut, HardDrive, Paperclip } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { IconRenderer } from '../components/IconRenderer';
 import { getIconBySlug } from '../icons/brandIcons';
+
+function formatBytes(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+function useStorageEstimate() {
+    const [storage, setStorage] = useState(null);
+    useEffect(() => {
+        async function estimate() {
+            if (!navigator.storage?.estimate) return;
+            try {
+                const { usage, quota } = await navigator.storage.estimate();
+                setStorage({ used: usage ?? 0, quota: quota ?? 0, percentage: quota ? Math.round(((usage ?? 0) / quota) * 100) : 0 });
+            } catch {}
+        }
+        estimate();
+        window.addEventListener('storageChanged', estimate);
+        return () => window.removeEventListener('storageChanged', estimate);
+    }, []);
+    return storage;
+}
+
+function StoragePopup({ storage, storageOpen, setStorageOpen, t }) {
+    const ref = useRef(null);
+
+    useEffect(() => {
+        if (!storageOpen) return;
+        function handleClick(e) {
+            if (ref.current && !ref.current.contains(e.target)) setStorageOpen(false);
+        }
+        document.addEventListener('pointerdown', handleClick);
+        return () => document.removeEventListener('pointerdown', handleClick);
+    }, [storageOpen, setStorageOpen]);
+
+    const barColor = storage
+        ? storage.percentage > 80 ? 'bg-red-500' : storage.percentage > 50 ? 'bg-yellow-400' : 'bg-blue-500'
+        : 'bg-blue-500';
+
+    return (
+        <div ref={ref} className="relative md:hidden">
+            {storageOpen && storage && (
+                <div className="absolute top-full mt-2 right-0 w-52 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl p-4 z-50">
+                    <div className="absolute top-[-6px] right-3 w-3 h-3 bg-slate-800 border-l border-t border-slate-700 rotate-45" />
+                    <div className="flex items-center gap-2 mb-2">
+                        <HardDrive size={13} className="text-blue-400 shrink-0" />
+                        <span className="text-xs font-semibold text-gray-200">{t('storage.title')}</span>
+                        <span className="ml-auto text-xs font-bold text-gray-400">{storage.percentage}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden mb-2">
+                        <div
+                            className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                            style={{ width: `${Math.min(storage.percentage, 100)}%` }}
+                        />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-400">
+                        <span>{t('storage.used')}: <span className="text-gray-200 font-medium">{formatBytes(storage.used)}</span></span>
+                        <span>{t('storage.total')}: <span className="text-gray-200 font-medium">{formatBytes(storage.quota)}</span></span>
+                    </div>
+                </div>
+            )}
+            <button
+                onClick={() => setStorageOpen(v => !v)}
+                className={`p-2 rounded-lg transition ${storageOpen ? 'text-blue-400 bg-blue-500/10' : 'text-gray-400 hover:bg-slate-800'}`}
+            >
+                <HardDrive size={20} />
+            </button>
+        </div>
+    );
+}
 
 const SORT_OPTIONS = {
     ALPHA_ASC: 'alpha_asc',
@@ -20,6 +92,7 @@ export function MainPage() {
     const navigate = useNavigate();
     const { t } = useTranslation();
     const [decryptedProfiles, setDecryptedProfiles] = useState([]);
+    const [attachmentProfileIds, setAttachmentProfileIds] = useState(new Set());
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [showSortMenu, setShowSortMenu] = useState(false);
@@ -42,6 +115,9 @@ export function MainPage() {
         });
     }, [decryptedProfiles]);
 
+    const storage = useStorageEstimate();
+    const [storageOpen, setStorageOpen] = useState(false);
+
     const [sortBy, setSortBy] = useState(() => {
         return localStorage.getItem('profileSortOrder') || SORT_OPTIONS.ALPHA_ASC;
     });
@@ -53,7 +129,7 @@ export function MainPage() {
     useEffect(() => {
         const handleSyncEvent = (event, data) => {
             if (event === 'synced' && data.direction === 'download') {
-                loadProfiles();
+                loadProfiles(); // ricarica profili + attachmentProfileIds
             }
         };
         syncService.addListener(handleSyncEvent);
@@ -67,7 +143,10 @@ export function MainPage() {
     async function loadProfiles() {
         setIsLoading(true);
         try {
-            const encrypted = await databaseService.getAllProfiles();
+            const [encrypted, attachments] = await Promise.all([
+                databaseService.getAllProfiles(),
+                databaseService.getAllAttachments()
+            ]);
 
             const decrypted = await Promise.all(
                 encrypted.map(async (p) => {
@@ -76,11 +155,7 @@ export function MainPage() {
                             iv: p.iv,
                             data: p.data
                         });
-
-                        return {
-                            id: p.id,
-                            ...data
-                        };
+                        return { id: p.id, ...data };
                     } catch {
                         return null;
                     }
@@ -88,6 +163,7 @@ export function MainPage() {
             );
 
             setDecryptedProfiles(decrypted.filter(Boolean));
+            setAttachmentProfileIds(new Set(attachments.map(a => a.profileId)));
         } catch (error) {
             console.error(error);
         } finally {
@@ -166,6 +242,14 @@ export function MainPage() {
                     <h1 className="text-2xl font-semibold text-white">{t('profiles.vault')}</h1>
 
                     <div className="flex items-center gap-2">
+
+                        {/* Storage - solo mobile */}
+                        <StoragePopup
+                            storage={storage}
+                            storageOpen={storageOpen}
+                            setStorageOpen={setStorageOpen}
+                            t={t}
+                        />
 
                         {/* Logout - solo mobile */}
                         <button
@@ -279,9 +363,12 @@ export function MainPage() {
 
                                                         <div className="flex-1 min-w-0 text-left">
                                                             <p className="font-semibold text-[15px] text-white">{profile.title}</p>
-                                                            {profile.note && (
-                                                                <p className="text-[13px] text-slate-500 truncate">
-                                                                    {profile.note}
+                                                            {(profile.note || attachmentProfileIds.has(profile.id)) && (
+                                                                <p className="text-[13px] text-slate-500 truncate flex items-center gap-1.5">
+                                                                    {attachmentProfileIds.has(profile.id) && (
+                                                                        <Paperclip size={11} className="shrink-0 text-slate-400" />
+                                                                    )}
+                                                                    {profile.note || ''}
                                                                 </p>
                                                             )}
                                                         </div>

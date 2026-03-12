@@ -74,19 +74,25 @@ const PageLoader = () => (
  * Gestione globale sync: check all'avvio, dialog conflitto, toast notifiche.
  */
 function SyncLaunchCheck() {
-    const { t } = useTranslation();    
+    const { t } = useTranslation();
     const [syncConflict, setSyncConflict] = useState(null);
-    const [syncToast, setSyncToast] = useState(null);    
+    const [syncToast, setSyncToast] = useState(null);
+    const [isSyncing, setIsSyncing] = useState(false);
 
     useEffect(() => {
         const handleSyncEvent = (event, data) => {
             if (event === 'conflict') {
                 setSyncConflict(data);
+            } else if (event === 'syncing') {
+                setIsSyncing(true);
             } else if (event === 'synced') {
+                setIsSyncing(false);
                 setSyncToast({ type: 'success', text: t('settings.sync.syncedDirection', { direction: data.direction }) });
             } else if (event === 'error') {
+                setIsSyncing(false);
                 setSyncToast({ type: 'error', text: t('settings.sync.syncErrorMsg', { error: data.error }) });
             } else if (event === 'reauth_needed') {
+                setIsSyncing(false);
                 setSyncToast({ type: 'error', text: t('settings.sync.reauthNeeded') });
             }
         };
@@ -108,7 +114,7 @@ function SyncLaunchCheck() {
             syncConflict.resolve(useCloud);
             setSyncConflict(null);
         }
-    }    
+    }
 
     return (
         <>
@@ -118,15 +124,22 @@ function SyncLaunchCheck() {
                     localData={syncConflict.localData}
                     onResolve={handleConflictResolution}
                 />
-            )}            
-            {syncToast && (
-                <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9998] px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium whitespace-nowrap
-                    ${syncToast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
-                    {syncToast.type === 'success'
-                        ? <CheckCircle size={16} />
-                        : <AlertTriangle size={16} />
-                    }
-                    {syncToast.text}
+            )}
+            {/* Spinner durante sync — si trasforma nel toast al completamento */}
+            {(isSyncing || syncToast) && (
+                <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9998] px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium whitespace-nowrap transition-colors
+                    ${syncToast
+                        ? syncToast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                        : 'bg-slate-700 text-white'
+                    }`}>
+                    {syncToast ? (
+                        syncToast.type === 'success'
+                            ? <CheckCircle size={16} />
+                            : <AlertTriangle size={16} />
+                    ) : (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                    )}
+                    {syncToast ? syncToast.text : t('settings.sync.status.syncing')}
                 </div>
             )}
         </>

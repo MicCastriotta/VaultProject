@@ -7,6 +7,7 @@
  */
 
 import Dexie from 'dexie';
+import { HMAC_VERSION } from './cryptoService';
 
 class OwnVaultDB extends Dexie {
     constructor() {
@@ -23,9 +24,17 @@ class OwnVaultDB extends Dexie {
             syncConfig: 'id'
         });
 
+        this.version(3).stores({
+            config: 'id',
+            profiles: '++id, category, lastModified, *searchTerms',
+            syncConfig: 'id',
+            attachments: '++id, profileId'
+        });
+
         this.config = this.table('config');
         this.profiles = this.table('profiles');
         this.syncConfig = this.table('syncConfig');
+        this.attachments = this.table('attachments');
     }
 }
 
@@ -66,24 +75,27 @@ class DatabaseService {
     // ========================================
 
     /**
-     * Salva l'HMAC di integrità nel DB.
-     * Chiamato dopo ogni operazione di scrittura.
+     * Salva l'HMAC di integrità nel DB insieme alla versione dell'algoritmo.
+     * La versione permette di rilevare aggiornamenti dell'algoritmo HMAC
+     * e rigenerare senza falsi positivi di tamper.
      */
     async saveHMAC(hmac) {
         await db.config.put({
             id: 'integrity',
-            hmac: hmac,
+            hmac,
+            version: HMAC_VERSION,
             updatedAt: new Date().toISOString()
         });
     }
 
     /**
      * Recupera l'HMAC di integrità salvato.
-     * Ritorna null se non esiste (primo avvio o post-aggiornamento).
+     * Ritorna { hmac, version } — o { hmac: null, version: 0 } se non esiste.
      */
     async getHMAC() {
         const record = await db.config.get('integrity');
-        return record ? record.hmac : null;
+        if (!record) return { hmac: null, version: 0 };
+        return { hmac: record.hmac, version: record.version ?? 1 };
     }
 
     // ========================================
@@ -167,11 +179,11 @@ class DatabaseService {
     }
 
     /**
-     * Elimina un profilo
+     * Elimina un profilo (e il relativo allegato se presente)
      */
     async deleteProfile(id) {
         await db.profiles.delete(id);
-
+        await this.deleteAttachmentByProfileId(id);
         await this.touchLocalModification();
     }
 
@@ -196,6 +208,7 @@ class DatabaseService {
         await db.config.clear();
         await db.profiles.clear();
         await db.syncConfig.clear();
+        await db.attachments.clear();
     }
 
     /**
@@ -204,12 +217,14 @@ class DatabaseService {
     async exportData() {
         const config = await db.config.get('crypto');
         const profiles = await db.profiles.toArray();
+        const attachments = await db.attachments.toArray();
 
         return {
-            version: 1,
+            version: 2,
             exportDate: new Date().toISOString(),
             crypto: config,
-            profiles: profiles
+            profiles,
+            attachments
         };
     }
 
@@ -292,6 +307,18 @@ class DatabaseService {
 
         // ===== IMPORT (struttura validata) =====
 
+        // Prima di cancellare, salva i binari già presenti localmente.
+        // Chiave: profileId → { iv, encryptedData }
+        // Se dopo l'import l'allegato importato ha lo stesso iv (= stesso contenuto cifrato),
+        // ripristiniamo encryptedData locale invece di lasciarlo null e costringere
+        // un lazy-download inutile su un device che ha già il file.
+        const existingAtts = await db.attachments.toArray();
+        const localBinaryMap = new Map(
+            existingAtts
+                .filter(a => a.encryptedData && a.iv)
+                .map(a => [a.profileId, { iv: a.iv, encryptedData: a.encryptedData }])
+        );
+
         // Pulisci DB
         await this.deleteAllData();
 
@@ -308,11 +335,11 @@ class DatabaseService {
         };
         await db.config.put(cleanCrypto);
 
-        // Importa profiles — solo i campi attesi
+        // Importa profiles — preserva gli ID originali per le FK degli allegati
         let profilesImported = 0;
         if (data.profiles && data.profiles.length > 0) {
             const cleanProfiles = data.profiles.map(p => ({
-                // Non importare l'id originale: lascia che Dexie generi nuovi auto-increment
+                ...(p.id != null ? { id: p.id } : {}),
                 iv: p.iv,
                 data: p.data,
                 category: p.category,
@@ -320,13 +347,93 @@ class DatabaseService {
                 createdAt: p.createdAt || new Date().toISOString(),
                 updatedAt: p.updatedAt || new Date().toISOString()
             }));
-            await db.profiles.bulkAdd(cleanProfiles);
+            await db.profiles.bulkPut(cleanProfiles);
             profilesImported = cleanProfiles.length;
         }
 
+        // Importa allegati (validazione rigorosa, ignora voci malformate)
+        // MAX_ATTACHMENT_ENCODED_SIZE: base64 di 15 MB ≈ 20 MB; aggiungiamo margine
+        const MAX_ATTACHMENT_ENCODED_SIZE = 22 * 1024 * 1024; // 22 MB in chars base64
+        const importedProfileIds = new Set(
+            (data.profiles || []).map(p => p.id).filter(id => id != null)
+        );
+
+        let attachmentsImported = 0;
+        if (data.attachments && Array.isArray(data.attachments) && data.attachments.length > 0) {
+            const cleanAttachments = data.attachments
+                .filter(a => {
+                    if (!a || a.profileId == null) return false;
+                    if (!a.iv || !base64Regex.test(a.iv)) return false;
+                    // encryptedData può essere assente se l'allegato è solo su Drive (sync)
+                    if (a.encryptedData != null) {
+                        if (!base64Regex.test(a.encryptedData)) return false;
+                        if (a.encryptedData.length > MAX_ATTACHMENT_ENCODED_SIZE) return false;
+                    }
+                    // Formato v2: metadati cifrati
+                    const hasEncryptedMeta = a.metaIv && a.metaData
+                        && base64Regex.test(a.metaIv) && base64Regex.test(a.metaData);
+                    // Formato v1 legacy: metadati in chiaro (backup vecchio)
+                    const hasLegacyMeta = a.fileName && a.mimeType;
+                    if (!hasEncryptedMeta && !hasLegacyMeta) return false;
+                    // Il profileId deve corrispondere a un profilo importato
+                    if (importedProfileIds.size > 0 && !importedProfileIds.has(a.profileId)) return false;
+                    return true;
+                })
+                .map(a => {
+                    const isV2 = a.metaIv && a.metaData;
+                    if (isV2) {
+                        return {
+                            profileId: a.profileId,
+                            metaIv: a.metaIv,
+                            metaData: a.metaData,
+                            iv: a.iv,
+                            encryptedData: a.encryptedData ?? null,
+                            blobVersion: a.blobVersion ?? 2,
+                            driveFileId: a.driveFileId ?? null,
+                            createdAt: a.createdAt || new Date().toISOString()
+                        };
+                    }
+                    // Formato v1 legacy: mantieni i campi in chiaro per retrocompatibilità
+                    return {
+                        profileId: a.profileId,
+                        fileName: a.fileName,
+                        mimeType: a.mimeType,
+                        size: a.size || 0,
+                        iv: a.iv,
+                        encryptedData: a.encryptedData ?? null,
+                        hash: a.hash || '',
+                        blobVersion: 1,
+                        driveFileId: a.driveFileId ?? null,
+                        createdAt: a.createdAt || new Date().toISOString()
+                    };
+                });
+            if (cleanAttachments.length > 0) {
+                await db.attachments.bulkPut(cleanAttachments);
+                attachmentsImported = cleanAttachments.length;
+            }
+        }
+
+        // Ripristina encryptedData per gli allegati già presenti localmente:
+        // se l'iv coincide (= stesso contenuto cifrato), il device ha già il binario
+        // e non serve un lazy-download da Drive.
+        if (localBinaryMap.size > 0) {
+            const importedAtts = await db.attachments.toArray();
+            for (const att of importedAtts) {
+                if (att.encryptedData) continue; // già popolato
+                const local = localBinaryMap.get(att.profileId);
+                if (local && local.iv === att.iv) {
+                    await db.attachments.update(att.id, { encryptedData: local.encryptedData });
+                }
+            }
+        }
+
+        // Notifica i widget storage (Sidebar, MainPage) di aggiornare la stima
+        window.dispatchEvent(new Event('storageChanged'));
+
         return {
             configImported: true,
-            profilesImported
+            profilesImported,
+            attachmentsImported
         };
     }
 
@@ -392,6 +499,107 @@ class DatabaseService {
      */
     async deleteSyncConfig() {
         await db.syncConfig.delete('sync');
+    }
+
+    // ========================================
+    // ATTACHMENT OPERATIONS
+    // ========================================
+
+    /**
+     * Salva un allegato cifrato. Sovrascrive eventuale allegato precedente dello stesso profilo.
+     *
+     * Schema v2 (nessun campo in chiaro):
+     *   metaIv / metaData  — metadati cifrati {fileName, mimeType, size, hash}
+     *   iv / encryptedData — contenuto file cifrato (AES-GCM + AAD profileId)
+     *   blobVersion        — 1 = legacy (no AAD), 2 = con AAD profileId
+     */
+    async saveAttachment({ profileId, metaIv, metaData, iv, encryptedData, blobVersion, driveFileId }) {
+        await this.deleteAttachmentByProfileId(profileId);
+        return await db.attachments.add({
+            profileId,
+            metaIv,
+            metaData,
+            iv,
+            encryptedData: encryptedData ?? null,
+            blobVersion: blobVersion ?? 2,
+            driveFileId: driveFileId ?? null,
+            createdAt: new Date().toISOString()
+        });
+    }
+
+    /**
+     * Aggiorna il driveFileId di un allegato dopo l'upload su Drive.
+     */
+    async updateAttachmentDriveId(attachmentId, driveFileId) {
+        await db.attachments.update(attachmentId, { driveFileId });
+    }
+
+    /**
+     * Salva l'encryptedData scaricato da Drive per un allegato già presente (metadati noti).
+     * Usato per il lazy download alla prima apertura su un nuovo dispositivo.
+     */
+    async saveAttachmentContent(attachmentId, encryptedData) {
+        await db.attachments.update(attachmentId, { encryptedData });
+    }
+
+    /**
+     * Recupera i metadati cifrati dell'allegato (senza encryptedData) per la visualizzazione.
+     * Il chiamante deve decifrare metaIv/metaData tramite cryptoService.decryptAttachmentMeta().
+     */
+    async getAttachmentMetaByProfileId(profileId) {
+        const att = await db.attachments.where('profileId').equals(profileId).first();
+        if (!att) return null;
+        return {
+            id: att.id,
+            profileId: att.profileId,
+            metaIv: att.metaIv,
+            metaData: att.metaData,
+            blobVersion: att.blobVersion ?? 1,
+            driveFileId: att.driveFileId ?? null,
+            hasLocalContent: !!att.encryptedData,
+            // Retrocompatibilità: allegati salvati prima della v2 hanno ancora i campi in chiaro
+            _legacyFileName: att.fileName,
+            _legacyMimeType: att.mimeType,
+            _legacySize: att.size
+        };
+    }
+
+    /**
+     * Recupera l'allegato completo (incluso encryptedData) per l'apertura.
+     */
+    async getAttachmentById(id) {
+        return await db.attachments.get(id);
+    }
+
+    /**
+     * Recupera tutti gli allegati (senza encryptedData) per il calcolo HMAC.
+     */
+    async getAllAttachments() {
+        const all = await db.attachments.toArray();
+        return all.map(a => ({
+            id: a.id,
+            profileId: a.profileId,
+            iv: a.iv,
+            metaIv: a.metaIv || null,
+            metaData: a.metaData || null,
+            blobVersion: a.blobVersion ?? 1,
+            driveFileId: a.driveFileId ?? null,
+            hasLocalContent: !!a.encryptedData
+        }));
+    }
+
+    /**
+     * Elimina allegato per ID.
+     */
+    async deleteAttachment(id) {
+        await db.attachments.delete(id);
+    }
+
+    /**
+     * Elimina allegato per profileId (cascata delete profilo).
+     */
+    async deleteAttachmentByProfileId(profileId) {
+        await db.attachments.where('profileId').equals(profileId).delete();
     }
 
     /**

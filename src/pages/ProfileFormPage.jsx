@@ -3,22 +3,31 @@
  * Crea o modifica un profilo (WEB o CARD)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowLeft, Save, User, CreditCard, RefreshCw, QrCode, Trash2, Image } from 'lucide-react';
+import { ArrowLeft, Save, User, CreditCard, RefreshCw, QrCode, Trash2, Image, Paperclip, X, FileText } from 'lucide-react';
 import { syncService } from '../services/syncService';
 import { OTPDisplay } from '../components/OTPDisplay';
 import { QRScanner } from '../components/QRScanner';
 import { IconPicker } from '../components/IconPicker';
 import { validators } from '../services/securityUtils';
 import { getIconBySlug, suggestIconFromTitle } from '../icons/brandIcons';
-
 import { IconRenderer } from '../components/IconRenderer';
 import { healthCache } from '../services/healthCacheService';
+
+const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15 MB
+
+function formatBytes(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
 
 export function ProfileFormPage() {
     const navigate = useNavigate();
@@ -26,7 +35,7 @@ export function ProfileFormPage() {
     const { refreshHMAC } = useAuth();
     const isNew = !id || id === 'new' || id === 'undefined';
     const { t } = useTranslation();
-
+    const fileInputRef = useRef(null);
 
     const [category, setCategory] = useState('WEB');
     const [iconName, setIconName] = useState('');
@@ -37,7 +46,7 @@ export function ProfileFormPage() {
         website: '',
         note: '',
         secretKey: '',
-        icon: null, // Icon slug (e.g., 'spotify')
+        icon: null,
         // CARD fields
         numberCard: '',
         owner: '',
@@ -48,10 +57,16 @@ export function ProfileFormPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
+    const [fileError, setFileError] = useState('');
     const [showQRScanner, setShowQRScanner] = useState(false);
     const [cardType, setCardType] = useState(null);
     const [showIconPicker, setShowIconPicker] = useState(false);
-    const [isIconAutoSet, setIsIconAutoSet] = useState(false); // true = icona impostata automaticamente dal titolo
+    const [isIconAutoSet, setIsIconAutoSet] = useState(false);
+
+    // Allegato
+    const [pendingFile, setPendingFile] = useState(null);           // File da caricare
+    const [existingAttachment, setExistingAttachment] = useState(null); // Metadati allegato già salvato
+    const [removeAttachment, setRemoveAttachment] = useState(false); // Flag rimozione
 
     useEffect(() => {
         if (!formData.icon) { setIconName(''); return; }
@@ -66,9 +81,7 @@ export function ProfileFormPage() {
 
     async function loadProfile() {
         const numericId = Number(id);
-        if (!Number.isInteger(numericId)) {
-            return;
-        }
+        if (!Number.isInteger(numericId)) return;
 
         setIsLoading(true);
         try {
@@ -85,6 +98,28 @@ export function ProfileFormPage() {
 
             setCategory(data.category || 'WEB');
             setFormData(data);
+
+            // Carica e decifra metadati allegato esistente
+            const attRaw = await databaseService.getAttachmentMetaByProfileId(numericId);
+            if (attRaw) {
+                let displayMeta;
+                if (attRaw.metaIv && attRaw.metaData) {
+                    // Formato v2: decifra i metadati
+                    const meta = await cryptoService.decryptAttachmentMeta({ iv: attRaw.metaIv, data: attRaw.metaData });
+                    displayMeta = { id: attRaw.id, profileId: attRaw.profileId, blobVersion: attRaw.blobVersion, ...meta };
+                } else {
+                    // Formato v1 legacy: usa i campi in chiaro
+                    displayMeta = {
+                        id: attRaw.id,
+                        profileId: attRaw.profileId,
+                        blobVersion: attRaw.blobVersion,
+                        fileName: attRaw._legacyFileName,
+                        mimeType: attRaw._legacyMimeType,
+                        size: attRaw._legacySize
+                    };
+                }
+                setExistingAttachment(displayMeta);
+            }
         } catch (err) {
             console.error('Error loading profile:', err);
             setError(t('profileForm.failedToLoad'));
@@ -93,11 +128,34 @@ export function ProfileFormPage() {
         }
     }
 
-    function detectCardType(number) {
-        // Rimuovi spazi e trattini
-        const cleaned = number.replace(/[\s-]/g, '');
+    function handleFileChange(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        // Reset input value per permettere ri-selezione dello stesso file
+        e.target.value = '';
 
-        // Regex per i vari circuiti
+        if (!ALLOWED_MIME.includes(file.type)) {
+            setFileError(t('attachment.invalidType'));
+            setTimeout(() => setFileError(''), 4000);
+            return;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+            setFileError(t('attachment.fileTooLarge'));
+            setTimeout(() => setFileError(''), 4000);
+            return;
+        }
+        setFileError('');
+        setPendingFile(file);
+        setRemoveAttachment(false);
+    }
+
+    function handleRemoveFile() {
+        setPendingFile(null);
+        if (existingAttachment) setRemoveAttachment(true);
+    }
+
+    function detectCardType(number) {
+        const cleaned = number.replace(/[\s-]/g, '');
         const patterns = {
             visa: /^4/,
             mastercard: /^(5[1-5]|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)/,
@@ -106,39 +164,22 @@ export function ProfileFormPage() {
             diners: /^3(?:0[0-5]|[68])/,
             jcb: /^35/
         };
-
         for (const [type, pattern] of Object.entries(patterns)) {
-            if (pattern.test(cleaned)) {
-                return type;
-            }
+            if (pattern.test(cleaned)) return type;
         }
-
         return null;
     }
 
     function formatCardNumber(value) {
-        // Rimuovi tutti i caratteri non numerici
         const cleaned = value.replace(/\D/g, '');
-
-        // Rileva il tipo di carta
         const type = detectCardType(cleaned);
         setCardType(type);
-
-        // Formatta con spazi ogni 4 cifre
-        const formatted = cleaned.match(/.{1,4}/g)?.join(' ') || cleaned;
-
-        return formatted;
+        return cleaned.match(/.{1,4}/g)?.join(' ') || cleaned;
     }
 
     function formatExpiration(value) {
-        // Rimuovi tutti i caratteri non numerici
         const cleaned = value.replace(/\D/g, '');
-
-        // Aggiungi lo slash dopo i primi 2 caratteri
-        if (cleaned.length >= 2) {
-            return cleaned.slice(0, 2) + '/' + cleaned.slice(2, 4);
-        }
-
+        if (cleaned.length >= 2) return cleaned.slice(0, 2) + '/' + cleaned.slice(2, 4);
         return cleaned;
     }
 
@@ -148,27 +189,18 @@ export function ProfileFormPage() {
         const digits = '0123456789';
         const symbols = '!@#$%^&*?_~-';
         const allChars = lower + upper + digits + symbols;
-
         const length = 10;
 
-        // Genera password con crypto.getRandomValues (CSPRNG)
         const randomValues = new Uint32Array(length);
         crypto.getRandomValues(randomValues);
-
         let password = Array.from(randomValues, (val) => allChars[val % allChars.length]).join('');
 
-        // Garantisci almeno 1 char per ogni categoria
-        // Sostituisci le prime 4 posizioni con un char random da ogni gruppo
         const guarantee = [lower, upper, digits, symbols];
         const guaranteeValues = new Uint32Array(guarantee.length);
         crypto.getRandomValues(guaranteeValues);
-
         const chars = password.split('');
-        guarantee.forEach((group, i) => {
-            chars[i] = group[guaranteeValues[i] % group.length];
-        });
+        guarantee.forEach((group, i) => { chars[i] = group[guaranteeValues[i] % group.length]; });
 
-        // Shuffle con Fisher-Yates (crypto-random)
         const shuffleValues = new Uint32Array(chars.length);
         crypto.getRandomValues(shuffleValues);
         for (let i = chars.length - 1; i > 0; i--) {
@@ -176,8 +208,7 @@ export function ProfileFormPage() {
             [chars[i], chars[j]] = [chars[j], chars[i]];
         }
 
-        password = chars.join('');
-        setFormData(prev => ({ ...prev, password }));
+        setFormData(prev => ({ ...prev, password: chars.join('') }));
     }
 
     function handleQRScan(secret) {
@@ -206,17 +237,15 @@ export function ProfileFormPage() {
                 lastModified: new Date().toISOString()
             };
 
-            // Sanitizza campi comuni WEB
             if (category === 'WEB') {
                 sanitizedData.username = validators.username(formData.username || '');
-                sanitizedData.password = formData.password || ''; // Password non va sanitizzata
+                sanitizedData.password = formData.password || '';
                 sanitizedData.website = validators.url(formData.website || '');
                 sanitizedData.secretKey = validators.text(formData.secretKey || '', 100);
                 sanitizedData.note = validators.notes(formData.note || '');
-                sanitizedData.icon = formData.icon || null; // Icon slug
+                sanitizedData.icon = formData.icon || null;
             }
 
-            // Sanitizza campi CARD
             if (category === 'CARD') {
                 sanitizedData.numberCard = validators.cardNumber(formData.numberCard || '');
                 sanitizedData.owner = validators.text(formData.owner || '', 100);
@@ -226,25 +255,46 @@ export function ProfileFormPage() {
                 sanitizedData.note = validators.notes(formData.note || '');
             }
 
-            // 2. Cifra i dati sanitizzati
             const encrypted = await cryptoService.encryptData(sanitizedData);
 
-            // 3. Salva nel DB
             const profileToSave = {
                 ...encrypted,
                 category,
                 ...(isNew ? {} : { id: Number(id) })
             };
 
-            await databaseService.saveProfile(profileToSave);
+            const savedProfileId = await databaseService.saveProfile(profileToSave);
 
-            // Aggiorna HMAC e invalida cache health dopo la scrittura
+            // Gestione allegato
+            if (pendingFile) {
+                const arrayBuffer = await pendingFile.arrayBuffer();
+                const hash = await cryptoService.computeFileHash(arrayBuffer);
+                const { iv, encryptedData, blobVersion } = await cryptoService.encryptBlob(arrayBuffer, savedProfileId);
+                // Cifra i metadati: fileName, mimeType, size e hash non escono mai in chiaro
+                const encryptedMeta = await cryptoService.encryptAttachmentMeta({
+                    fileName: pendingFile.name,
+                    mimeType: pendingFile.type,
+                    size: pendingFile.size,
+                    hash
+                });
+                await databaseService.saveAttachment({
+                    profileId: savedProfileId,
+                    metaIv: encryptedMeta.iv,
+                    metaData: encryptedMeta.data,
+                    iv,
+                    encryptedData,
+                    blobVersion
+                });
+                window.dispatchEvent(new CustomEvent('storageChanged'));
+            } else if (removeAttachment && existingAttachment) {
+                await databaseService.deleteAttachment(existingAttachment.id);
+                window.dispatchEvent(new CustomEvent('storageChanged'));
+            }
+
             await refreshHMAC();
             healthCache.clear();
-
             await syncService.triggerSync();
 
-            // 4. Torna alla lista
             navigate('/');
         } catch (err) {
             console.error('Error saving profile:', err);
@@ -261,6 +311,11 @@ export function ProfileFormPage() {
             </div>
         );
     }
+
+    // Determina stato visualizzazione allegato
+    const showExisting = existingAttachment && !removeAttachment && !pendingFile;
+    const showPending = !!pendingFile;
+    const showPicker = !showExisting && !showPending;
 
     return (
         <>
@@ -339,14 +394,12 @@ export function ProfileFormPage() {
                                 onChange={(e) => {
                                     const title = e.target.value;
                                     setFormData(prev => ({ ...prev, title }));
-                                    // Auto-suggerisci icona se non impostata o se era già auto-suggerita
                                     if (category === 'WEB' && (!formData.icon || isIconAutoSet)) {
                                         suggestIconFromTitle(title).then(icon => {
                                             if (icon) {
                                                 setFormData(prev => ({ ...prev, icon: icon.slug }));
                                                 setIsIconAutoSet(true);
                                             } else if (isIconAutoSet) {
-                                                // Nessun match: rimuovi l'icona auto-impostata
                                                 setFormData(prev => ({ ...prev, icon: null }));
                                                 setIsIconAutoSet(false);
                                             }
@@ -367,22 +420,13 @@ export function ProfileFormPage() {
                                 </label>
 
                                 <div className="flex items-center gap-3">
-                                    {/* Icon Preview */}
                                     {formData.icon ? (
                                         <>
                                             <div className="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-blue-500/10 to-blue-500/5 rounded-lg flex items-center justify-center border-2 border-blue-500/20">
-                                                {formData.icon && (
-                                                    <IconRenderer
-                                                        slug={formData.icon}
-                                                        size={32}
-                                                        useHex
-                                                    />
-                                                )}
+                                                <IconRenderer slug={formData.icon} size={32} useHex />
                                             </div>
                                             <div className="flex-1">
-                                                <p className="text-sm text-gray-400">
-                                                    {iconName || formData.icon}
-                                                </p>
+                                                <p className="text-sm text-gray-400">{iconName || formData.icon}</p>
                                                 <button
                                                     type="button"
                                                     onClick={() => setShowIconPicker(!showIconPicker)}
@@ -410,7 +454,6 @@ export function ProfileFormPage() {
                                     )}
                                 </div>
 
-                                {/* Icon Picker Modal */}
                                 {showIconPicker && (
                                     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
                                         <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md max-h-96 flex flex-col">
@@ -432,7 +475,6 @@ export function ProfileFormPage() {
                         {/* WEB Fields */}
                         {category === 'WEB' && (
                             <>
-                                
                                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
                                         {t('profiles.fields.usernameEmail')}
@@ -499,9 +541,7 @@ export function ProfileFormPage() {
                                         )}
                                     </div>
 
-                                    <p className="text-xs text-slate-500">
-                                        {t('profileForm.twoFactorHint')}
-                                    </p>
+                                    <p className="text-xs text-slate-500">{t('profileForm.twoFactorHint')}</p>
 
                                     {!formData.secretKey ? (
                                         <div className="space-y-3">
@@ -512,7 +552,6 @@ export function ProfileFormPage() {
                                                 className="w-full px-3 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm placeholder-slate-500"
                                                 placeholder={t('profileForm.base32Placeholder')}
                                             />
-
                                             <button
                                                 type="button"
                                                 onClick={() => setShowQRScanner(true)}
@@ -524,17 +563,11 @@ export function ProfileFormPage() {
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
-                                            {/* Secret Key Display */}
                                             <div className="bg-slate-900/60 border border-slate-700 px-3 py-2 rounded-lg">
                                                 <div className="text-xs text-slate-500 mb-1">{t('profileForm.secretKey')}</div>
                                                 <div className="font-mono text-sm break-all text-gray-200">{formData.secretKey}</div>
                                             </div>
-
-                                            {/* OTP Code Display */}
-                                            <OTPDisplay
-                                                secret={formData.secretKey}
-                                                title={formData.title || 'Account'}
-                                            />
+                                            <OTPDisplay secret={formData.secretKey} title={formData.title || 'Account'} />
                                         </div>
                                     )}
                                 </div>
@@ -560,7 +593,6 @@ export function ProfileFormPage() {
                                             placeholder="1234 5678 9012 3456"
                                             maxLength="19"
                                         />
-                                        {/* Logo carta */}
                                         {cardType && (
                                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
                                                 {cardType === 'visa' && (
@@ -669,6 +701,89 @@ export function ProfileFormPage() {
                                 rows="4"
                                 placeholder={t('profileForm.additionalNotes')}
                             />
+                        </div>
+
+                        {/* Allegato */}
+                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                            <label className="block text-sm font-medium text-gray-300 mb-3">
+                                <Paperclip size={14} className="inline mr-2" />
+                                {t('attachment.label')}
+                            </label>
+
+                            {/* File pending (appena selezionato) */}
+                            {showPending && (
+                                <div className="flex items-center gap-3 bg-slate-900/60 border border-slate-700 px-3 py-2 rounded-lg">
+                                    {pendingFile.type === 'application/pdf'
+                                        ? <FileText size={18} className="text-blue-400 shrink-0" />
+                                        : <Image size={18} className="text-blue-400 shrink-0" />
+                                    }
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-gray-200 truncate">{pendingFile.name}</p>
+                                        <p className="text-xs text-gray-500">{formatBytes(pendingFile.size)}</p>
+                                    </div>
+                                    <button type="button" onClick={handleRemoveFile} className="p-1 text-red-400 hover:text-red-300">
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Allegato esistente (modalità edit) */}
+                            {showExisting && (
+                                <div className="flex items-center gap-3 bg-slate-900/60 border border-slate-700 px-3 py-2 rounded-lg">
+                                    {existingAttachment.mimeType === 'application/pdf'
+                                        ? <FileText size={18} className="text-blue-400 shrink-0" />
+                                        : <Image size={18} className="text-blue-400 shrink-0" />
+                                    }
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-gray-200 truncate">{existingAttachment.fileName}</p>
+                                        <p className="text-xs text-gray-500">{formatBytes(existingAttachment.size)}</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1"
+                                    >
+                                        {t('attachment.changeFile')}
+                                    </button>
+                                    <button type="button" onClick={handleRemoveFile} className="p-1 text-red-400 hover:text-red-300">
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Nessun file — mostra picker */}
+                            {showPicker && (
+                                <label className="flex items-center justify-center w-full py-3 bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 transition-colors cursor-pointer font-medium gap-2">
+                                    <Paperclip size={18} />
+                                    {t('attachment.chooseFile')}
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                                        className="hidden"
+                                        onChange={handleFileChange}
+                                    />
+                                </label>
+                            )}
+
+                            {/* Input nascosto per "Cambia file" sull'allegato esistente */}
+                            {showExisting && (
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                                    className="hidden"
+                                    onChange={handleFileChange}
+                                />
+                            )}
+
+                            {/* Errore file (dimensione o tipo non valido) */}
+                            {fileError && (
+                                <p className="mt-2 text-xs text-red-400 flex items-center gap-1.5">
+                                    <span className="shrink-0">⚠</span>
+                                    {fileError}
+                                </p>
+                            )}
                         </div>
 
                         {/* Save Button */}
