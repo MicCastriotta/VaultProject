@@ -301,7 +301,8 @@ export function SettingsPage() {
                 // importData ha sostituito la cryptoConfig in DB: la DEK in memoria è
                 // ora obsoleta. Forziamo il re-login così login() ri-deriva la chiave
                 // corretta dalla nuova config cloud.
-                logout();
+                setMessage({ type: 'success', text: t('settings.sync.reloginRequired') });
+                setTimeout(() => logout(), 3000);
             } else {
                 setMessage({ type: 'success', text: t('settings.sync.enableSuccess') });
             }
@@ -415,6 +416,8 @@ export function SettingsPage() {
             const result = await resetAll();
             if (!result.success) {
                 setMessage({ type: 'error', text: 'Delete failed: ' + result.error });
+            } else {
+                navigate('/');
             }
         } catch (error) {
             console.error('Delete error:', error);

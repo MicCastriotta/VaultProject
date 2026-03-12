@@ -146,7 +146,8 @@
       "reauthModalTitle": "Google Drive Session Expired",
       "reauthModalDesc": "Your Google Drive sync session has expired. Would you like to reconnect now?",
       "reconnecting": "Connecting...",
-      "dismiss": "Dismiss"
+      "dismiss": "Dismiss",
+      "reloginRequired": "Cloud data imported. You will be logged out in 3 seconds to apply the new configuration."
     },
     "export": {
       "title": "Export Database",
