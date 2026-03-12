@@ -18,10 +18,14 @@ import {
     ExternalLink,
     Check,
     User,
-    CreditCard
+    CreditCard,
+    Paperclip,
+    FileText,
+    Image
 } from 'lucide-react';
 import { OTPDisplay } from '../components/OTPDisplay';
 import { IconRenderer } from '../components/IconRenderer';
+import { syncService } from '../services/syncService';
 
 export function ProfileDetailPage() {
     const navigate = useNavigate();
@@ -32,6 +36,8 @@ export function ProfileDetailPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [copiedField, setCopiedField] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [attachmentMeta, setAttachmentMeta] = useState(null);
+    const [isOpeningFile, setIsOpeningFile] = useState(false);
 
     useEffect(() => {
         loadProfile();
@@ -56,6 +62,28 @@ export function ProfileDetailPage() {
                 ...data,
                 updatedAt: encrypted.updatedAt
             });
+
+            // Carica e decifra metadati allegato (lazy: encryptedData viene letto solo su "Apri")
+            const attRaw = await databaseService.getAttachmentMetaByProfileId(parseInt(id));
+            if (attRaw) {
+                let displayMeta;
+                if (attRaw.metaIv && attRaw.metaData) {
+                    // Formato v2: decifra i metadati
+                    const meta = await cryptoService.decryptAttachmentMeta({ iv: attRaw.metaIv, data: attRaw.metaData });
+                    displayMeta = { id: attRaw.id, profileId: attRaw.profileId, blobVersion: attRaw.blobVersion, ...meta };
+                } else {
+                    // Formato v1 legacy: usa i campi in chiaro
+                    displayMeta = {
+                        id: attRaw.id,
+                        profileId: attRaw.profileId,
+                        blobVersion: attRaw.blobVersion,
+                        fileName: attRaw._legacyFileName,
+                        mimeType: attRaw._legacyMimeType,
+                        size: attRaw._legacySize
+                    };
+                }
+                setAttachmentMeta(displayMeta);
+            }
         } catch (err) {
             console.error('Error loading profile:', err);
             navigate('/');
@@ -82,6 +110,61 @@ export function ProfileDetailPage() {
             navigate('/');
         } catch (err) {
             console.error('Delete failed:', err);
+        }
+    }
+
+    async function handleOpenAttachment() {
+        if (!attachmentMeta || isOpeningFile) return;
+        setIsOpeningFile(true);
+        try {
+            let full = await databaseService.getAttachmentById(attachmentMeta.id);
+            if (!full) return;
+
+            // Se il contenuto non è locale (allegato sincronizzato da altro dispositivo),
+            // scaricalo dal file Drive separato e salvalo in IndexedDB per i prossimi accessi
+            if (!full.encryptedData) {
+                full = await syncService.ensureAttachmentLocal(full);
+            }
+
+            // Decifratura: passa profileId e blobVersion per supportare AAD (v2) e legacy (v1)
+            const arrayBuffer = await cryptoService.decryptBlob(
+                full.encryptedData,
+                full.iv,
+                attachmentMeta.profileId,
+                full.blobVersion ?? 1
+            );
+
+            // Verifica integrità hash post-decifratura (hash è nei metadati cifrati)
+            if (attachmentMeta.hash) {
+                const actualHash = await cryptoService.computeFileHash(arrayBuffer);
+                if (actualHash !== attachmentMeta.hash) {
+                    throw new Error('File integrity check failed — hash mismatch');
+                }
+            }
+
+            const { fileName, mimeType } = attachmentMeta;
+            const blob = new Blob([arrayBuffer], { type: mimeType });
+            const file = new File([blob], fileName, { type: mimeType });
+
+            // Web Share API: apre il foglio di condivisione OS — solo su mobile
+            // (Chrome desktop supporta canShare ma lo share dialog è poco utile su PC)
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            if (isMobile && navigator.canShare?.({ files: [file] })) {
+                await navigator.share({ files: [file], title: fileName });
+                return;
+            }
+
+            // Fallback: scarica il file — il browser/OS sceglie come aprirlo
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Error opening attachment:', err);
+        } finally {
+            setIsOpeningFile(false);
         }
     }
 
@@ -348,6 +431,36 @@ export function ProfileDetailPage() {
                                 {t('profiles.fields.comments')}
                             </label>
                             <p className="text-gray-200 whitespace-pre-wrap">{profile.note}</p>
+                        </div>
+                    )}
+
+                    {/* Allegato */}
+                    {attachmentMeta && (
+                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                            <label className="block text-sm font-medium text-gray-300 mb-3">
+                                <Paperclip size={14} className="inline mr-2" />
+                                {t('attachment.label')}
+                            </label>
+                            <div className="flex items-center gap-3 bg-slate-900/60 border border-slate-700 px-3 py-2 rounded-lg">
+                                {attachmentMeta.mimeType === 'application/pdf'
+                                    ? <FileText size={18} className="text-blue-400 shrink-0" />
+                                    : <Image size={18} className="text-blue-400 shrink-0" />
+                                }
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-gray-200 truncate">{attachmentMeta.fileName}</p>
+                                    <p className="text-xs text-gray-500">{(attachmentMeta.size / (1024 * 1024)).toFixed(1)} MB</p>
+                                </div>
+                                <button
+                                    onClick={handleOpenAttachment}
+                                    disabled={isOpeningFile}
+                                    className="px-3 py-1.5 text-sm bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors disabled:opacity-50 shrink-0"
+                                >
+                                    {isOpeningFile
+                                        ? <span className="inline-block w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                                        : t('attachment.open')
+                                    }
+                                </button>
+                            </div>
                         </div>
                     )}
 

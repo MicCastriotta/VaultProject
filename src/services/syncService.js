@@ -9,6 +9,28 @@ import { databaseService } from './databaseService';
 const SYNC_FILE_NAME = 'ownvault-sync.json';
 const SYNC_DEBOUNCE_MS = 2000; // Aspetta 2s dopo ultima modifica
 
+/**
+ * Trasforma gli allegati per il payload JSON del sync:
+ * rimuove encryptedData (contenuto binario, fino a 15 MB) e lascia solo
+ * il riferimento driveFileId. Il contenuto viaggia in file Drive separati.
+ * Gli allegati senza driveFileId (non ancora caricati) vengono saltati.
+ */
+function buildAttachmentSyncRefs(attachments) {
+    return attachments
+        .filter(a => a.driveFileId) // includi solo quelli già su Drive
+        .map(({ profileId, metaIv, metaData, iv, blobVersion, driveFileId,
+                 fileName, mimeType, size, hash }) => ({
+            profileId,
+            metaIv: metaIv ?? null,
+            metaData: metaData ?? null,
+            iv,
+            blobVersion: blobVersion ?? 2,
+            driveFileId,
+            // Campi legacy v1 se presenti
+            ...(fileName != null ? { fileName, mimeType, size, hash } : {})
+        }));
+}
+
 class SyncService {
     constructor() {
         this.syncTimer = null;
@@ -55,7 +77,90 @@ class SyncService {
     }
 
     /**
-     * Abilita sync e fa primo upload
+     * Carica su Drive i file binari degli allegati che non hanno ancora un driveFileId.
+     * Aggiorna IndexedDB con il driveFileId ottenuto.
+     * Chiamato dopo ogni sync riuscito e dopo enableSync.
+     *
+     * Elimina anche i file Drive orfani (non più referenziati da nessun allegato locale).
+     */
+    async syncAttachmentFiles() {
+        const allAttachments = await databaseService.getAllAttachments();
+
+        // Upload allegati nuovi/senza driveFileId
+        for (const att of allAttachments) {
+            if (att.driveFileId) continue; // già su Drive
+            if (!att.hasLocalContent) continue; // niente da caricare
+
+            try {
+                const full = await databaseService.getAttachmentById(att.id);
+                if (!full?.encryptedData) continue;
+
+                const driveFileId = await googleDriveService.uploadAttachmentBinary(null, full.encryptedData);
+                await databaseService.updateAttachmentDriveId(att.id, driveFileId);
+                att.driveFileId = driveFileId; // aggiorna riferimento locale per il cleanup
+            } catch (err) {
+                console.error(`Attachment upload failed for id=${att.id}:`, err);
+                // Non blocca il sync: l'allegato sarà ricaricato al prossimo tentativo
+            }
+        }
+
+        // Cleanup: elimina file Drive orfani (allegati cancellati localmente)
+        try {
+            const activeDriveIds = new Set(
+                allAttachments.map(a => a.driveFileId).filter(Boolean)
+            );
+            const driveFiles = await googleDriveService.listAttachmentFiles();
+            for (const f of driveFiles) {
+                if (!activeDriveIds.has(f.id)) {
+                    await googleDriveService.deleteFile(f.id).catch(() => {});
+                }
+            }
+        } catch (err) {
+            console.error('Attachment cleanup error:', err);
+        }
+    }
+
+    /**
+     * Garantisce che il contenuto binario di un allegato sia disponibile localmente.
+     * Se encryptedData è null (allegato scaricato solo come riferimento dal sync),
+     * lo scarica da Drive e lo salva in IndexedDB.
+     * Ritorna il record completo con encryptedData.
+     */
+    async ensureAttachmentLocal(attachmentRecord) {
+        if (attachmentRecord.encryptedData) return attachmentRecord;
+        if (!attachmentRecord.driveFileId) {
+            throw new Error('Attachment content not available locally and no Drive reference found');
+        }
+
+        const encryptedData = await googleDriveService.downloadAttachmentBinary(attachmentRecord.driveFileId);
+        await databaseService.saveAttachmentContent(attachmentRecord.id, encryptedData);
+        return { ...attachmentRecord, encryptedData };
+    }
+
+    /**
+     * Costruisce syncData pronto per l'upload (dopo syncAttachmentFiles).
+     */
+    async _buildSyncPayload(now) {
+        const rawLocalData = await databaseService.exportData();
+        const localData = {
+            ...rawLocalData,
+            attachments: buildAttachmentSyncRefs(await databaseService.getAllAttachments())
+        };
+        return {
+            version: 2,
+            lastModified: new Date().toISOString(),
+            deviceId: this.deviceId,
+            deviceName: this.deviceName,
+            syncTimestamp: now,
+            ...localData
+        };
+    }
+
+    /**
+     * Abilita sync e fa primo upload.
+     * IMPORTANTE: syncAttachmentFiles() (che include il cleanup dei file orfani su Drive)
+     * viene chiamato SOLO nei rami in cui si carica locale → cloud.
+     * Nei rami in cui si scarica cloud → locale non va toccato nulla su Drive.
      */
     async enableSync() {
         try {
@@ -65,63 +170,60 @@ class SyncService {
             // 2. Cerca file esistente
             let file = await googleDriveService.findFile(SYNC_FILE_NAME);
 
-            // 3. Export dati locali
-            const localData = await databaseService.exportData();
-
             const now = Date.now();
-
-            // 4. Prepara payload sync
-            const syncData = {
-                version: 2,
-                lastModified: new Date().toISOString(),
-                deviceId: this.deviceId,
-                deviceName: this.deviceName,
-                syncTimestamp: now,
-                ...localData
-            };
-
             let fileId;
             let cryptoChanged = false;
 
             if (file) {
-                // File esiste già → confronta contenuto (non timestamp: syncData è appena creato)
+                // File esiste già → leggi cloud e decidi direzione
                 const cloudData = await googleDriveService.downloadFile(file.id);
-
-                const hasLocalProfiles = localData.profiles.length > 0;
+                const rawLocalData = await databaseService.exportData();
+                const hasLocalProfiles = rawLocalData.profiles.length > 0;
                 const hasCloudProfiles = (cloudData.profiles?.length || 0) > 0;
 
                 if (!hasLocalProfiles) {
-                    // Locale vuoto → scarica cloud senza chiedere
+                    // Locale vuoto → importa cloud (NON chiamare syncAttachmentFiles:
+                    // i file Drive sono del cloud e non devono essere toccati)
                     await databaseService.importData(cloudData);
                     fileId = file.id;
-                    cryptoChanged = true; // importData ha sostituito la cryptoConfig: serve re-login
+                    cryptoChanged = true;
                     this.notifyListeners('synced', { direction: 'download', conflict: false });
+
                 } else if (!hasCloudProfiles) {
-                    // Cloud vuoto → upload locale senza chiedere
+                    // Cloud vuoto → upload locale
+                    await this.syncAttachmentFiles();
+                    const syncData = await this._buildSyncPayload(now);
                     await googleDriveService.updateFile(file.id, syncData);
                     fileId = file.id;
+
                 } else {
                     // Entrambi hanno dati → chiedi all'utente
-                    const shouldImport = await this.askConflictResolution(cloudData, localData);
+                    const shouldImport = await this.askConflictResolution(cloudData, rawLocalData);
                     if (shouldImport) {
+                        // Importa cloud → NON chiamare syncAttachmentFiles
                         await databaseService.importData(cloudData);
                         fileId = file.id;
-                        cryptoChanged = true; // importData ha sostituito la cryptoConfig: serve re-login
+                        cryptoChanged = true;
                     } else {
+                        // Mantieni locale → upload
+                        await this.syncAttachmentFiles();
+                        const syncData = await this._buildSyncPayload(now);
                         await googleDriveService.updateFile(file.id, syncData);
                         fileId = file.id;
                     }
                 }
             } else {
-                // Nessun file esistente → crea nuovo
+                // Nessun file esistente → crea nuovo con dati locali
+                await this.syncAttachmentFiles();
+                const syncData = await this._buildSyncPayload(now);
                 file = await googleDriveService.createFile(SYNC_FILE_NAME, syncData);
                 fileId = file.id;
             }
 
-            // 5. Salva flag localStorage (persiste anche se IndexedDB viene svuotato)
+            // Salva flag localStorage (persiste anche se IndexedDB viene svuotato)
             localStorage.setItem('ownvault_sync_enabled_flag', 'true');
 
-            // 6. Salva config sync
+            // Salva config sync
             await databaseService.saveSyncConfig({
                 enabled: true,
                 googleDriveFileId: fileId,
@@ -129,10 +231,9 @@ class SyncService {
                 lastLocalModification: now,
                 deviceId: this.deviceId,
                 deviceName: this.deviceName,
-                conflictStrategy: 'ask' // 'ask', 'local-wins', 'cloud-wins'
+                conflictStrategy: 'ask'
             });
 
-            // 6. Notifica listeners
             this.notifyListeners('enabled');
 
             return { success: true, userInfo, cryptoChanged };
@@ -206,88 +307,61 @@ class SyncService {
         this.notifyListeners('syncing');
 
         try {
-            // 1. Export dati locali
-            const localData = await databaseService.exportData();
-            const localTimestamp = syncConfig.lastLocalModification || Date.now();
-            // Correggi exportDate: usa lastLocalModification, non l'ora corrente
-            localData.exportDate = new Date(localTimestamp).toISOString();
+            // 1. Upload allegati nuovi su Drive (ottieni driveFileId) + cleanup orfani
+            await this.syncAttachmentFiles();
 
-            // 2. Download da cloud
+            // 2. Costruisci payload locale: allegati senza encryptedData inline
+            const rawLocalData = await databaseService.exportData();
+            const localTimestamp = syncConfig.lastLocalModification || Date.now();
+            const localData = {
+                ...rawLocalData,
+                exportDate: new Date(localTimestamp).toISOString(),
+                attachments: buildAttachmentSyncRefs(await databaseService.getAllAttachments())
+            };
+
+            // 3. Download da cloud
             const cloudData = await googleDriveService.downloadFile(
                 syncConfig.googleDriveFileId
             );
             const cloudTimestamp = cloudData.syncTimestamp || 0;
 
-            // 3. Compare timestamps
+            // 4. Compare timestamps
             if (localTimestamp > cloudTimestamp) {
-                // LOCAL PIÙ RECENTE → Upload
-                const syncData = {
-                    version: 2,
-                    lastModified: new Date().toISOString(),
-                    deviceId: this.deviceId,
-                    deviceName: this.deviceName,
-                    syncTimestamp: Date.now(),
-                    ...localData
-                };
-
+                // LOCAL PIÙ RECENTE → Upload JSON (allegati già su Drive)
                 await googleDriveService.updateFile(
                     syncConfig.googleDriveFileId,
-                    syncData
+                    { version: 2, lastModified: new Date().toISOString(),
+                      deviceId: this.deviceId, deviceName: this.deviceName,
+                      syncTimestamp: Date.now(), ...localData }
                 );
-
-                // Aggiorna lastSyncTimestamp
-                await databaseService.updateSyncConfig({
-                    lastSyncTimestamp: Date.now()
-                });
-
+                await databaseService.updateSyncConfig({ lastSyncTimestamp: Date.now() });
                 this.notifyListeners('synced', { direction: 'upload' });
 
             } else if (cloudTimestamp > localTimestamp) {
-                // CLOUD PIÙ RECENTE → Conflict!
+                // CLOUD PIÙ RECENTE → Conflict
                 const strategy = syncConfig.conflictStrategy || 'ask';
-
-                let shouldImport = false;
-
-                if (strategy === 'ask') {
-                    shouldImport = await this.askConflictResolution(cloudData, localData);
-                } else if (strategy === 'cloud-wins') {
-                    shouldImport = true;
-                } else if (strategy === 'local-wins') {
-                    shouldImport = false;
-                }
+                let shouldImport = strategy === 'cloud-wins'
+                    ? true
+                    : strategy === 'local-wins'
+                        ? false
+                        : await this.askConflictResolution(cloudData, localData);
 
                 if (shouldImport) {
-                    // Importa da cloud
                     await databaseService.importData(cloudData);
-
-                    // importData svuota la tabella syncConfig: re-salva il config completo con i nuovi timestamp
                     await databaseService.saveSyncConfig({
                         ...syncConfig,
                         lastSyncTimestamp: cloudTimestamp,
                         lastLocalModification: cloudTimestamp
                     });
-
                     this.notifyListeners('synced', { direction: 'download', conflict: true });
                 } else {
-                    // Mantieni locale e sovrascrivi cloud
-                    const syncData = {
-                        version: 2,
-                        lastModified: new Date().toISOString(),
-                        deviceId: this.deviceId,
-                        deviceName: this.deviceName,
-                        syncTimestamp: Date.now(),
-                        ...localData
-                    };
-
                     await googleDriveService.updateFile(
                         syncConfig.googleDriveFileId,
-                        syncData
+                        { version: 2, lastModified: new Date().toISOString(),
+                          deviceId: this.deviceId, deviceName: this.deviceName,
+                          syncTimestamp: Date.now(), ...localData }
                     );
-
-                    await databaseService.updateSyncConfig({
-                        lastSyncTimestamp: Date.now()
-                    });
-
+                    await databaseService.updateSyncConfig({ lastSyncTimestamp: Date.now() });
                     this.notifyListeners('synced', { direction: 'upload', conflict: true });
                 }
 
@@ -349,11 +423,12 @@ class SyncService {
             }
 
             // Cloud più recente → confronta contenuto
-            const localData = await databaseService.exportData();
-            // Correggi exportDate: usa lastLocalModification, non l'ora corrente
-            localData.exportDate = localTimestamp
-                ? new Date(localTimestamp).toISOString()
-                : localData.exportDate;
+            const rawLocalData = await databaseService.exportData();
+            const localData = {
+                ...rawLocalData,
+                exportDate: localTimestamp ? new Date(localTimestamp).toISOString() : rawLocalData.exportDate,
+                attachments: buildAttachmentSyncRefs(await databaseService.getAllAttachments())
+            };
 
             const hasLocalProfiles = (localData.profiles?.length || 0) > 0;
             const hasCloudProfiles = (cloudData.profiles?.length || 0) > 0;
@@ -384,16 +459,14 @@ class SyncService {
                 });
                 this.notifyListeners('synced', { direction: 'download', conflict: true });
             } else {
-                // Mantieni locale → re-upload per allineare il cloud
-                const syncData = {
-                    version: 2,
-                    lastModified: new Date().toISOString(),
-                    deviceId: this.deviceId,
-                    deviceName: this.deviceName,
-                    syncTimestamp: Date.now(),
-                    ...localData
-                };
-                await googleDriveService.updateFile(syncConfig.googleDriveFileId, syncData);
+                // Mantieni locale → upload allegati + re-upload JSON
+                await this.syncAttachmentFiles();
+                const freshRefs = buildAttachmentSyncRefs(await databaseService.getAllAttachments());
+                await googleDriveService.updateFile(syncConfig.googleDriveFileId, {
+                    version: 2, lastModified: new Date().toISOString(),
+                    deviceId: this.deviceId, deviceName: this.deviceName,
+                    syncTimestamp: Date.now(), ...localData, attachments: freshRefs
+                });
                 await databaseService.updateSyncConfig({ lastSyncTimestamp: Date.now() });
                 this.notifyListeners('synced', { direction: 'upload', conflict: true });
             }

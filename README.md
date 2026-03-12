@@ -185,6 +185,7 @@ Funzionalità da implementare:
 - [x] Multi-lingua
 - [ ] Logging centralizzato
 - [ ] Aggiunta campi personalizzati nella creazione di un profilo
+- [x] Aggiunta file allegato ad un profilo web
 
 ## Struttura del Progetto
 

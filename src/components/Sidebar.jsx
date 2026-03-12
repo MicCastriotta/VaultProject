@@ -29,6 +29,8 @@ function useStorageEstimate() {
             }
         }
         estimate();
+        window.addEventListener('storageChanged', estimate);
+        return () => window.removeEventListener('storageChanged', estimate);
     }, []);
 
     return storage;

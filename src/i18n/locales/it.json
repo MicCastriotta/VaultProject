@@ -363,6 +363,14 @@
     },
     "chars": "car."
   },
+  "attachment": {
+    "label": "Allegato",
+    "chooseFile": "Scegli file",
+    "changeFile": "Cambia file",
+    "open": "Apri",
+    "fileTooLarge": "File troppo grande (max 15 MB)",
+    "invalidType": "Tipo file non supportato. Usa immagini (JPEG, PNG, WebP) o PDF."
+  },
   "storage": {
     "title": "Storage",
     "used": "Usati",

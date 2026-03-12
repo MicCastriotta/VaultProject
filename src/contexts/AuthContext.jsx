@@ -172,9 +172,10 @@ export function AuthProvider({ children }) {
             const cryptoConfig = await cryptoService.setupMasterPassword(password);
             await databaseService.saveCryptoConfig(cryptoConfig);
 
-            // Calcola e salva HMAC iniziale (DB vuoto, 0 profili)
+            // Calcola e salva HMAC iniziale (DB vuoto, 0 profili, 0 allegati)
             const profiles = await databaseService.getAllProfiles();
-            const hmac = await cryptoService.computeHMAC(cryptoConfig, profiles);
+            const attachments = await databaseService.getAllAttachments();
+            const hmac = await cryptoService.computeHMAC(cryptoConfig, profiles, attachments);
             await databaseService.saveHMAC(hmac);
             securityLog('HMAC initialized on first setup');
 
@@ -279,15 +280,17 @@ export function AuthProvider({ children }) {
 
     /**
      * Verifica integrità del database.
-     * Confronta l'HMAC salvato con quello calcolato sullo stato attuale.
+     * Confronta l'HMAC salvato con quello calcolato sullo stato attuale
+     * (profili + allegati). Gestisce automaticamente la migrazione di versione.
      */
     async function verifyDatabaseIntegrity() {
         try {
             const cryptoConfig = await databaseService.getCryptoConfig();
             const profiles = await databaseService.getAllProfiles();
-            const storedHmac = await databaseService.getHMAC();
+            const attachments = await databaseService.getAllAttachments();
+            const storedRecord = await databaseService.getHMAC();
 
-            return await cryptoService.verifyHMAC(storedHmac, cryptoConfig, profiles);
+            return await cryptoService.verifyHMAC(storedRecord, cryptoConfig, profiles, attachments);
         } catch (error) {
             securityLog('Integrity check error', { error: error.message });
             return { valid: false, reason: `Check failed: ${error.message}` };
@@ -295,15 +298,16 @@ export function AuthProvider({ children }) {
     }
 
     /**
-     * Ricalcola e salva l'HMAC.
+     * Ricalcola e salva l'HMAC (profili + allegati).
      * DA CHIAMARE dopo ogni operazione che modifica il DB:
-     * - saveProfile, deleteProfile, importData
+     * - saveProfile, deleteProfile, saveAttachment, deleteAttachment, importData
      */
     async function refreshHMAC() {
         try {
             const cryptoConfig = await databaseService.getCryptoConfig();
             const profiles = await databaseService.getAllProfiles();
-            const hmac = await cryptoService.computeHMAC(cryptoConfig, profiles);
+            const attachments = await databaseService.getAllAttachments();
+            const hmac = await cryptoService.computeHMAC(cryptoConfig, profiles, attachments);
             await databaseService.saveHMAC(hmac);
             securityLog('HMAC refreshed');
         } catch (error) {
