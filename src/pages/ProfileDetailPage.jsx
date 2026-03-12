@@ -144,17 +144,11 @@ export function ProfileDetailPage() {
 
             const { fileName, mimeType } = attachmentMeta;
             const blob = new Blob([arrayBuffer], { type: mimeType });
-            const file = new File([blob], fileName, { type: mimeType });
 
-            // Web Share API: apre il foglio di condivisione OS — solo su mobile
-            // (Chrome desktop supporta canShare ma lo share dialog è poco utile su PC)
-            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-            if (isMobile && navigator.canShare?.({ files: [file] })) {
-                await navigator.share({ files: [file], title: fileName });
-                return;
-            }
-
-            // Fallback: scarica il file — il browser/OS sceglie come aprirlo
+            // Scarica il file su tutti i dispositivi.
+            // Su Android: notifica download → "APRI" → menu "Apri con" (Adobe, Galleria…)
+            // Su iOS: download completato → Safari permette di aprire con app compatibili
+            // Su desktop: il browser salva e lascia decidere all'OS
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;

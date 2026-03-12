@@ -146,7 +146,8 @@
       "reauthModalTitle": "Sessione Google Drive scaduta",
       "reauthModalDesc": "La sessione di sincronizzazione con Google Drive è scaduta. Vuoi riconnetterti ora?",
       "reconnecting": "Connessione in corso...",
-      "dismiss": "Ignora"
+      "dismiss": "Ignora",
+      "reloginRequired": "Dati cloud importati. Verrai disconnesso tra 3 secondi per applicare la nuova configurazione."
     },
     "export": {
       "title": "Esporta Database",

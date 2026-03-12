@@ -759,7 +759,7 @@ export function ProfileFormPage() {
                                     <input
                                         ref={fileInputRef}
                                         type="file"
-                                        accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                                        accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.jpg,.jpeg,.png,.webp,.gif,.pdf"
                                         className="hidden"
                                         onChange={handleFileChange}
                                     />
@@ -771,7 +771,7 @@ export function ProfileFormPage() {
                                 <input
                                     ref={fileInputRef}
                                     type="file"
-                                    accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                                    accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.jpg,.jpeg,.png,.webp,.gif,.pdf"
                                     className="hidden"
                                     onChange={handleFileChange}
                                 />
