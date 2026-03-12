@@ -307,6 +307,18 @@ class DatabaseService {
 
         // ===== IMPORT (struttura validata) =====
 
+        // Prima di cancellare, salva i binari già presenti localmente.
+        // Chiave: profileId → { iv, encryptedData }
+        // Se dopo l'import l'allegato importato ha lo stesso iv (= stesso contenuto cifrato),
+        // ripristiniamo encryptedData locale invece di lasciarlo null e costringere
+        // un lazy-download inutile su un device che ha già il file.
+        const existingAtts = await db.attachments.toArray();
+        const localBinaryMap = new Map(
+            existingAtts
+                .filter(a => a.encryptedData && a.iv)
+                .map(a => [a.profileId, { iv: a.iv, encryptedData: a.encryptedData }])
+        );
+
         // Pulisci DB
         await this.deleteAllData();
 
@@ -398,6 +410,20 @@ class DatabaseService {
             if (cleanAttachments.length > 0) {
                 await db.attachments.bulkPut(cleanAttachments);
                 attachmentsImported = cleanAttachments.length;
+            }
+        }
+
+        // Ripristina encryptedData per gli allegati già presenti localmente:
+        // se l'iv coincide (= stesso contenuto cifrato), il device ha già il binario
+        // e non serve un lazy-download da Drive.
+        if (localBinaryMap.size > 0) {
+            const importedAtts = await db.attachments.toArray();
+            for (const att of importedAtts) {
+                if (att.encryptedData) continue; // già popolato
+                const local = localBinaryMap.get(att.profileId);
+                if (local && local.iv === att.iv) {
+                    await db.attachments.update(att.id, { encryptedData: local.encryptedData });
+                }
             }
         }
 

@@ -57,6 +57,7 @@ export function ProfileFormPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
+    const [fileError, setFileError] = useState('');
     const [showQRScanner, setShowQRScanner] = useState(false);
     const [cardType, setCardType] = useState(null);
     const [showIconPicker, setShowIconPicker] = useState(false);
@@ -134,14 +135,16 @@ export function ProfileFormPage() {
         e.target.value = '';
 
         if (!ALLOWED_MIME.includes(file.type)) {
-            setError(t('attachment.invalidType'));
+            setFileError(t('attachment.invalidType'));
+            setTimeout(() => setFileError(''), 4000);
             return;
         }
         if (file.size > MAX_FILE_SIZE) {
-            setError(t('attachment.fileTooLarge'));
+            setFileError(t('attachment.fileTooLarge'));
+            setTimeout(() => setFileError(''), 4000);
             return;
         }
-        setError('');
+        setFileError('');
         setPendingFile(file);
         setRemoveAttachment(false);
     }
@@ -772,6 +775,14 @@ export function ProfileFormPage() {
                                     className="hidden"
                                     onChange={handleFileChange}
                                 />
+                            )}
+
+                            {/* Errore file (dimensione o tipo non valido) */}
+                            {fileError && (
+                                <p className="mt-2 text-xs text-red-400 flex items-center gap-1.5">
+                                    <span className="shrink-0">⚠</span>
+                                    {fileError}
+                                </p>
                             )}
                         </div>
 

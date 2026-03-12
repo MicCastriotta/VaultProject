@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
 import { syncService } from '../services/syncService';
-import { Plus, Search, ArrowUpDown, User, CreditCard, LogOut, HardDrive } from 'lucide-react';
+import { Plus, Search, ArrowUpDown, User, CreditCard, LogOut, HardDrive, Paperclip } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { IconRenderer } from '../components/IconRenderer';
 import { getIconBySlug } from '../icons/brandIcons';
@@ -92,6 +92,7 @@ export function MainPage() {
     const navigate = useNavigate();
     const { t } = useTranslation();
     const [decryptedProfiles, setDecryptedProfiles] = useState([]);
+    const [attachmentProfileIds, setAttachmentProfileIds] = useState(new Set());
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [showSortMenu, setShowSortMenu] = useState(false);
@@ -128,7 +129,7 @@ export function MainPage() {
     useEffect(() => {
         const handleSyncEvent = (event, data) => {
             if (event === 'synced' && data.direction === 'download') {
-                loadProfiles();
+                loadProfiles(); // ricarica profili + attachmentProfileIds
             }
         };
         syncService.addListener(handleSyncEvent);
@@ -142,7 +143,10 @@ export function MainPage() {
     async function loadProfiles() {
         setIsLoading(true);
         try {
-            const encrypted = await databaseService.getAllProfiles();
+            const [encrypted, attachments] = await Promise.all([
+                databaseService.getAllProfiles(),
+                databaseService.getAllAttachments()
+            ]);
 
             const decrypted = await Promise.all(
                 encrypted.map(async (p) => {
@@ -151,11 +155,7 @@ export function MainPage() {
                             iv: p.iv,
                             data: p.data
                         });
-
-                        return {
-                            id: p.id,
-                            ...data
-                        };
+                        return { id: p.id, ...data };
                     } catch {
                         return null;
                     }
@@ -163,6 +163,7 @@ export function MainPage() {
             );
 
             setDecryptedProfiles(decrypted.filter(Boolean));
+            setAttachmentProfileIds(new Set(attachments.map(a => a.profileId)));
         } catch (error) {
             console.error(error);
         } finally {
@@ -362,9 +363,12 @@ export function MainPage() {
 
                                                         <div className="flex-1 min-w-0 text-left">
                                                             <p className="font-semibold text-[15px] text-white">{profile.title}</p>
-                                                            {profile.note && (
-                                                                <p className="text-[13px] text-slate-500 truncate">
-                                                                    {profile.note}
+                                                            {(profile.note || attachmentProfileIds.has(profile.id)) && (
+                                                                <p className="text-[13px] text-slate-500 truncate flex items-center gap-1.5">
+                                                                    {attachmentProfileIds.has(profile.id) && (
+                                                                        <Paperclip size={11} className="shrink-0 text-slate-400" />
+                                                                    )}
+                                                                    {profile.note || ''}
                                                                 </p>
                                                             )}
                                                         </div>
