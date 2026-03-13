@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
 import { syncService } from '../services/syncService';
-import { Plus, Search, ArrowUpDown, User, CreditCard, LogOut, HardDrive, Paperclip } from 'lucide-react';
+import { Plus, Search, ArrowUpDown, User, CreditCard, LogOut, HardDrive, Paperclip, UserPlus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { IconRenderer } from '../components/IconRenderer';
 import { getIconBySlug } from '../icons/brandIcons';
@@ -250,6 +250,14 @@ export function MainPage() {
                             setStorageOpen={setStorageOpen}
                             t={t}
                         />
+
+                        {/* Aggiungi amico - solo mobile */}
+                        <button
+                            onClick={() => navigate('/contacts')}
+                            className="md:hidden p-2 hover:bg-slate-800 text-gray-400 rounded-lg transition"
+                        >
+                            <UserPlus size={20} />
+                        </button>
 
                         {/* Logout - solo mobile */}
                         <button
