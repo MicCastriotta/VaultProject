@@ -12,7 +12,7 @@
  */
 
 import { cryptoService } from './cryptoService';
-import { db } from './databaseService';
+import { db, databaseService } from './databaseService';
 
 class ContactsService {
 
@@ -80,6 +80,7 @@ class ContactsService {
     async setDisplayName(name) {
         const identity = await this.getOrCreateIdentity();
         await db.config.put({ ...identity, displayName: name.trim() });
+        await databaseService.touchLocalModification();
     }
 
     /**
