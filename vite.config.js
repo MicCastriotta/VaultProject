@@ -103,6 +103,15 @@ export default defineConfig({
         theme_color: '#0f172a',
         background_color: '#1e293b',
         display: 'standalone',
+        start_url: '/',
+        scope: '/',
+        share_target: {
+          action: '/share-receive',
+          method: 'GET',
+          params: {
+            url: 'url'
+          }
+        },
         icons: [
           {
             src: '/icons/icon-192x192.png',

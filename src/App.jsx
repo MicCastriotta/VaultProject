@@ -151,6 +151,45 @@ function SyncLaunchCheck() {
 }
 
 /**
+ * Gestisce l'apertura via Web Share Target API (iOS).
+ * iOS apre la PWA a /share-receive?url=<encoded_url> quando l'utente
+ * sceglie OwnVault nello share sheet di Safari.
+ * Estrae l'URL condiviso e reindirizza alla route interna corretta.
+ */
+function ShareReceivePage() {
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const sharedUrl = params.get('url');
+
+        if (!sharedUrl) {
+            navigate('/', { replace: true });
+            return;
+        }
+
+        try {
+            const url = new URL(sharedUrl);
+            if (url.pathname === '/receive' && url.hash) {
+                navigate('/receive' + url.hash, { replace: true });
+            } else if (url.pathname === '/invite' && url.hash) {
+                navigate('/invite' + url.hash, { replace: true });
+            } else {
+                navigate('/', { replace: true });
+            }
+        } catch {
+            navigate('/', { replace: true });
+        }
+    }, []);
+
+    return (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500" />
+        </div>
+    );
+}
+
+/**
  * Processa un invite pendente salvato in sessionStorage prima del login.
  * Scatta una sola volta dopo che il vault viene sbloccato.
  */
@@ -253,6 +292,10 @@ function AppRoutes() {
                 <PrivacyPage />
             </Suspense>
         );
+    }
+
+    if (location.pathname === '/share-receive') {
+        return <ShareReceivePage />;
     }
 
     if (location.pathname === '/invite') {
