@@ -438,7 +438,9 @@
     "imported": "Profilo importato!",
     "importError": "Importazione fallita. Riprova.",
     "decryptError": "Decifratura fallita. Chiave errata o link corrotto.",
-    "invalidLink": "Link di condivisione non valido o corrotto."
+    "invalidLink": "Link di condivisione non valido o corrotto.",
+    "openInApp": "Apri in OwnVault",
+    "iosNotice": "Il tuo vault si trova nell'app OwnVault installata. Tocca il pulsante e seleziona OwnVault dallo share sheet."
   },
   "storage": {
     "title": "Storage",

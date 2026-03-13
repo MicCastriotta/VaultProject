@@ -12,8 +12,11 @@ import { UserPlus, ShieldCheck, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { contactsService } from '../services/contactsService';
 
+const isIosNonStandalone = /iPhone|iPad|iPod/.test(navigator.userAgent)
+    && !window.navigator.standalone;
+
 export function InvitePage() {
-    const { isUnlocked } = useAuth();
+    const { isUnlocked, userExists } = useAuth();
     const navigate = useNavigate();
     const { t } = useTranslation();
     const [payload, setPayload] = useState(null);
@@ -80,20 +83,32 @@ export function InvitePage() {
                     <p className="text-center text-red-400 text-sm py-3">{t('contacts.addError')}</p>
                 ) : !isUnlocked ? (
                     <div>
-                        <p className="text-sm text-gray-400 text-center mb-4">
-                            {t('contacts.loginRequired')}
-                        </p>
-                        <button
-                            onClick={() => {
-                                // Salva il payload prima di navigare al login
-                                // così viene ripristinato automaticamente dopo lo sblocco
-                                sessionStorage.setItem('ov_pending_invite', JSON.stringify(payload));
-                                navigate('/');
-                            }}
-                            className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition"
-                        >
-                            {t('contacts.openVault')}
-                        </button>
+                        {isIosNonStandalone && !userExists ? (
+                            <>
+                                <p className="text-sm text-gray-400 text-center mb-4">{t('share.iosNotice')}</p>
+                                <button
+                                    onClick={() => navigator.share({ url: window.location.href })}
+                                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition"
+                                >
+                                    {t('share.openInApp')}
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-sm text-gray-400 text-center mb-4">
+                                    {t('contacts.loginRequired')}
+                                </p>
+                                <button
+                                    onClick={() => {
+                                        sessionStorage.setItem('ov_pending_invite', JSON.stringify(payload));
+                                        navigate('/');
+                                    }}
+                                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition"
+                                >
+                                    {t('contacts.openVault')}
+                                </button>
+                            </>
+                        )}
                     </div>
                 ) : (
                     <button

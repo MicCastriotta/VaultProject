@@ -362,7 +362,8 @@ class DatabaseService {
                 id: 'identity',
                 publicKey: data.identity.publicKey,
                 encryptedPrivateKey: data.identity.encryptedPrivateKey,
-                createdAt: data.identity.createdAt || new Date().toISOString()
+                createdAt: data.identity.createdAt || new Date().toISOString(),
+                ...(data.identity.displayName ? { displayName: data.identity.displayName } : {})
             });
         }
 

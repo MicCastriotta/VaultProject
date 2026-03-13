@@ -28,8 +28,11 @@ function parseReceiveHash(hash) {
     }
 }
 
+const isIosNonStandalone = /iPhone|iPad|iPod/.test(navigator.userAgent)
+    && !window.navigator.standalone;
+
 export function ReceivePage() {
-    const { isUnlocked, refreshHMAC } = useAuth();
+    const { isUnlocked, userExists, refreshHMAC } = useAuth();
     const navigate = useNavigate();
     const { t } = useTranslation();
 
@@ -175,13 +178,27 @@ export function ReceivePage() {
                     <p className="text-center text-red-400 text-sm py-3">{t('share.decryptError')}</p>
                 ) : !isUnlocked ? (
                     <div>
-                        <p className="text-sm text-gray-400 text-center mb-4">{t('contacts.loginRequired')}</p>
-                        <button
-                            onClick={handleOpenVault}
-                            className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition"
-                        >
-                            {t('contacts.openVault')}
-                        </button>
+                        {isIosNonStandalone && !userExists ? (
+                            <>
+                                <p className="text-sm text-gray-400 text-center mb-4">{t('share.iosNotice')}</p>
+                                <button
+                                    onClick={() => navigator.share({ url: window.location.href })}
+                                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition"
+                                >
+                                    {t('share.openInApp')}
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-sm text-gray-400 text-center mb-4">{t('contacts.loginRequired')}</p>
+                                <button
+                                    onClick={handleOpenVault}
+                                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition"
+                                >
+                                    {t('contacts.openVault')}
+                                </button>
+                            </>
+                        )}
                     </div>
                 ) : status === 'decrypting' ? (
                     <div className="flex justify-center py-4">

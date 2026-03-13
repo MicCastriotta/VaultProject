@@ -74,7 +74,6 @@ export function LoginPage() {
                                     className="w-full px-4 py-3 bg-slate-800/70 text-gray-200 border border-slate-700 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent pr-12 placeholder-gray-500"
                                     placeholder={t('login.enterPassword')}
                                     disabled={isLoading}
-                                    autoFocus={!biometricEnabled}
                                 />
                                 <button
                                     type="button"
