@@ -56,6 +56,11 @@
   },
   "signup": {
     "letsBegin": "Let's begin!",
+    "chooseSetupMode": "How would you like to set up OwnVault?",
+    "newDevice": "New device",
+    "newDeviceHint": "Create a new vault with a master password",
+    "restoreBackup": "Restore from backup",
+    "restoreBackupHint": "Import an existing encrypted backup",
     "choosePasswordHint": "Choose a password that you will remember. In case of loss it will not be possible to recover the data!",
     "passwordStrength": "Password strength",
     "enterPasswordPlaceholder": "Enter password",
@@ -70,6 +75,24 @@
       "medium": "Medium!",
       "strong": "Strong!",
       "veryStrong": "Very Strong!"
+    },
+    "restore": {
+      "chooseSource": "Choose how to restore your backup",
+      "fromFile": "From JSON file",
+      "fromFileHint": "Select an OwnVault backup (.json)",
+      "fromDrive": "From Google Drive",
+      "fromDriveHint": "Connect and download the backup automatically",
+      "readingFile": "Reading file...",
+      "importing": "Importing data...",
+      "connectingDrive": "Connecting to Google Drive...",
+      "searchingBackup": "Looking for backup...",
+      "downloading": "Downloading backup...",
+      "driveNoBackup": "No OwnVault backup found on Google Drive",
+      "fileError": "The file is invalid or corrupted",
+      "driveError": "Google Drive restore failed",
+      "errorTitle": "Restore failed",
+      "tryAgain": "Try again",
+      "fallbackToNew": "Set up as new device"
     }
   },
   "tutorial": {

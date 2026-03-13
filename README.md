@@ -59,8 +59,16 @@ DEK — Data Encryption Key (random, 256-bit)
 - **XSS protection** — tutti gli input sanitizzati con DOMPurify
 - **Content Security Policy** — CSP restrittiva via header HTTP in produzione
 
+### Contatti e Condivisione profili
+- **Identità crittografica** per ogni vault: keypair ECDH P-256 generata al primo accesso, chiave privata cifrata con la DEK
+- **Invite link** per aggiungere contatti: `#pk=<publicKey>&name=<name>` nel fragment URL (mai inviato al server)
+- **Fingerprint visivo** del contatto: primi 8 byte SHA-256(publicKey) in esadecimale per verifica out-of-band
+- **Condivisione profilo cifrata**: ECDH effimero + HKDF-SHA256 + AES-256-GCM (forward secrecy per ogni share)
+- Flusso pendente: invite/receive salvati in `sessionStorage` se il vault è bloccato, ripristinati dopo l'unlock
+- Export/Import JSON v3: include identità e rubrica contatti
+
 ### Backup e Sync
-- Export/Import JSON cifrato v2 (portabile su qualsiasi device con la stessa password, include allegati)
+- Export/Import JSON cifrato v3 (portabile su qualsiasi device con la stessa password, include allegati, identità e contatti)
 - Sync **Google Drive** opzionale (backup automatico, risoluzione conflitti, allegati lazy-loaded)
 
 ### UX
@@ -69,6 +77,8 @@ DEK — Data Encryption Key (random, 256-bit)
 - Dark/Light theme con persistenza
 - Sidebar desktop + bottom nav mobile
 - Multi-lingua (i18n)
+- **Setup guidato al primo avvio**: scegli tra "Nuovo dispositivo" (imposta master password) o "Ripristina backup" (da file JSON o Google Drive) con fallback automatico in caso di errore
+- **Navigate to root al lock**: auto-lock e logout portano sempre alla root, evitando URL orfani su pagine protette
 
 ---
 
@@ -88,6 +98,33 @@ Master Password → KEK → decifra DEK → DEK in RAM
 ```
 
 WebAuthn è un **gate di accesso UI** (2FA locale), non un meccanismo crittografico. La DEK non è mai derivabile dalla biometria da sola. Un database rubato è inutilizzabile senza la master password, anche con la configurazione biometrica registrata.
+
+### Identità crittografica e condivisione profili (ECDH)
+
+```
+Vault sbloccato
+   → genera keypair ECDH P-256 (se non esiste)
+   → chiave pubblica → salvata in chiaro in IndexedDB + export backup
+   → chiave privata → cifrata con DEK (JWK → AES-GCM) → IndexedDB
+
+Condivisione profilo verso contatto:
+   sender:
+     → genera keypair effimero ECDH P-256 (usa-e-getta)
+     → ECDH(effimero_priv, destinatario_pub) → sharedBits 256-bit
+     → HKDF-SHA256(sharedBits, info="OwnVault-Share-v1") → wrapKey AES-256
+     → AES-256-GCM(wrapKey, profileData) → (ct, iv)
+     → payload = { v:1, epk, iv, ct } → base64url → URL fragment /receive#...
+
+   destinatario (vault sbloccato):
+     → decifra chiave privata con DEK
+     → ECDH(priv, epk) → sharedBits → wrapKey
+     → AES-256-GCM-decrypt → profileData
+     → re-cifra con propria DEK → salva in IndexedDB + refreshHMAC
+```
+
+La chiave effimera del mittente garantisce **forward secrecy**: compromettere la chiave privata dell'identità non espone share passati. Il payload viaggia nel fragment URL (mai inviato al server).
+
+**Limiti noti (v1):** nessuna firma del mittente (chiunque con la chiave pubblica del destinatario può cifrare un payload), nessuna scadenza o monouso sui link. Previsti in una versione futura con firme Ed25519.
 
 ### Integrità database (HMAC v2 — anti-tampering)
 
@@ -171,6 +208,9 @@ upgrade-insecure-requests
 | Bit flipping / corruzione | GCM rileva qualsiasi modifica |
 | Padding oracle | GCM non usa padding |
 | Tampering IndexedDB | HMAC-SHA256 v2 con chiave derivata dalla DEK (copre anche allegati) |
+| Profilo importato senza HMAC update | refreshHMAC() chiamato dopo ogni import da contatto |
+| Share profilo intercettato | AES-256-GCM con chiave ECDH effimera — illeggibile senza chiave privata destinatario |
+| Eavesdropping link condivisione | Payload nel fragment URL — mai inviato al server |
 | Eliminazione silenziosa record | Conteggio profili + allegati nel payload HMAC |
 | Allegati spostati tra profili | AAD con profileId — decifratura fallisce cross-profile |
 | Brute-force locale | Rate limiting persistente + 600k iterazioni KDF |
@@ -190,6 +230,9 @@ upgrade-insecure-requests
 | Attaccante con DevTools e pazienza | Può cancellare localStorage per bypassare rate limit |
 | Modalità privata del browser | Storage separato — rate limit non persiste tra sessioni private |
 | Brute-force GPU su DB rubato | PBKDF2 non è memory-hard (Argon2id sarebbe più resistente) |
+| Mittente non autenticato nello share | Nessuna firma Ed25519 in v1 — chiunque con la pubkey del destinatario può inviare |
+| Sostituzione chiave pubblica nel link invito | TOFU — l'utente deve verificare il fingerprint out-of-band |
+| Invite link non scade | Nessun meccanismo di revoca o TTL in v1 |
 
 ---
 
@@ -231,14 +274,17 @@ src/
 │
 ├── pages/
 │   ├── LoginPage.jsx              # Unlock con password (+ 2FA biometrico)
-│   ├── SignUpPage.jsx             # Setup master password (prima volta)
+│   ├── SignUpPage.jsx             # Setup guidato: nuovo dispositivo | ripristina da file/Drive
 │   ├── MainPage.jsx               # Vault — lista profili con ricerca/ordinamento
-│   ├── ProfileDetailPage.jsx      # Visualizzazione profilo + OTP + allegati
+│   ├── ProfileDetailPage.jsx      # Visualizzazione profilo + OTP + allegati + share ECDH
 │   ├── ProfileFormPage.jsx        # Creazione / modifica profilo
 │   ├── PasswordGeneratorPage.jsx  # Generatore password e passphrase
 │   ├── PasswordHealthPage.jsx     # Analisi sicurezza password (HIBP + duplicati + forza)
 │   ├── SettingsPage.jsx           # Impostazioni (biometria, sync, auto-lock, tema)
-│   └── ImportPage.jsx             # Import da database legacy
+│   ├── ImportPage.jsx             # Import da database legacy
+│   ├── ContactsPage.jsx           # Rubrica contatti + identità + invite link
+│   ├── InvitePage.jsx             # Pagina pubblica riscatto invite link
+│   └── ReceivePage.jsx            # Pagina pubblica ricezione profilo cifrato
 │
 ├── components/
 │   ├── Sidebar.jsx                # Navigazione desktop + mobile bottom nav
@@ -255,7 +301,8 @@ src/
 │
 ├── services/
 │   ├── cryptoService.js           # PBKDF2, AES-GCM, HKDF, HMAC, blob encryption con AAD
-│   ├── databaseService.js         # IndexedDB (Dexie), export/import v2, validazione
+│   ├── databaseService.js         # IndexedDB (Dexie), export/import v3, validazione
+│   ├── contactsService.js         # Identità ECDH, rubrica, invite link, encrypt/decrypt profili
 │   ├── biometricService.js        # WebAuthn registration + assertion
 │   ├── healthCacheService.js      # Cache in-memoria per risultati Password Health
 │   ├── googledriveService.js      # OAuth2 + Drive API
@@ -276,7 +323,7 @@ src/
 
 ## Flusso di Autenticazione
 
-### Prima volta
+### Prima volta (nuovo dispositivo)
 
 ```
 Utente sceglie master password
@@ -352,7 +399,24 @@ isUnlocked = false
 }
 ```
 
-Il file è portabile: funziona su qualsiasi device con la stessa master password. L'import valida rigorosamente la struttura prima di sovrascrivere il database. Il formato v1 (senza allegati) è supportato in import per retrocompatibilità.
+Il file è portabile: funziona su qualsiasi device con la stessa master password. L'import valida rigorosamente la struttura prima di sovrascrivere il database.
+
+**Versioni supportate in import:** v1 (senza allegati), v2 (con allegati), v3 (con allegati + identità ECDH + contatti).
+
+**Formato v3** aggiunge:
+```json
+{
+  "version": 3,
+  "identity": {
+    "publicKey": "<base64url>",
+    "encryptedPrivateKey": { "iv": "...", "data": "..." },
+    "displayName": "Mario Rossi"
+  },
+  "contacts": [
+    { "name": "Alice", "publicKey": "<base64url>", "fingerprint": "AA:BB:CC:DD:EE:FF:11:22" }
+  ]
+}
+```
 
 ---
 
@@ -424,9 +488,15 @@ VITE_GOOGLE_API_KEY=your-api-key
 - [x] Allegati file cifrati per profilo
 - [x] HMAC v2 (integrità su profili + allegati)
 - [x] Content Security Policy (produzione)
+- [x] Identità crittografica ECDH P-256 per vault
+- [x] Rubrica contatti con fingerprint visivo
+- [x] Invite link (fragment URL, mai inviato al server)
+- [x] Condivisione profili cifrati (ECDH effimero + AES-256-GCM, forward secrecy)
+- [x] Export/Import v3 (include identità + contatti)
+- [x] Setup guidato al primo avvio (nuovo dispositivo o ripristino backup)
+- [ ] Firme Ed25519 per autenticazione mittente nello share (v2 protocollo)
 - [ ] Argon2id come KDF (più resistente a brute-force GPU)
 - [ ] Secret Key (entropia extra indipendente dalla password)
 - [ ] Export/Import da altri password manager (Bitwarden, 1Password CSV)
 - [ ] Campi personalizzati nella creazione profilo
-- [ ] Condivisione profili cifrati
 - [ ] Logging centralizzato

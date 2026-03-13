@@ -3,7 +3,7 @@
  * Gestisce routing e protezione route
  */
 
-import { lazy, Suspense, useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useTranslation } from 'react-i18next';
@@ -226,6 +226,16 @@ function AppRoutes() {
         skipBiometricSetup
     } = useAuth();
     const location = useLocation();
+    const navigate = useNavigate();
+    const wasUnlocked = useRef(false);
+
+    // Quando il vault si blocca (auto-lock o logout), torna alla root
+    useEffect(() => {
+        if (wasUnlocked.current && !isUnlocked) {
+            navigate('/', { replace: true });
+        }
+        wasUnlocked.current = isUnlocked;
+    }, [isUnlocked]);
 
     // Hook chiamato prima di qualsiasi return anticipato (Rules of Hooks)
     const [tutorialDone, setTutorialDone] = useState(

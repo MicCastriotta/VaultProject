@@ -56,6 +56,11 @@
   },
   "signup": {
     "letsBegin": "Iniziamo!",
+    "chooseSetupMode": "Come vuoi configurare OwnVault?",
+    "newDevice": "Nuovo dispositivo",
+    "newDeviceHint": "Crea un nuovo vault con una master password",
+    "restoreBackup": "Ripristina da backup",
+    "restoreBackupHint": "Importa un backup cifrato esistente",
     "choosePasswordHint": "Scegli una password che ricorderai. In caso di perdita non sarà possibile recuperare i dati!",
     "passwordStrength": "Forza password",
     "enterPasswordPlaceholder": "Inserisci password",
@@ -70,6 +75,24 @@
       "medium": "Media!",
       "strong": "Forte!",
       "veryStrong": "Molto Forte!"
+    },
+    "restore": {
+      "chooseSource": "Scegli come ripristinare il backup",
+      "fromFile": "Da file JSON",
+      "fromFileHint": "Seleziona un backup OwnVault (.json)",
+      "fromDrive": "Da Google Drive",
+      "fromDriveHint": "Connetti e scarica il backup automaticamente",
+      "readingFile": "Lettura file...",
+      "importing": "Importazione dati...",
+      "connectingDrive": "Connessione a Google Drive...",
+      "searchingBackup": "Ricerca backup...",
+      "downloading": "Download backup...",
+      "driveNoBackup": "Nessun backup OwnVault trovato su Google Drive",
+      "fileError": "Il file non è valido o è corrotto",
+      "driveError": "Ripristino da Google Drive fallito",
+      "errorTitle": "Ripristino fallito",
+      "tryAgain": "Riprova",
+      "fallbackToNew": "Configura come nuovo dispositivo"
     }
   },
   "tutorial": {
