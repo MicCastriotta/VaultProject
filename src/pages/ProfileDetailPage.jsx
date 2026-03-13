@@ -21,11 +21,15 @@ import {
     CreditCard,
     Paperclip,
     FileText,
-    Image
+    Image,
+    Send,
+    Share2,
+    AlertTriangle
 } from 'lucide-react';
 import { OTPDisplay } from '../components/OTPDisplay';
 import { IconRenderer } from '../components/IconRenderer';
 import { syncService } from '../services/syncService';
+import { contactsService } from '../services/contactsService';
 
 export function ProfileDetailPage() {
     const navigate = useNavigate();
@@ -38,6 +42,7 @@ export function ProfileDetailPage() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [attachmentMeta, setAttachmentMeta] = useState(null);
     const [isOpeningFile, setIsOpeningFile] = useState(false);
+    const [showShareSheet, setShowShareSheet] = useState(false);
 
     useEffect(() => {
         loadProfile();
@@ -221,6 +226,13 @@ export function ProfileDetailPage() {
                             <h1 className="text-2xl font-bold text-white">{t('profiles.details')}</h1>
                         </div>
                         <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowShareSheet(true)}
+                                className="p-2 text-gray-400 hover:bg-slate-700 rounded-lg transition-colors"
+                                title={t('share.send')}
+                            >
+                                <Send size={20} />
+                            </button>
                             <button
                                 onClick={() => navigate(`/profile/${id}/edit`)}
                                 className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
@@ -464,6 +476,15 @@ export function ProfileDetailPage() {
                 </div>{/* fine max-w-2xl */}
             </div>{/* fine h-full flex flex-col */}
 
+            {/* Share Sheet */}
+            {showShareSheet && (
+                <ShareContactSheet
+                    profile={profile}
+                    attachmentMeta={attachmentMeta}
+                    onClose={() => setShowShareSheet(false)}
+                />
+            )}
+
             {/* Delete Confirmation Modal */}
             {showDeleteConfirm && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
@@ -490,6 +511,153 @@ export function ProfileDetailPage() {
                 </div>
             )}
         </>
+    );
+}
+
+// ========================================
+// SHARE CONTACT SHEET
+// ========================================
+
+function ShareContactSheet({ profile, attachmentMeta, onClose }) {
+    const { t } = useTranslation();
+    const [contacts, setContacts] = useState([]);
+    const [selected, setSelected] = useState(null);
+    const [step, setStep] = useState('pick');   // pick | share
+    const [shareLink, setShareLink] = useState('');
+    const [copied, setCopied] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    useEffect(() => {
+        contactsService.getAllContacts().then(setContacts);
+    }, []);
+
+    function encodeBase64url(str) {
+        const bytes = new TextEncoder().encode(str);
+        let binary = '';
+        for (const b of bytes) binary += String.fromCharCode(b);
+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+
+    async function handleSelectContact(contact) {
+        setSelected(contact);
+        setIsGenerating(true);
+        try {
+            const { title, category, username, password, website, note, secretKey, icon, lastModified } = profile;
+            const payload = await contactsService.encryptProfileForContact(
+                { title, category, username, password, website, note, secretKey, icon, lastModified },
+                contact.publicKey
+            );
+            const encoded = encodeBase64url(JSON.stringify(payload));
+            setShareLink(`${window.location.origin}/receive#${encoded}`);
+            setStep('share');
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsGenerating(false);
+        }
+    }
+
+    async function handleCopy() {
+        await navigator.clipboard.writeText(shareLink);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    }
+
+    async function handleNativeShare() {
+        if (navigator.share) {
+            await navigator.share({ url: shareLink, title: 'OwnVault — ' + (profile.title || '') });
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative w-full max-w-sm mx-4 mb-6 md:mb-0 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
+
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-800">
+                    {step === 'share' ? (
+                        <button onClick={() => setStep('pick')} className="text-gray-400 hover:text-white transition text-sm">
+                            ← {t('common.back')}
+                        </button>
+                    ) : (
+                        <h2 className="text-base font-semibold text-white">{t('share.chooseContact')}</h2>
+                    )}
+                    {step === 'share' && (
+                        <h2 className="text-base font-semibold text-white">{t('share.send')}</h2>
+                    )}
+                    <button onClick={onClose} className="text-gray-500 hover:text-white transition text-sm">✕</button>
+                </div>
+
+                <div className="p-5">
+                    {attachmentMeta && (
+                        <div className="flex items-start gap-2 mb-4 px-3 py-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                            <AlertTriangle size={15} className="text-amber-400 shrink-0 mt-0.5" />
+                            <p className="text-xs text-amber-300">{t('share.attachmentNotIncluded')}</p>
+                        </div>
+                    )}
+                    {step === 'pick' ? (
+                        contacts.length === 0 ? (
+                            <div className="text-center py-8">
+                                <User size={32} className="mx-auto mb-3 text-gray-600" />
+                                <p className="text-gray-400 text-sm">{t('share.noContacts')}</p>
+                                <p className="text-gray-500 text-xs mt-1">{t('share.noContactsHint')}</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {contacts.map(c => (
+                                    <button
+                                        key={c.id}
+                                        onClick={() => handleSelectContact(c)}
+                                        disabled={isGenerating}
+                                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 transition disabled:opacity-50"
+                                    >
+                                        <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                                            <User size={16} className="text-blue-400" />
+                                        </div>
+                                        <div className="flex-1 min-w-0 text-left">
+                                            <p className="text-sm font-medium text-white truncate">{c.name}</p>
+                                            <p className="text-xs font-mono text-gray-500 truncate">{c.fingerprint}</p>
+                                        </div>
+                                        {isGenerating && selected?.id === c.id && (
+                                            <span className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                                        )}
+                                        {!isGenerating && <Send size={15} className="text-gray-500 flex-shrink-0" />}
+                                    </button>
+                                ))}
+                            </div>
+                        )
+                    ) : (
+                        <div>
+                            <p className="text-xs text-gray-400 mb-1">{t('share.sendingTo')}: <span className="text-white font-medium">{selected?.name}</span></p>
+                            <div className="p-3 bg-slate-800 rounded-xl mb-4 break-all">
+                                <p className="text-xs text-gray-300 font-mono line-clamp-3">{shareLink}</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleCopy}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium text-sm transition ${
+                                        copied ? 'bg-green-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-white'
+                                    }`}
+                                >
+                                    {copied ? <Check size={16} /> : <Copy size={16} />}
+                                    {copied ? t('contacts.copied') : t('contacts.copyLink')}
+                                </button>
+                                {navigator.share && (
+                                    <button
+                                        onClick={handleNativeShare}
+                                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium text-sm bg-blue-600 hover:bg-blue-500 text-white transition"
+                                    >
+                                        <Share2 size={16} />
+                                        {t('share.shareVia')}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 }
 

@@ -396,6 +396,27 @@
     "addError": "Error adding contact. Try again.",
     "inviteInvalid": "Invalid or expired invite link."
   },
+  "share": {
+    "send": "Send encrypted",
+    "chooseContact": "Send to...",
+    "sendingTo": "Sending to",
+    "noContacts": "No contacts yet",
+    "noContactsHint": "Add a contact first from the Contacts page.",
+    "shareVia": "Share via...",
+    "attachmentNotIncluded": "This profile has an attachment. The link will only include the profile data — the file will not be shared.",
+    "receivedTitle": "Encrypted profile received",
+    "encryptedProfile": "Encrypted profile",
+    "encryptedProfileHint": "Unlock your vault to decrypt and preview.",
+    "untitled": "Untitled",
+    "web": "Web credential",
+    "card": "Payment card",
+    "importButton": "Import into vault",
+    "importing": "Importing...",
+    "imported": "Profile imported!",
+    "importError": "Import failed. Try again.",
+    "decryptError": "Decryption failed. Wrong key or corrupted link.",
+    "invalidLink": "Invalid or corrupted share link."
+  },
   "storage": {
     "title": "Storage",
     "used": "Used",

@@ -59,6 +59,7 @@ const PasswordHealthPage = lazy(() => import('./pages/PasswordHealthPage').then(
 const ImportPage = lazy(() => import('./pages/ImportPage'));
 const ContactsPage = lazy(() => import('./pages/ContactsPage').then(m => ({ default: m.ContactsPage })));
 const InvitePage = lazy(() => import('./pages/InvitePage').then(m => ({ default: m.InvitePage })));
+const ReceivePage = lazy(() => import('./pages/ReceivePage').then(m => ({ default: m.ReceivePage })));
 
 // Spinner piccolo per transizioni interne (non sostituisce tutto lo schermo)
 const PageSpinner = () => (
@@ -175,6 +176,23 @@ function PendingInviteHandler() {
 }
 
 /**
+ * Processa un profilo ricevuto pendente salvato in sessionStorage prima del login.
+ * Reindirizza a /receive ripristinando il hash con il payload cifrato.
+ */
+function PendingReceiveHandler() {
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const hash = sessionStorage.getItem('ov_pending_receive');
+        if (!hash) return;
+        sessionStorage.removeItem('ov_pending_receive');
+        navigate('/receive' + hash);
+    }, []);
+
+    return null;
+}
+
+/**
  * Shell statico per le route autenticate.
  * AppLayout (sidebar + sfondo) rimane montato durante le navigazioni;
  * solo il contenuto interno sospende.
@@ -184,6 +202,7 @@ function AppShell({ showBiometricSetup, enableBiometric, skipBiometricSetup }) {
         <AppLayout>
             <SyncLaunchCheck />
             <PendingInviteHandler />
+            <PendingReceiveHandler />
             {showBiometricSetup && (
                 <BiometricSetupDialog
                     onEnable={enableBiometric}
@@ -230,6 +249,14 @@ function AppRoutes() {
         return (
             <Suspense fallback={<PageLoader />}>
                 <InvitePage />
+            </Suspense>
+        );
+    }
+
+    if (location.pathname === '/receive') {
+        return (
+            <Suspense fallback={<PageLoader />}>
+                <ReceivePage />
             </Suspense>
         );
     }

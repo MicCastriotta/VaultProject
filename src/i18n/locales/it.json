@@ -396,6 +396,27 @@
     "addError": "Errore nell'aggiunta del contatto. Riprova.",
     "inviteInvalid": "Link di invito non valido o scaduto."
   },
+  "share": {
+    "send": "Invia cifrato",
+    "chooseContact": "Invia a...",
+    "sendingTo": "Invio a",
+    "noContacts": "Nessun contatto",
+    "noContactsHint": "Aggiungi prima un contatto dalla pagina Contatti.",
+    "shareVia": "Condividi con...",
+    "attachmentNotIncluded": "Questo profilo ha un allegato. Il link includerà solo i dati del profilo — il file non verrà condiviso.",
+    "receivedTitle": "Profilo cifrato ricevuto",
+    "encryptedProfile": "Profilo cifrato",
+    "encryptedProfileHint": "Sblocca il vault per decifrare e visualizzare l'anteprima.",
+    "untitled": "Senza titolo",
+    "web": "Credenziale web",
+    "card": "Carta di pagamento",
+    "importButton": "Importa nel vault",
+    "importing": "Importazione...",
+    "imported": "Profilo importato!",
+    "importError": "Importazione fallita. Riprova.",
+    "decryptError": "Decifratura fallita. Chiave errata o link corrotto.",
+    "invalidLink": "Link di condivisione non valido o corrotto."
+  },
   "storage": {
     "title": "Storage",
     "used": "Usati",
