@@ -439,8 +439,9 @@
     "importError": "Import failed. Try again.",
     "decryptError": "Decryption failed. Wrong key or corrupted link.",
     "invalidLink": "Invalid or corrupted share link.",
-    "openInApp": "Open in OwnVault",
-    "iosNotice": "Your vault is in the installed OwnVault app. Tap the button and select OwnVault from the share sheet."
+    "openInApp": "Prepare for OwnVault",
+    "iosNotice": "Your vault is in the installed OwnVault app. Tap the button, then open OwnVault from your Home Screen.",
+    "iosCookieSet": "Ready! Open OwnVault from your Home Screen to complete the import."
   },
   "storage": {
     "title": "Storage",

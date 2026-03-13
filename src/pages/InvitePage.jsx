@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { UserPlus, ShieldCheck, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { contactsService } from '../services/contactsService';
+import { IosBridgePrompt } from '../components/IosBridgePrompt';
 
 const isIosNonStandalone = /iPhone|iPad|iPod/.test(navigator.userAgent)
     && !window.navigator.standalone;
@@ -84,15 +85,7 @@ export function InvitePage() {
                 ) : !isUnlocked ? (
                     <div>
                         {isIosNonStandalone && !userExists ? (
-                            <>
-                                <p className="text-sm text-gray-400 text-center mb-4">{t('share.iosNotice')}</p>
-                                <button
-                                    onClick={() => navigator.share({ url: window.location.href })}
-                                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition"
-                                >
-                                    {t('share.openInApp')}
-                                </button>
-                            </>
+                            <IosBridgePrompt cookieName="ov_cb_invite" />
                         ) : (
                             <>
                                 <p className="text-sm text-gray-400 text-center mb-4">
