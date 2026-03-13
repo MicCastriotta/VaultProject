@@ -439,8 +439,9 @@
     "importError": "Importazione fallita. Riprova.",
     "decryptError": "Decifratura fallita. Chiave errata o link corrotto.",
     "invalidLink": "Link di condivisione non valido o corrotto.",
-    "openInApp": "Apri in OwnVault",
-    "iosNotice": "Il tuo vault si trova nell'app OwnVault installata. Tocca il pulsante e seleziona OwnVault dallo share sheet."
+    "openInApp": "Prepara per OwnVault",
+    "iosNotice": "Il tuo vault è nell'app OwnVault installata. Tocca il pulsante, poi apri OwnVault dalla tua Home Screen.",
+    "iosCookieSet": "Pronto! Apri OwnVault dalla tua Home Screen per completare l'importazione."
   },
   "storage": {
     "title": "Storage",

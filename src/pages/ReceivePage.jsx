@@ -13,6 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { contactsService } from '../services/contactsService';
 import { cryptoService } from '../services/cryptoService';
 import { databaseService } from '../services/databaseService';
+import { IosBridgePrompt } from '../components/IosBridgePrompt';
 
 function parseReceiveHash(hash) {
     const raw = hash.startsWith('#') ? hash.slice(1) : hash;
@@ -179,15 +180,7 @@ export function ReceivePage() {
                 ) : !isUnlocked ? (
                     <div>
                         {isIosNonStandalone && !userExists ? (
-                            <>
-                                <p className="text-sm text-gray-400 text-center mb-4">{t('share.iosNotice')}</p>
-                                <button
-                                    onClick={() => navigator.share({ url: window.location.href })}
-                                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition"
-                                >
-                                    {t('share.openInApp')}
-                                </button>
-                            </>
+                            <IosBridgePrompt cookieName="ov_cb_receive" />
                         ) : (
                             <>
                                 <p className="text-sm text-gray-400 text-center mb-4">{t('contacts.loginRequired')}</p>

@@ -3,7 +3,7 @@
  * Prima volta: scegli tra nuovo dispositivo o ripristina backup
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { cryptoService } from '../services/cryptoService';
@@ -36,6 +36,14 @@ export function SignUpPage() {
     const [error, setError] = useState('');
 
     const fileInputRef = useRef(null);
+    const [isConnecting, setIsConnecting] = useState(false);
+
+    // Pre-carica GIS al mount: quando l'utente tocca "Da Google Drive",
+    // init() sarà già completata e requestAccessToken verrà chiamata
+    // nell'immediato user-gesture context (fix blocco popup su iOS Safari).
+    useEffect(() => {
+        googleDriveService.init().catch(() => {});
+    }, []);
 
     const strength = cryptoService.checkPasswordStrength(password);
     const strengthConfig = {
@@ -114,14 +122,22 @@ export function SignUpPage() {
     // ============================================================
 
     async function handleDriveRestore() {
+        // signIn() deve essere chiamata il prima possibile nel contesto user-gesture,
+        // senza await intermedi — altrimenti iOS Safari blocca il popup OAuth.
+        setIsConnecting(true);
+        try {
+            await googleDriveService.signIn();
+        } catch (err) {
+            setIsConnecting(false);
+            setRestoreError(err.message || t('signup.restore.driveError'));
+            setView('restore_error');
+            return;
+        }
+        setIsConnecting(false);
         setView('restoring');
-        setRestoringMsg(t('signup.restore.connectingDrive'));
+        setRestoringMsg(t('signup.restore.searchingBackup'));
 
         try {
-            await googleDriveService.init();
-            await googleDriveService.signIn();
-
-            setRestoringMsg(t('signup.restore.searchingBackup'));
             const file = await googleDriveService.findFile('ownvault-sync.json');
 
             if (!file) {
@@ -256,10 +272,14 @@ export function SignUpPage() {
 
                         <button
                             onClick={handleDriveRestore}
-                            className="w-full flex items-center gap-4 px-5 py-4 bg-slate-700/40 hover:bg-slate-700/60 border border-slate-600/40 rounded-2xl transition-colors text-left"
+                            disabled={isConnecting}
+                            className="w-full flex items-center gap-4 px-5 py-4 bg-slate-700/40 hover:bg-slate-700/60 border border-slate-600/40 rounded-2xl transition-colors text-left disabled:opacity-50"
                         >
                             <div className="p-2 bg-slate-600/40 rounded-xl shrink-0">
-                                <Cloud size={24} className="text-gray-300" />
+                                {isConnecting
+                                    ? <Loader size={24} className="text-gray-300 animate-spin" />
+                                    : <Cloud size={24} className="text-gray-300" />
+                                }
                             </div>
                             <div>
                                 <p className="font-semibold text-white">{t('signup.restore.fromDrive')}</p>
