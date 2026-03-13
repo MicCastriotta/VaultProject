@@ -31,10 +31,19 @@ class OwnVaultDB extends Dexie {
             attachments: '++id, profileId'
         });
 
+        this.version(4).stores({
+            config: 'id',
+            profiles: '++id, category, lastModified, *searchTerms',
+            syncConfig: 'id',
+            attachments: '++id, profileId',
+            contacts: '++id, fingerprint'
+        });
+
         this.config = this.table('config');
         this.profiles = this.table('profiles');
         this.syncConfig = this.table('syncConfig');
         this.attachments = this.table('attachments');
+        this.contacts = this.table('contacts');
     }
 }
 
@@ -209,22 +218,28 @@ class DatabaseService {
         await db.profiles.clear();
         await db.syncConfig.clear();
         await db.attachments.clear();
+        await db.contacts.clear();
     }
 
     /**
      * Esporta tutto (per backup)
+     * v3: aggiunge identity (keypair ECDH cifrato) e contacts
      */
     async exportData() {
         const config = await db.config.get('crypto');
+        const identity = await db.config.get('identity');
         const profiles = await db.profiles.toArray();
         const attachments = await db.attachments.toArray();
+        const contacts = await db.contacts.toArray();
 
         return {
-            version: 2,
+            version: 3,
             exportDate: new Date().toISOString(),
             crypto: config,
+            identity: identity || null,
             profiles,
-            attachments
+            attachments,
+            contacts
         };
     }
 
@@ -240,7 +255,7 @@ class DatabaseService {
         }
 
         // Verifica versione
-        if (data.version !== 1 && data.version !== 2) {
+        if (data.version !== 1 && data.version !== 2 && data.version !== 3) {
             throw new Error('Unsupported backup version: ' + data.version);
         }
 
@@ -335,6 +350,22 @@ class DatabaseService {
         };
         await db.config.put(cleanCrypto);
 
+        // Importa identity (keypair ECDH) — presente solo nei backup v3+
+        // La private key è già cifrata con la DEK: sicura da ripristinare così com'è.
+        if (
+            data.identity &&
+            typeof data.identity.publicKey === 'string' &&
+            data.identity.encryptedPrivateKey?.iv &&
+            data.identity.encryptedPrivateKey?.data
+        ) {
+            await db.config.put({
+                id: 'identity',
+                publicKey: data.identity.publicKey,
+                encryptedPrivateKey: data.identity.encryptedPrivateKey,
+                createdAt: data.identity.createdAt || new Date().toISOString()
+            });
+        }
+
         // Importa profiles — preserva gli ID originali per le FK degli allegati
         let profilesImported = 0;
         if (data.profiles && data.profiles.length > 0) {
@@ -427,13 +458,31 @@ class DatabaseService {
             }
         }
 
+        // Importa contatti — presenti solo nei backup v3+
+        let contactsImported = 0;
+        if (data.contacts && Array.isArray(data.contacts) && data.contacts.length > 0) {
+            const cleanContacts = data.contacts
+                .filter(c => c && typeof c.name === 'string' && typeof c.publicKey === 'string' && typeof c.fingerprint === 'string')
+                .map(c => ({
+                    name: c.name,
+                    publicKey: c.publicKey,
+                    fingerprint: c.fingerprint,
+                    createdAt: c.createdAt || new Date().toISOString()
+                }));
+            if (cleanContacts.length > 0) {
+                await db.contacts.bulkPut(cleanContacts);
+                contactsImported = cleanContacts.length;
+            }
+        }
+
         // Notifica i widget storage (Sidebar, MainPage) di aggiornare la stima
         window.dispatchEvent(new Event('storageChanged'));
 
         return {
             configImported: true,
             profilesImported,
-            attachmentsImported
+            attachmentsImported,
+            contactsImported
         };
     }
 

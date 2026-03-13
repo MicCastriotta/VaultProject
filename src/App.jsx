@@ -4,7 +4,7 @@
  */
 
 import { lazy, Suspense, useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useTranslation } from 'react-i18next';
 import { CheckCircle, AlertTriangle, Cloud } from 'lucide-react';
@@ -16,6 +16,7 @@ import { SyncConflictDialog } from './components/SyncConflictDialog';
 import { AppLayout } from './layouts/AppLayout';
 import { InstallPrompt } from './components/InstallPrompt';
 import { syncService } from './services/syncService';
+import { contactsService } from './services/contactsService';
 
 /* global __APP_VERSION__ */
 
@@ -56,6 +57,8 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ defa
 const PasswordGeneratorPage = lazy(() => import('./pages/PasswordGeneratorPage').then(m => ({ default: m.PasswordGeneratorPage })));
 const PasswordHealthPage = lazy(() => import('./pages/PasswordHealthPage').then(m => ({ default: m.PasswordHealthPage })));
 const ImportPage = lazy(() => import('./pages/ImportPage'));
+const ContactsPage = lazy(() => import('./pages/ContactsPage').then(m => ({ default: m.ContactsPage })));
+const InvitePage = lazy(() => import('./pages/InvitePage').then(m => ({ default: m.InvitePage })));
 
 // Spinner piccolo per transizioni interne (non sostituisce tutto lo schermo)
 const PageSpinner = () => (
@@ -147,6 +150,31 @@ function SyncLaunchCheck() {
 }
 
 /**
+ * Processa un invite pendente salvato in sessionStorage prima del login.
+ * Scatta una sola volta dopo che il vault viene sbloccato.
+ */
+function PendingInviteHandler() {
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const raw = sessionStorage.getItem('ov_pending_invite');
+        if (!raw) return;
+        sessionStorage.removeItem('ov_pending_invite');
+        try {
+            const payload = JSON.parse(raw);
+            contactsService
+                .addContact({ name: payload.name, publicKey: payload.publicKey })
+                .then(() => navigate('/contacts'))
+                .catch(console.error);
+        } catch {
+            // payload malformato, ignora
+        }
+    }, []);
+
+    return null;
+}
+
+/**
  * Shell statico per le route autenticate.
  * AppLayout (sidebar + sfondo) rimane montato durante le navigazioni;
  * solo il contenuto interno sospende.
@@ -155,6 +183,7 @@ function AppShell({ showBiometricSetup, enableBiometric, skipBiometricSetup }) {
     return (
         <AppLayout>
             <SyncLaunchCheck />
+            <PendingInviteHandler />
             {showBiometricSetup && (
                 <BiometricSetupDialog
                     onEnable={enableBiometric}
@@ -193,6 +222,14 @@ function AppRoutes() {
         return (
             <Suspense fallback={<PageLoader />}>
                 <PrivacyPage />
+            </Suspense>
+        );
+    }
+
+    if (location.pathname === '/invite') {
+        return (
+            <Suspense fallback={<PageLoader />}>
+                <InvitePage />
             </Suspense>
         );
     }
@@ -257,6 +294,7 @@ function AppRoutes() {
                     <Route path="/profile/new" element={<ProfileFormPage />} />
                     <Route path="/profile/:id" element={<ProfileDetailPage />} />
                     <Route path="/profile/:id/edit" element={<ProfileFormPage />} />
+                    <Route path="/contacts" element={<ContactsPage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>
             </Routes>
