@@ -52,7 +52,7 @@
     "unlockVault": "Sblocca Vault",
     "biometricHint": "La verifica biometrica verrà richiesta automaticamente dopo la password",
     "e2eEncryption": "Crittografia End-to-End",
-    "storageWarning": "I dati sono salvati nel browser di questo dispositivo. Cancellare la cache o lo storage del browser senza un backup può causare la perdita irreversibile di tutti di dati."
+    "storageWarning": "I dati sono salvati nel browser di questo dispositivo. Cancellare la cache o lo storage del browser senza un backup può causare la perdita irreversibile di tutti i dati."
   },
   "signup": {
     "letsBegin": "Iniziamo!",
