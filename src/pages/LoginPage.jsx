@@ -1,16 +1,27 @@
 /**
  * Login Page
- * Unlock con password o biometria
+ * Unlock con password o biometria.
+ *
+ * iOS clipboard bridge: al tap del bottone di sblocco (gesto utente),
+ * avvia in parallelo la lettura della clipboard. Se dopo lo sblocco
+ * la clipboard contiene un link /receive o /invite, naviga direttamente.
+ * Il permesso viene richiesto da iOS una sola volta.
  */
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Eye, EyeOff, AlertTriangle, Info } from 'lucide-react';
+
+// Rileva iOS PWA standalone (differente da Safari normale)
+const isIosStandalone = /iPhone|iPad|iPod/.test(navigator.userAgent)
+    && window.navigator.standalone === true;
 
 export function LoginPage() {
     const { login, biometricEnabled } = useAuth();
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -29,14 +40,40 @@ export function LoginPage() {
 
         setIsLoading(true);
 
+        // Su iOS standalone: avvia lettura clipboard DURANTE il gesto utente
+        // (prima di qualsiasi await, così iOS considera la chiamata sincronizzata al tap)
+        const clipboardPromise = (isIosStandalone && navigator.clipboard)
+            ? navigator.clipboard.readText().catch(() => null)
+            : Promise.resolve(null);
+
         try {
             const result = await login(password);
 
             if (!result.success) {
                 setError(result.error === 'Wrong password' ? t('auth.wrongPassword') : result.error);
+                return;
             }
-            // Se successo, AuthContext reindirizza automaticamente
-        } catch (err) {
+
+            // Login riuscito: verifica se la clipboard contiene un link compatibile
+            const clipText = await clipboardPromise;
+            if (clipText) {
+                try {
+                    const url = new URL(clipText.trim());
+                    if (url.pathname === '/receive' && url.hash) {
+                        navigate('/receive' + url.hash, { replace: true });
+                        return;
+                    }
+                    if (url.pathname === '/invite' && url.hash) {
+                        navigate('/invite' + url.hash, { replace: true });
+                        return;
+                    }
+                } catch {
+                    // non è un URL valido, ignora
+                }
+            }
+
+            // Nessun link in clipboard: AuthContext gestisce la navigazione normale
+        } catch {
             setError(t('auth.unexpectedError'));
         } finally {
             setIsLoading(false);
@@ -115,6 +152,16 @@ export function LoginPage() {
                         )}
                     </form>
                 </div>
+
+                {/* Hint permesso clipboard (solo iOS PWA) */}
+                {isIosStandalone && (
+                    <div className="mt-4 flex items-start gap-2 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
+                        <Info size={14} className="text-blue-400 mt-0.5 flex-shrink-0" />
+                        <p className="text-xs text-gray-400 leading-relaxed">
+                            {t('login.iosClipboardHint')}
+                        </p>
+                    </div>
+                )}
 
                 {/* Avviso storage browser */}
                 <div className="mt-4 flex items-start gap-2 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">

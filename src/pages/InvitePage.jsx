@@ -84,8 +84,8 @@ export function InvitePage() {
                     <p className="text-center text-red-400 text-sm py-3">{t('contacts.addError')}</p>
                 ) : !isUnlocked ? (
                     <div>
-                        {isIosNonStandalone && !userExists ? (
-                            <IosBridgePrompt cookieName="ov_cb_invite" />
+                        {isIosNonStandalone ? (
+                            <IosBridgePrompt />
                         ) : (
                             <>
                                 <p className="text-sm text-gray-400 text-center mb-4">

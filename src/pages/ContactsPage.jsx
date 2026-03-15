@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, UserPlus, Copy, Check, Trash2, User, Pencil } from 'lucide-react';
+import { ArrowLeft, UserPlus, Copy, Check, Trash2, User, Pencil, Share2 } from 'lucide-react';
 import { contactsService } from '../services/contactsService';
 
 export function ContactsPage() {
@@ -79,6 +79,14 @@ export function ContactsPage() {
         await navigator.clipboard.writeText(inviteLink);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+    }
+
+    async function handleShare() {
+        try {
+            await navigator.share({ url: inviteLink });
+        } catch {
+            // utente ha annullato o share non disponibile
+        }
     }
 
     async function handleDelete(id) {
@@ -207,17 +215,27 @@ export function ContactsPage() {
                         <div className="p-3 bg-slate-800 rounded-xl mb-4 break-all">
                             <p className="text-xs text-gray-300 font-mono">{inviteLink}</p>
                         </div>
-                        <button
-                            onClick={handleCopy}
-                            className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition ${
-                                copied
-                                    ? 'bg-green-600 text-white'
-                                    : 'bg-blue-600 hover:bg-blue-500 text-white'
-                            }`}
-                        >
-                            {copied ? <Check size={18} /> : <Copy size={18} />}
-                            {copied ? t('contacts.copied') : t('contacts.copyLink')}
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleCopy}
+                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition ${
+                                    copied
+                                        ? 'bg-green-600 text-white'
+                                        : 'bg-blue-600 hover:bg-blue-500 text-white'
+                                }`}
+                            >
+                                {copied ? <Check size={18} /> : <Copy size={18} />}
+                                {copied ? t('contacts.copied') : t('contacts.copyLink')}
+                            </button>
+                            {navigator.share && (
+                                <button
+                                    onClick={handleShare}
+                                    className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-medium transition"
+                                >
+                                    <Share2 size={18} />
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
