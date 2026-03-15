@@ -52,7 +52,8 @@
     "unlockVault": "Unlock Vault",
     "biometricHint": "Biometric verification will be requested automatically after your password",
     "e2eEncryption": "End-to-End Encryption",
-    "storageWarning": "Data is stored in this device's browser. Clearing browser cache or storage may cause irreversible loss of all your data."
+    "storageWarning": "Data is stored in this device's browser. Clearing browser cache or storage may cause irreversible loss of all your data.",
+    "iosClipboardHint": "When tapping 'Unlock Vault', iOS may ask for permission to access the clipboard. This is needed to receive encrypted profiles and contact requests shared by other users."
   },
   "signup": {
     "letsBegin": "Let's begin!",
@@ -439,9 +440,9 @@
     "importError": "Import failed. Try again.",
     "decryptError": "Decryption failed. Wrong key or corrupted link.",
     "invalidLink": "Invalid or corrupted share link.",
-    "openInApp": "Prepare for OwnVault",
-    "iosNotice": "Your vault is in the installed OwnVault app. Tap the button, then open OwnVault from your Home Screen.",
-    "iosCookieSet": "Ready! Open OwnVault from your Home Screen to complete the import."
+    "copyLink": "Copy link",
+    "iosNotice": "Have OwnVault installed? Copy the link, open it from your Home Screen and unlock the vault.",
+    "iosCopied": "Link copied! Open OwnVault from your Home Screen and unlock the vault to complete the import."
   },
   "storage": {
     "title": "Storage",
