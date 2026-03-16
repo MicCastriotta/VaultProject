@@ -106,6 +106,12 @@ class BiometricService {
     async registerWithPRF() {
         if (!this.isSupported) throw new Error('WebAuthn not supported');
 
+        // Su Android: residentKey 'required' forza il passkey sul dispositivo locale,
+        // impedendo il salvataggio su Google Password Manager (i passkey GPM non supportano PRF).
+        // Su desktop (Windows Hello, macOS Touch ID): 'preferred' mantiene il comportamento
+        // originale che funziona correttamente senza vincoli aggiuntivi.
+        const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+
         try {
             // ---- Step 1: crea il credenziale con PRF extension ----
             const challenge = new Uint8Array(32);
@@ -127,11 +133,7 @@ class BiometricService {
                     authenticatorSelection: {
                         authenticatorAttachment: 'platform',
                         userVerification: 'required',
-                        // residentKey: 'required' forza un credential residente sul dispositivo.
-                        // È il prerequisito per PRF su Android: i passkey cloud (Google Password
-                        // Manager) non supportano l'estensione PRF. Con 'required' il passkey
-                        // viene sempre salvato localmente e PRF funziona correttamente.
-                        residentKey: 'required'
+                        residentKey: isMobile ? 'required' : 'preferred'
                     },
                     timeout: 60000,
                     attestation: 'none',
@@ -146,25 +148,28 @@ class BiometricService {
             const credentialId = this.arrayBufferToBase64(credential.rawId);
             const transports = credential.response.getTransports?.() ?? ['internal'];
 
-            // ---- Verifica PRF dopo create() ----
-            // Se prf.enabled non è true, il credential non supporta PRF:
-            // saltiamo il secondo prompt biometrico e segnaliamo il fallback.
-            const createPrfResult = credential.getClientExtensionResults?.()?.prf;
-            if (!createPrfResult?.enabled) {
-                return {
-                    version: 3,
-                    credentialId,
-                    transports,
-                    prfOutput: null,
-                    prfSupported: false,
-                    registeredAt: Date.now()
-                };
+            // ---- Verifica PRF dopo create() (solo mobile) ----
+            // Su Android, prf.enabled=false/assente indica passkey GPM non compatibile con PRF.
+            // Su desktop Chrome non popola sempre prf.enabled in create(), quindi skippare
+            // il check evita falsi negativi su Windows Hello / macOS Touch ID.
+            if (isMobile) {
+                const createPrfResult = credential.getClientExtensionResults?.()?.prf;
+                if (!createPrfResult?.enabled) {
+                    return {
+                        version: 3,
+                        credentialId,
+                        transports,
+                        prfOutput: null,
+                        prfSupported: false,
+                        registeredAt: Date.now()
+                    };
+                }
             }
 
             // ---- Step 2: ottieni l'output PRF tramite get() ----
             // create() non restituisce prf.results.first (solo prf.enabled=true).
             // L'output deterministico è disponibile solo durante l'autenticazione.
-            const authResult = await this.authenticateWithPRF(credentialId, ['internal']);
+            const authResult = await this.authenticateWithPRF(credentialId);
 
             return {
                 version: 3,
