@@ -376,6 +376,19 @@ class DatabaseService {
                 .map(a => [a.profileId, { iv: a.iv, encryptedData: a.encryptedData }])
         );
 
+        // Salva i record device-local prima di cancellare il DB.
+        // Vengono ripristinati dopo l'import SOLO se il backup appartiene allo stesso vault
+        // (salt + encryptedDEK identici → stessa chiave → stessi dati).
+        // Se il vault è diverso (backup da altro device) non vengono ripristinati.
+        //
+        // - deviceSecret: wrappedDSK cifrato con PRF hardware, inutile su altri device
+        // - biometric:    credentialId specifico del device, non funziona altrove
+        // - integrity:    HMAC non incluso: se assente, verifyHMAC ritorna firstRun=true
+        //                 e lo ricalcola automaticamente al primo login → nessun problema
+        const localDeviceSecret = await db.config.get('deviceSecret');
+        const localBiometric    = await db.config.get('biometric');
+        const localCrypto       = await db.config.get('crypto');
+
         // Pulisci DB
         await this.deleteAllData();
 
@@ -394,6 +407,21 @@ class DatabaseService {
             ...(data.crypto.deviceSecretEnabled ? { deviceSecretEnabled: true } : {})
         };
         await db.config.put(cleanCrypto);
+
+        // Ripristina deviceSecret locale se il vault importato è lo stesso.
+        // Condizione: salt e encryptedDEK identici → la DSK locale è ancora valida.
+        // Se il vault è diverso (backup da altro device con DSK diversa), il record
+        // non viene ripristinato e il login chiederà recovery key / QR approval.
+        const isSameVault = localCrypto &&
+            localCrypto.salt === data.crypto.salt &&
+            localCrypto.encryptedDEK === data.crypto.encryptedDEK;
+
+        if (isSameVault && localDeviceSecret) {
+            await db.config.put(localDeviceSecret);
+        }
+        if (isSameVault && localBiometric) {
+            await db.config.put(localBiometric);
+        }
 
         // Importa identity (keypair ECDH) — presente solo nei backup v3+
         // La private key è già cifrata con la DEK: sicura da ripristinare così com'è.
