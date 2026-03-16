@@ -18,7 +18,7 @@ import { biometricService } from '../services/biometricService';
 import { deviceSecretService } from '../services/deviceSecretService';
 import { BiometricSetupDialog } from '../components/BiometricSetupDialog';
 import { DeviceSecretSetupDialog } from '../components/DeviceSecretSetupDialog';
-import { DeviceApprovalSender } from '../components/DeviceApprovalDialog';
+import { DeviceApprovalSender, DeviceApprovalReceiver } from '../components/DeviceApprovalDialog';
 
 export function BiometricSettingsSection() {
     const {
@@ -47,6 +47,7 @@ export function BiometricSettingsSection() {
     const [showReEnroll, setShowReEnroll]       = useState(false);
     const [reEnrollKey, setReEnrollKey]         = useState('');
     const [reEnrollError, setReEnrollError]     = useState('');
+    const [showReEnrollQR, setShowReEnrollQR]   = useState(false);
 
     useEffect(() => {
         loadBiometricType();
@@ -88,7 +89,6 @@ export function BiometricSettingsSection() {
             setReEnrollError(t('deviceSecret.login.recoveryKeyRequired'));
             return;
         }
-        const { deviceSecretService } = await import('../services/deviceSecretService');
         const dskBytes = deviceSecretService.parseRecoveryKey(key);
         if (!dskBytes) {
             setReEnrollError(t('deviceSecret.login.recoveryKeyHint'));
@@ -107,6 +107,23 @@ export function BiometricSettingsSection() {
             }
         } catch (err) {
             setReEnrollError(err.message || 'Unexpected error');
+        } finally {
+            setIsProcessing(false);
+        }
+    }
+
+    async function handleReEnrollQRApproved(dskBytes) {
+        setShowReEnrollQR(false);
+        setIsProcessing(true);
+        try {
+            const result = await enrollBiometricAfterRecovery(dskBytes);
+            if (result.success) {
+                setMessage({ type: 'success', text: t('settings.biometric.enabledOk', { type: biometricType }) });
+            } else {
+                setMessage({ type: 'error', text: result.error || t('settings.biometric.enableError') });
+            }
+        } catch (err) {
+            setMessage({ type: 'error', text: err.message || 'Unexpected error' });
         } finally {
             setIsProcessing(false);
         }
@@ -367,8 +384,29 @@ export function BiometricSettingsSection() {
                                 }
                             </button>
                         </div>
+                        <div className="flex items-center gap-3">
+                            <div className="flex-1 h-px bg-slate-700" />
+                            <span className="text-xs text-slate-500">{t('auth.or')}</span>
+                            <div className="flex-1 h-px bg-slate-700" />
+                        </div>
+                        <button
+                            onClick={() => { setShowReEnroll(false); setShowReEnrollQR(true); }}
+                            disabled={isProcessing}
+                            className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-gray-300 rounded-xl font-medium flex items-center justify-center gap-2"
+                        >
+                            <Smartphone size={16} />
+                            {t('deviceSecret.settings.reEnrollViaQR')}
+                        </button>
                     </div>
                 </div>
+            )}
+
+            {/* Re-enroll tramite QR (DeviceApprovalReceiver) */}
+            {showReEnrollQR && (
+                <DeviceApprovalReceiver
+                    onApproved={handleReEnrollQRApproved}
+                    onClose={() => setShowReEnrollQR(false)}
+                />
             )}
 
             {/* Device Approval (sender) */}

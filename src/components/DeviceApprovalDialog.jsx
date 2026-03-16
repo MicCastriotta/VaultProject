@@ -60,7 +60,7 @@ export function DeviceApprovalSender({ onClose }) {
                 return;
             }
 
-            const prfResult = await biometricService.authenticateWithPRF(biometricConfig.credentialId);
+            const prfResult = await biometricService.authenticateWithPRF(biometricConfig.credentialId, biometricConfig.transports);
             if (!prfResult.success || !prfResult.prfOutput) {
                 setError(t('deviceApproval.sender.biometricFailed'));
                 setStep('auth');

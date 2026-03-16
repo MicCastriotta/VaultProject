@@ -194,8 +194,6 @@ export function AuthProvider({ children }) {
             setIsUnlocked(true);
             setUserExists(true);
 
-            if (biometricAvailable) setShowBiometricSetup(true);
-
             return { success: true };
         } catch (error) {
             console.error('Setup error:', error);
@@ -247,7 +245,7 @@ export function AuthProvider({ children }) {
 
                 let prfOutput;
                 try {
-                    const prfResult = await biometricService.authenticateWithPRF(biometricConfig.credentialId);
+                    const prfResult = await biometricService.authenticateWithPRF(biometricConfig.credentialId, biometricConfig.transports);
                     if (!prfResult.success || !prfResult.prfOutput) {
                         cryptoService.lock();
                         return { success: false, error: 'Biometric authentication failed' };
@@ -501,6 +499,7 @@ export function AuthProvider({ children }) {
             await databaseService.saveBiometricConfig({
                 version: 3,
                 credentialId: regResult.credentialId,
+                transports: regResult.transports,
                 registeredAt: regResult.registeredAt
             });
 
@@ -617,6 +616,7 @@ export function AuthProvider({ children }) {
             await databaseService.saveBiometricConfig({
                 version: 3,
                 credentialId: regResult.credentialId,
+                transports: regResult.transports,
                 registeredAt: regResult.registeredAt
             });
 
@@ -628,6 +628,7 @@ export function AuthProvider({ children }) {
 
             setBiometricEnabled(true);
             setDeviceSecretLocallyAvailable(true);
+            setLoginRequiresRecoveryKey(false);
             securityLog('Biometric enrolled after recovery');
             return { success: true };
         } catch (error) {
@@ -687,13 +688,17 @@ export function AuthProvider({ children }) {
     // LOGOUT / RESET
     // ========================================
 
-    function logout() {
+    async function logout() {
         if (autoLockTimer.current) autoLockTimer.current.stop();
         cryptoService.lock();
         hibpService.clearCache();
         healthCache.clear();
         setIsUnlocked(false);
         setIntegrityError(null);
+        // Rilegge da IndexedDB: garantisce che loginRequiresRecoveryKey e biometricEnabled
+        // siano aggiornati dopo qualsiasi operazione (import, re-enroll, disable DSK).
+        await checkBiometricStatus();
+        await checkDeviceSecretStatus();
     }
 
     async function resetAll() {

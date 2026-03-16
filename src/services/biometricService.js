@@ -140,15 +140,19 @@ class BiometricService {
             if (!credential) throw new Error('Failed to create credential');
 
             const credentialId = this.arrayBufferToBase64(credential.rawId);
+            // getTransports() indica a Chrome quale authenticator usare nell'autenticazione
+            // (es. ['internal'] per platform). Senza questo, Chrome mostra il cross-device picker.
+            const transports = credential.response.getTransports?.() ?? ['internal'];
 
             // ---- Step 2: ottieni l'output PRF tramite get() ----
             // create() spesso non restituisce prf.results.first (solo prf.enabled=true).
             // L'output deterministico è disponibile solo durante l'autenticazione.
-            const authResult = await this.authenticateWithPRF(credentialId);
+            const authResult = await this.authenticateWithPRF(credentialId, transports);
 
             return {
                 version: 3,
                 credentialId,
+                transports,
                 prfOutput: authResult.prfOutput,
                 prfSupported: !!authResult.prfOutput,
                 registeredAt: Date.now()
@@ -168,7 +172,7 @@ class BiometricService {
      *   { success: true, prfOutput: Uint8Array }
      *   { success: false, prfOutput: null }  — se PRF non supportata dal device
      */
-    async authenticateWithPRF(credentialId) {
+    async authenticateWithPRF(credentialId, transports) {
         if (!this.isSupported) throw new Error('WebAuthn not supported');
         if (!credentialId) throw new Error('No biometric credentials configured');
 
@@ -176,14 +180,19 @@ class BiometricService {
             const challenge = new Uint8Array(32);
             crypto.getRandomValues(challenge);
 
+            const credentialDescriptor = {
+                type: 'public-key',
+                id: this.base64ToArrayBuffer(credentialId),
+                // transports indica a Chrome dove cercare il credential (es. ['internal'] = Windows Hello / Touch ID).
+                // Senza questo Chrome mostra il picker cross-device (Android Bluetooth, USB passkey).
+                ...(transports?.length ? { transports } : {})
+            };
+
             const assertion = await navigator.credentials.get({
                 publicKey: {
                     challenge,
                     rpId: RP_ID,
-                    allowCredentials: [{
-                        type: 'public-key',
-                        id: this.base64ToArrayBuffer(credentialId)
-                    }],
+                    allowCredentials: [credentialDescriptor],
                     userVerification: 'required',
                     timeout: 60000,
                     extensions: {

@@ -631,7 +631,8 @@
       "reEnrollTitle": "Registra biometria su questo dispositivo",
       "reEnrollDescription": "Il vault ha già un Device Secret attivo. Inserisci la Recovery Key per registrare la biometria su questo dispositivo senza generare una nuova chiave.",
       "reEnrollBtn": "Registra biometria",
-      "reEnrollEnrolling": "Registrazione in corso..."
+      "reEnrollEnrolling": "Registrazione in corso...",
+      "reEnrollViaQR": "Approva tramite QR da un altro dispositivo"
     },
 
     "login": {
