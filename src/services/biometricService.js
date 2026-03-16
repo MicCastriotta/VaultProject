@@ -127,7 +127,11 @@ class BiometricService {
                     authenticatorSelection: {
                         authenticatorAttachment: 'platform',
                         userVerification: 'required',
-                        requireResidentKey: false
+                        // residentKey: 'required' forza un credential residente sul dispositivo.
+                        // È il prerequisito per PRF su Android: i passkey cloud (Google Password
+                        // Manager) non supportano l'estensione PRF. Con 'required' il passkey
+                        // viene sempre salvato localmente e PRF funziona correttamente.
+                        residentKey: 'required'
                     },
                     timeout: 60000,
                     attestation: 'none',
@@ -140,14 +144,27 @@ class BiometricService {
             if (!credential) throw new Error('Failed to create credential');
 
             const credentialId = this.arrayBufferToBase64(credential.rawId);
-            // getTransports() indica a Chrome quale authenticator usare nell'autenticazione
-            // (es. ['internal'] per platform). Senza questo, Chrome mostra il cross-device picker.
             const transports = credential.response.getTransports?.() ?? ['internal'];
 
+            // ---- Verifica PRF dopo create() ----
+            // Se prf.enabled non è true, il credential non supporta PRF:
+            // saltiamo il secondo prompt biometrico e segnaliamo il fallback.
+            const createPrfResult = credential.getClientExtensionResults?.()?.prf;
+            if (!createPrfResult?.enabled) {
+                return {
+                    version: 3,
+                    credentialId,
+                    transports,
+                    prfOutput: null,
+                    prfSupported: false,
+                    registeredAt: Date.now()
+                };
+            }
+
             // ---- Step 2: ottieni l'output PRF tramite get() ----
-            // create() spesso non restituisce prf.results.first (solo prf.enabled=true).
+            // create() non restituisce prf.results.first (solo prf.enabled=true).
             // L'output deterministico è disponibile solo durante l'autenticazione.
-            const authResult = await this.authenticateWithPRF(credentialId, transports);
+            const authResult = await this.authenticateWithPRF(credentialId, ['internal']);
 
             return {
                 version: 3,
@@ -172,7 +189,7 @@ class BiometricService {
      *   { success: true, prfOutput: Uint8Array }
      *   { success: false, prfOutput: null }  — se PRF non supportata dal device
      */
-    async authenticateWithPRF(credentialId, transports) {
+    async authenticateWithPRF(credentialId) {
         if (!this.isSupported) throw new Error('WebAuthn not supported');
         if (!credentialId) throw new Error('No biometric credentials configured');
 
@@ -183,9 +200,9 @@ class BiometricService {
             const credentialDescriptor = {
                 type: 'public-key',
                 id: this.base64ToArrayBuffer(credentialId),
-                // transports indica a Chrome dove cercare il credential (es. ['internal'] = Windows Hello / Touch ID).
-                // Senza questo Chrome mostra il picker cross-device (Android Bluetooth, USB passkey).
-                ...(transports?.length ? { transports } : {})
+                // I credential PRF sono sempre platform/internal (residentKey: 'required').
+                // Forzare ['internal'] evita il picker cross-device di Chrome su Windows/Android.
+                transports: ['internal']
             };
 
             const assertion = await navigator.credentials.get({
