@@ -2,32 +2,60 @@
  * Login Page
  * Unlock con password o biometria.
  *
+ * Gestisce tre flussi di login:
+ *   1. Standard      : solo master password
+ *   2. Recovery Key  : master password + recovery key OV-XXXX (DSK abilitata, nuovo device)
+ *   3. Device QR     : approvazione da vecchio device via QR+PIN
+ *
  * iOS clipboard bridge: al tap del bottone di sblocco (gesto utente),
  * avvia in parallelo la lettura della clipboard. Se dopo lo sblocco
  * la clipboard contiene un link /receive o /invite, naviga direttamente.
- * Il permesso viene richiesto da iOS una sola volta.
  */
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, AlertTriangle, Info } from 'lucide-react';
+import { Eye, EyeOff, AlertTriangle, Info, KeyRound, QrCode, Fingerprint } from 'lucide-react';
+import { DeviceApprovalReceiver } from '../components/DeviceApprovalDialog';
 
-// Rileva iOS PWA standalone (differente da Safari normale)
 const isIosStandalone = /iPhone|iPad|iPod/.test(navigator.userAgent)
     && window.navigator.standalone === true;
 
 export function LoginPage() {
-    const { login, biometricEnabled } = useAuth();
+    const {
+        login,
+        loginWithRecoveryKey,
+        loginWithApprovedDSK,
+        enrollBiometricAfterRecovery,
+        biometricEnabled,
+        biometricAvailable,
+        loginRequiresRecoveryKey,
+        deviceSecretEnabled
+    } = useAuth();
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const [password, setPassword] = useState('');
+
+    const [password, setPassword]     = useState('');
     const [showPassword, setShowPassword] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
+    const [recoveryKey, setRecoveryKey]   = useState('');
+    const [isLoading, setIsLoading]       = useState(false);
+    const [error, setError]               = useState('');
+
+    // Dopo recovery/QR: offrire iscrizione biometria
+    const [offerBiometric, setOfferBiometric]       = useState(false);
+    const [pendingDSKBytes, setPendingDSKBytes]      = useState(null);
+    const [isEnrolling, setIsEnrolling]             = useState(false);
+
+    // QR device approval (receiver)
+    const [showQRApproval, setShowQRApproval]       = useState(false);
 
     const version = __APP_VERSION__;
+
+    // Determina se mostrare il campo recovery key:
+    // - se il server ci ha detto che serve (loginRequiresRecoveryKey)
+    // - oppure se l'utente ha già scelto di usarla
+    const showRecoveryKeyField = loginRequiresRecoveryKey || (deviceSecretEnabled && recoveryKey.length > 0);
 
     async function handleSubmit(e) {
         e.preventDefault();
@@ -40,39 +68,42 @@ export function LoginPage() {
 
         setIsLoading(true);
 
-        // Su iOS standalone: avvia lettura clipboard DURANTE il gesto utente
-        // (prima di qualsiasi await, così iOS considera la chiamata sincronizzata al tap)
         const clipboardPromise = (isIosStandalone && navigator.clipboard)
             ? navigator.clipboard.readText().catch(() => null)
             : Promise.resolve(null);
 
         try {
-            const result = await login(password);
+            let result;
+
+            if (loginRequiresRecoveryKey || recoveryKey.trim()) {
+                if (!recoveryKey.trim()) {
+                    setError(t('deviceSecret.login.recoveryKeyRequired'));
+                    return;
+                }
+                result = await loginWithRecoveryKey(password, recoveryKey.trim());
+            } else {
+                result = await login(password);
+            }
+
+            if (result?.needsRecoveryKey) {
+                // login() ci ha detto che serve la recovery key
+                setError(t('deviceSecret.login.recoveryKeyNeeded'));
+                return;
+            }
 
             if (!result.success) {
                 setError(result.error === 'Wrong password' ? t('auth.wrongPassword') : result.error);
                 return;
             }
 
-            // Login riuscito: verifica se la clipboard contiene un link compatibile
-            const clipText = await clipboardPromise;
-            if (clipText) {
-                try {
-                    const url = new URL(clipText.trim());
-                    if (url.pathname === '/receive' && url.hash) {
-                        navigate('/receive' + url.hash, { replace: true });
-                        return;
-                    }
-                    if (url.pathname === '/invite' && url.hash) {
-                        navigate('/invite' + url.hash, { replace: true });
-                        return;
-                    }
-                } catch {
-                    // non è un URL valido, ignora
-                }
+            // Se il login ha restituito dskBytes (da recovery o QR), offri iscrizione biometria
+            if (result.offerBiometricEnrollment && result.dskBytes && biometricAvailable) {
+                setPendingDSKBytes(result.dskBytes);
+                setOfferBiometric(true);
+                return; // non naviga ancora
             }
 
-            // Nessun link in clipboard: AuthContext gestisce la navigazione normale
+            await handlePostLogin(clipboardPromise);
         } catch {
             setError(t('auth.unexpectedError'));
         } finally {
@@ -80,55 +111,181 @@ export function LoginPage() {
         }
     }
 
+    /** Chiamata dopo approvazione QR: ha la DSK in chiaro. */
+    async function handleQRApproved(dskBytes) {
+        setShowQRApproval(false);
+        if (!password) {
+            setError(t('auth.requiredField'));
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const result = await loginWithApprovedDSK(password, dskBytes);
+            if (!result.success) {
+                setError(result.error);
+                return;
+            }
+            if (result.offerBiometricEnrollment && biometricAvailable) {
+                setPendingDSKBytes(dskBytes);
+                setOfferBiometric(true);
+                return;
+            }
+            await handlePostLogin(Promise.resolve(null));
+        } catch {
+            setError(t('auth.unexpectedError'));
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    async function handleEnrollBiometric() {
+        setIsEnrolling(true);
+        try {
+            await enrollBiometricAfterRecovery(pendingDSKBytes);
+        } finally {
+            if (pendingDSKBytes) pendingDSKBytes.fill(0);
+            setPendingDSKBytes(null);
+            setIsEnrolling(false);
+            setOfferBiometric(false);
+        }
+    }
+
+    function handleSkipEnroll() {
+        if (pendingDSKBytes) pendingDSKBytes.fill(0);
+        setPendingDSKBytes(null);
+        setOfferBiometric(false);
+    }
+
+    async function handlePostLogin(clipboardPromise) {
+        const clipText = await clipboardPromise;
+        if (clipText) {
+            try {
+                const url = new URL(clipText.trim());
+                if (url.pathname === '/receive' && url.hash) {
+                    navigate('/receive' + url.hash, { replace: true });
+                    return;
+                }
+                if (url.pathname === '/invite' && url.hash) {
+                    navigate('/invite' + url.hash, { replace: true });
+                    return;
+                }
+            } catch {
+                // non è un URL valido
+            }
+        }
+    }
+
+    // ---- OFFER BIOMETRIC ENROLLMENT ----
+
+    if (offerBiometric) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center px-4">
+                <div className="w-full max-w-md">
+                    <div className="glass rounded-3xl p-8 border border-slate-800 shadow-2xl space-y-5 text-center">
+                        <Fingerprint size={40} className="text-blue-400 mx-auto" />
+                        <h2 className="text-xl font-bold text-white">
+                            {t('deviceSecret.enrollBiometric.title')}
+                        </h2>
+                        <p className="text-sm text-gray-400">
+                            {t('deviceSecret.enrollBiometric.description')}
+                        </p>
+                        <button
+                            onClick={handleEnrollBiometric}
+                            disabled={isEnrolling}
+                            className="w-full bg-gradient-to-r from-brand to-blue-500 text-white py-3 rounded-xl font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {isEnrolling
+                                ? <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" /><span>{t('deviceSecret.enrollBiometric.enrolling')}</span></>
+                                : <><Fingerprint size={18} /><span>{t('deviceSecret.enrollBiometric.enrollBtn')}</span></>
+                            }
+                        </button>
+                        <button
+                            onClick={handleSkipEnroll}
+                            className="w-full text-gray-400 text-sm hover:text-gray-300 py-2"
+                        >
+                            {t('deviceSecret.enrollBiometric.skipBtn')}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ---- MAIN LOGIN ----
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center px-4">
-            {/* Glass Container */}
             <div className="w-full max-w-md">
-                {/* Header con icona */}
+                {/* Header */}
                 <div className="text-center mb-10">
                     <div className="flex items-center justify-center mb-6">
-                        <img
-                            src="/icons/appicon.png"
-                            alt="OwnVault"
-                            className="w-24 h-24 object-contain drop-shadow-lg"
-                        />
+                        <img src="/icons/appicon.png" alt="OwnVault" className="w-24 h-24 object-contain drop-shadow-lg" />
                     </div>
                     <h1 className="text-3xl font-bold text-white mb-2 tracking-wide">OwnVault</h1>
                     <p className="text-gray-400 text-sm">{t('login.welcomeBack')}</p>
                 </div>
 
-                {/* Form Glass Card */}
+                {/* Form */}
                 <div className="glass rounded-3xl p-8 border border-slate-800 shadow-2xl">
                     <form onSubmit={handleSubmit} className="space-y-5">
-                        {/* Password Input */}
+
+                        {/* Master password */}
                         <div className="space-y-2">
                             <label className="text-xs text-gray-400 font-medium">{t('auth.masterPassword')}</label>
                             <div className="relative">
                                 <input
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                                    onChange={e => setPassword(e.target.value)}
                                     className="w-full px-4 py-3 bg-slate-800/70 text-gray-200 border border-slate-700 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent pr-12 placeholder-gray-500"
                                     placeholder={t('login.enterPassword')}
                                     disabled={isLoading}
                                 />
                                 <button
                                     type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
+                                    onClick={() => setShowPassword(v => !v)}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
                                 >
                                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                 </button>
                             </div>
-
-                            {error && (
-                                <p className="text-red-400 text-sm flex items-center gap-1">
-                                    <span className="text-xs">⚠️</span> {error}
-                                </p>
-                            )}
                         </div>
 
-                        {/* Submit Button */}
+                        {/* Recovery key (mostrato se DSK richiesta) */}
+                        {(loginRequiresRecoveryKey || showRecoveryKeyField) && (
+                            <div className="space-y-2">
+                                <label className="text-xs text-gray-400 font-medium flex items-center gap-1.5">
+                                    <KeyRound size={12} className="text-blue-400" />
+                                    {t('deviceSecret.login.recoveryKeyLabel')}
+                                </label>
+                                <input
+                                    type="text"
+                                    value={recoveryKey}
+                                    onChange={e => setRecoveryKey(e.target.value)}
+                                    className="w-full px-4 py-3 bg-slate-800/70 text-gray-200 border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 placeholder-gray-500 font-mono text-sm tracking-wider"
+                                    placeholder="OV-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX"
+                                    disabled={isLoading}
+                                    spellCheck={false}
+                                    autoComplete="off"
+                                />
+                                {loginRequiresRecoveryKey && (
+                                    <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-2.5">
+                                        <p className="text-xs text-blue-300">
+                                            {t('deviceSecret.login.recoveryKeyHint')}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Error */}
+                        {error && (
+                            <p className="text-red-400 text-sm flex items-center gap-1">
+                                <span className="text-xs">⚠️</span> {error}
+                            </p>
+                        )}
+
+                        {/* Submit */}
                         <button
                             type="submit"
                             disabled={isLoading}
@@ -136,7 +293,7 @@ export function LoginPage() {
                         >
                             {isLoading ? (
                                 <div className="flex items-center justify-center gap-2">
-                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
                                     <span>{t('login.unlocking')}</span>
                                 </div>
                             ) : (
@@ -144,47 +301,71 @@ export function LoginPage() {
                             )}
                         </button>
 
-                        {/* Hint biometria */}
-                        {biometricEnabled && (
+                        {/* Hint biometria (solo standard, non recovery) */}
+                        {biometricEnabled && !loginRequiresRecoveryKey && (
                             <p className="text-xs text-center text-gray-500">
                                 {t('login.biometricHint')}
                             </p>
                         )}
+
+                        {/* Alternativa QR approval (quando DSK richiesta) */}
+                        {loginRequiresRecoveryKey && (
+                            <button
+                                type="button"
+                                onClick={() => setShowQRApproval(true)}
+                                className="w-full py-2.5 bg-slate-700/60 hover:bg-slate-700 text-gray-300 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 border border-slate-600"
+                            >
+                                <QrCode size={16} />
+                                <span>{t('deviceSecret.login.approvalQRBtn')}</span>
+                            </button>
+                        )}
+
+                        {/* Link per inserire recovery key manualmente (se DSK abilitata ma non necessaria) */}
+                        {deviceSecretEnabled && !loginRequiresRecoveryKey && !recoveryKey && (
+                            <button
+                                type="button"
+                                onClick={() => setRecoveryKey(' ')}
+                                className="w-full text-xs text-gray-500 hover:text-gray-400 py-1 transition-colors flex items-center justify-center gap-1"
+                            >
+                                <KeyRound size={11} />
+                                <span>{t('deviceSecret.login.useRecoveryKeyLink')}</span>
+                            </button>
+                        )}
                     </form>
                 </div>
 
-                {/* Hint permesso clipboard (solo iOS PWA) */}
+                {/* iOS hint */}
                 {isIosStandalone && (
                     <div className="mt-4 flex items-start gap-2 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
                         <Info size={14} className="text-blue-400 mt-0.5 flex-shrink-0" />
-                        <p className="text-xs text-gray-400 leading-relaxed">
-                            {t('login.iosClipboardHint')}
-                        </p>
+                        <p className="text-xs text-gray-400 leading-relaxed">{t('login.iosClipboardHint')}</p>
                     </div>
                 )}
 
-                {/* Avviso storage browser */}
+                {/* Storage warning */}
                 <div className="mt-4 flex items-start gap-2 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
                     <AlertTriangle size={14} className="text-amber-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-gray-400 leading-relaxed">
-                        {t('login.storageWarning')}
-                    </p>
+                    <p className="text-xs text-gray-400 leading-relaxed">{t('login.storageWarning')}</p>
                 </div>
 
                 {/* Footer */}
                 <div className="mt-4 text-center text-xs text-gray-500">
                     {t('login.e2eEncryption')} • v{version}
                     <span className="mx-2">•</span>
-                    <a
-                        href="/privacy"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-gray-300 underline underline-offset-2 transition-colors"
-                    >
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer"
+                        className="hover:text-gray-300 underline underline-offset-2 transition-colors">
                         {t('privacy.link')}
                     </a>
                 </div>
             </div>
+
+            {/* QR Device Approval (receiver mode) */}
+            {showQRApproval && (
+                <DeviceApprovalReceiver
+                    onApproved={handleQRApproved}
+                    onClose={() => setShowQRApproval(false)}
+                />
+            )}
         </div>
     );
 }
