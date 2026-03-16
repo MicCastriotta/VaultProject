@@ -11,7 +11,6 @@ import { CheckCircle, AlertTriangle } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { IntegrityWarningBanner } from './components/IntegrityWarningBanner';
-import { BiometricSetupDialog } from './components/BiometricSetupDialog';
 import { SyncConflictDialog } from './components/SyncConflictDialog';
 import { AppLayout } from './layouts/AppLayout';
 import { InstallPrompt } from './components/InstallPrompt';
@@ -237,18 +236,12 @@ function PendingReceiveHandler() {
  * AppLayout (sidebar + sfondo) rimane montato durante le navigazioni;
  * solo il contenuto interno sospende.
  */
-function AppShell({ showBiometricSetup, enableBiometric, skipBiometricSetup }) {
+function AppShell() {
     return (
         <AppLayout>
             <SyncLaunchCheck />
             <PendingInviteHandler />
             <PendingReceiveHandler />
-            {showBiometricSetup && (
-                <BiometricSetupDialog
-                    onEnable={enableBiometric}
-                    onSkip={skipBiometricSetup}
-                />
-            )}
             <Suspense fallback={<PageSpinner />}>
                 <Outlet />
             </Suspense>
@@ -261,9 +254,6 @@ function AppRoutes() {
         isUnlocked,
         isLoading,
         userExists,
-        showBiometricSetup,
-        enableBiometric,
-        skipBiometricSetup
     } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
@@ -361,11 +351,7 @@ function AppRoutes() {
             <IntegrityWarningBanner />
             <Routes>
                 <Route element={
-                    <AppShell
-                        showBiometricSetup={showBiometricSetup}
-                        enableBiometric={enableBiometric}
-                        skipBiometricSetup={skipBiometricSetup}
-                    />
+                    <AppShell />
                 }>
                     <Route path="/" element={<MainPage />} />
                     <Route path="/settings" element={<SettingsPage />} />

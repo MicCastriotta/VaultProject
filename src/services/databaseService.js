@@ -145,6 +145,45 @@ class DatabaseService {
     }
 
     // ========================================
+    // DEVICE SECRET STORAGE
+    // Nota: NON viene mai esportato in exportData().
+    // ========================================
+
+    /**
+     * Salva la DSK avvolta con il PRF output del credenziale biometrico.
+     * { wrappedDSK: base64, wrapIv: base64 }
+     */
+    async saveDeviceSecret({ wrappedDSK, wrapIv }) {
+        await db.config.put({
+            id: 'deviceSecret',
+            wrappedDSK,
+            wrapIv,
+            savedAt: new Date().toISOString()
+        });
+    }
+
+    /**
+     * Recupera il device secret wrapper (se presente).
+     * Ritorna { wrappedDSK, wrapIv } oppure null.
+     */
+    async getDeviceSecret() {
+        const record = await db.config.get('deviceSecret');
+        if (!record) return null;
+        return { wrappedDSK: record.wrappedDSK, wrapIv: record.wrapIv };
+    }
+
+    /** Elimina il device secret (quando si disabilita). */
+    async deleteDeviceSecret() {
+        await db.config.delete('deviceSecret');
+    }
+
+    /** Verifica se la DSK è disponibile localmente. */
+    async isDeviceSecretLocallyAvailable() {
+        const record = await db.config.get('deviceSecret');
+        return !!record?.wrappedDSK;
+    }
+
+    // ========================================
     // PROFILE OPERATIONS
     // ========================================
 
@@ -235,6 +274,9 @@ class DatabaseService {
         return {
             version: 3,
             exportDate: new Date().toISOString(),
+            // Il campo deviceSecret NON viene esportato intenzionalmente.
+            // Il flag deviceSecretEnabled è incluso per informare il device di destinazione
+            // che dovrà richiedere la recovery key o l'approvazione QR.
             crypto: config,
             identity: identity || null,
             profiles,
@@ -337,7 +379,9 @@ class DatabaseService {
         // Pulisci DB
         await this.deleteAllData();
 
-        // Importa config — solo i campi attesi, niente extra
+        // Importa config — solo i campi attesi, niente extra.
+        // deviceSecretEnabled viene preservato: il device di destinazione saprà
+        // che deve richiedere la recovery key o l'approvazione QR al login.
         const cleanCrypto = {
             id: 'crypto',
             version: data.crypto.version,
@@ -346,7 +390,8 @@ class DatabaseService {
             salt: data.crypto.salt,
             iv: data.crypto.iv,
             encryptedDEK: data.crypto.encryptedDEK,
-            createdAt: data.crypto.createdAt || new Date().toISOString()
+            createdAt: data.crypto.createdAt || new Date().toISOString(),
+            ...(data.crypto.deviceSecretEnabled ? { deviceSecretEnabled: true } : {})
         };
         await db.config.put(cleanCrypto);
 

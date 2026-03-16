@@ -585,5 +585,107 @@
     "userControl": "I dati restano sotto il pieno controllo dell'utente. La cancellazione dei dati del browser, l'utilizzo della modalità privata o il cambio di dispositivo possono causare la perdita delle informazioni salvate.",
     "disclaimer": "Questo software è fornito \"così com'è\", senza garanzie di alcun tipo. L'autore non è responsabile per eventuali perdite di dati, accessi non autorizzati o danni derivanti dall'utilizzo dell'applicazione.",
     "acceptance": "Utilizzando l'applicazione l'utente accetta queste condizioni."
+  },
+
+  "deviceSecret": {
+    "badge": "Device Secret",
+
+    "setup": {
+      "title": "Abilita Device Secret",
+      "whatIsIt": "Cos'è il Device Secret?",
+      "description": "Una chiave crittografica legata al tuo dispositivo che si combina con la master password per proteggere il vault. Anche se qualcuno conosce la tua password e ottiene il backup, non può decriptare nulla senza questa chiave.",
+      "warning": "Il dispositivo chiederà la biometria due volte: una per registrare il credenziale, una per generare la chiave. Verrà poi mostrata una Recovery Key da conservare in un luogo sicuro.",
+      "passwordLabel": "Conferma la tua master password",
+      "activating": "Attivazione in corso...",
+      "activateBtn": "Attiva Device Secret"
+    },
+
+    "key": {
+      "title": "Recovery Key",
+      "successHint": "Device Secret attivato con successo. Salva questa chiave in un posto sicuro.",
+      "recoveryKeyLabel": "La tua Recovery Key",
+      "copy": "Copia",
+      "savedBtn": "Ho salvato la chiave",
+      "saveWarningTitle": "Conserva questa chiave!",
+      "saveWarningBody": "Non verrà mostrata di nuovo. Se perdi il dispositivo e non hai questa chiave, perderai l'accesso al vault."
+    },
+
+    "confirm": {
+      "title": "Conferma salvataggio",
+      "description": "Assicurati di aver salvato la Recovery Key. Qui sotto puoi vederla un'ultima volta.",
+      "checkboxLabel": "Ho salvato la Recovery Key in un posto sicuro e capisco che non sarà più visualizzabile.",
+      "doneBtn": "Fatto, ho salvato la chiave"
+    },
+
+    "settings": {
+      "enabledDescription": "Il vault è protetto da Device Secret + biometria. Senza entrambi (o la Recovery Key) i dati non possono essere decifrati.",
+      "protectionActive": "Protezione crittografica attiva: master password + chiave dispositivo richieste per ogni accesso.",
+      "upgradeHint": "Il tuo dispositivo supporta Device Secret (WebAuthn PRF). Disabilita e riabilita la biometria per attivare la protezione avanzata.",
+      "prfAvailable": "Il tuo dispositivo supporta il Device Secret. Abilita la biometria per proteggere il vault con una chiave legata a questo dispositivo.",
+      "approveDeviceBtn": "Approva nuovo dispositivo",
+      "enableWithDSKBtn": "Abilita con Device Secret",
+      "disableBtn": "Disabilita Device Secret",
+      "disableConfirmTitle": "Disabilita Device Secret?",
+      "disableConfirmBody": "Il vault verrà re-cifrato con la sola master password. La protezione aggiuntiva del dispositivo verrà rimossa.",
+      "disablePasswordLabel": "Master password (richiesta per re-cifrare)",
+      "reEnrollTitle": "Registra biometria su questo dispositivo",
+      "reEnrollDescription": "Il vault ha già un Device Secret attivo. Inserisci la Recovery Key per registrare la biometria su questo dispositivo senza generare una nuova chiave.",
+      "reEnrollBtn": "Registra biometria",
+      "reEnrollEnrolling": "Registrazione in corso...",
+      "reEnrollViaQR": "Approva tramite QR da un altro dispositivo"
+    },
+
+    "login": {
+      "recoveryKeyLabel": "Recovery Key",
+      "recoveryKeyRequired": "Inserisci la Recovery Key per accedere",
+      "recoveryKeyNeeded": "Questo vault è protetto da Device Secret. Inserisci la Recovery Key o usa l'approvazione QR.",
+      "recoveryKeyHint": "Inserisci la Recovery Key del dispositivo originale (formato: OV-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX).",
+      "approvalQRBtn": "Approva tramite QR (da altro dispositivo)",
+      "useRecoveryKeyLink": "Usa Recovery Key manualmente"
+    },
+
+    "enrollBiometric": {
+      "title": "Registra biometria su questo dispositivo",
+      "description": "Vuoi abilitare lo sblocco biometrico su questo dispositivo? In futuro non sarà necessario inserire la Recovery Key.",
+      "enrollBtn": "Abilita biometria",
+      "enrolling": "Registrazione in corso...",
+      "skipBtn": "Salta, userò la Recovery Key"
+    }
+  },
+
+  "deviceApproval": {
+    "sender": {
+      "title": "Approva nuovo dispositivo",
+      "authInstruction": "Prima di procedere, autentica la tua identità per sbloccare la chiave dispositivo.",
+      "authBtn": "Autentica con biometria",
+      "scanInstruction": "Scansiona il QR Code mostrato dal nuovo dispositivo per approvarlo.",
+      "scanBtn": "Scansiona QR del nuovo dispositivo",
+      "unlocking": "Autenticazione in corso...",
+      "generating": "Generazione chiave di trasferimento...",
+      "pinLabel": "PIN da inserire sul nuovo dispositivo",
+      "pinHint": "Mostra questo PIN al proprietario del nuovo dispositivo.",
+      "showQRHint": "Mostra questo QR Code al nuovo dispositivo, poi digita il PIN.",
+      "doneBtn": "Fatto",
+      "noBiometric": "Nessuna credenziale biometrica configurata.",
+      "biometricFailed": "Autenticazione biometrica fallita.",
+      "noDSK": "Device Secret non disponibile su questo dispositivo.",
+      "invalidQR": "QR Code non valido. Assicurati di scansionare un QR OwnVault."
+    },
+    "receiver": {
+      "title": "Aggiungi questo dispositivo",
+      "initializing": "Preparazione...",
+      "showQRInstruction": "Mostra questo QR Code al dispositivo già autorizzato.",
+      "afterScanInstruction": "Dopo che l'altro dispositivo ha scansionato il QR, scansiona il QR di risposta.",
+      "scanResponseBtn": "Scansiona QR di risposta",
+      "enterPinInstruction": "Inserisci il PIN mostrato dall'altro dispositivo.",
+      "pinInvalid": "Il PIN deve essere di 6 cifre.",
+      "pinWrong": "PIN errato o QR non valido. Riprova.",
+      "decryptError": "Errore durante la decifratura. Riprova.",
+      "decrypting": "Verifica in corso...",
+      "confirmPin": "Conferma PIN",
+      "success": "Dispositivo approvato!",
+      "successHint": "Puoi ora registrare la biometria per accessi futuri senza Recovery Key.",
+      "qrInvalid": "QR Code di risposta non valido."
+    }
   }
 }
