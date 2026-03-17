@@ -7,11 +7,10 @@ import { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle, AlertTriangle, Cloud } from 'lucide-react';
+import { CheckCircle, AlertTriangle } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { IntegrityWarningBanner } from './components/IntegrityWarningBanner';
-import { BiometricSetupDialog } from './components/BiometricSetupDialog';
 import { SyncConflictDialog } from './components/SyncConflictDialog';
 import { AppLayout } from './layouts/AppLayout';
 import { InstallPrompt } from './components/InstallPrompt';
@@ -150,35 +149,6 @@ function SyncLaunchCheck() {
     );
 }
 
-/**
- * Cookie bridge (iOS): Safari non può aprire la PWA installata direttamente.
- * Safari scrive un cookie first-party con il hash pending;
- * quando la PWA si apre dalla Home Screen, questo handler lo legge
- * e naviga alla route corretta prima che AuthContext completi il caricamento.
- *
- * Cookie usati (TTL 1h, SameSite=Lax, path=/):
- *   ov_cb_receive = hash encodato  → naviga a /receive#...
- *   ov_cb_invite  = hash encodato  → naviga a /invite#...
- */
-function CookieBridgeHandler() {
-    const navigate = useNavigate();
-
-    useEffect(() => {
-        const receiveMatch = document.cookie.match(/ov_cb_receive=([^;]+)/);
-        if (receiveMatch) {
-            document.cookie = 'ov_cb_receive=; max-age=0; path=/; SameSite=Lax';
-            navigate('/receive' + decodeURIComponent(receiveMatch[1]), { replace: true });
-            return;
-        }
-        const inviteMatch = document.cookie.match(/ov_cb_invite=([^;]+)/);
-        if (inviteMatch) {
-            document.cookie = 'ov_cb_invite=; max-age=0; path=/; SameSite=Lax';
-            navigate('/invite' + decodeURIComponent(inviteMatch[1]), { replace: true });
-        }
-    }, []);
-
-    return null;
-}
 
 /**
  * Gestisce l'apertura via Web Share Target API (iOS).
@@ -266,18 +236,12 @@ function PendingReceiveHandler() {
  * AppLayout (sidebar + sfondo) rimane montato durante le navigazioni;
  * solo il contenuto interno sospende.
  */
-function AppShell({ showBiometricSetup, enableBiometric, skipBiometricSetup }) {
+function AppShell() {
     return (
         <AppLayout>
             <SyncLaunchCheck />
             <PendingInviteHandler />
             <PendingReceiveHandler />
-            {showBiometricSetup && (
-                <BiometricSetupDialog
-                    onEnable={enableBiometric}
-                    onSkip={skipBiometricSetup}
-                />
-            )}
             <Suspense fallback={<PageSpinner />}>
                 <Outlet />
             </Suspense>
@@ -290,9 +254,6 @@ function AppRoutes() {
         isUnlocked,
         isLoading,
         userExists,
-        showBiometricSetup,
-        enableBiometric,
-        skipBiometricSetup
     } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
@@ -390,11 +351,7 @@ function AppRoutes() {
             <IntegrityWarningBanner />
             <Routes>
                 <Route element={
-                    <AppShell
-                        showBiometricSetup={showBiometricSetup}
-                        enableBiometric={enableBiometric}
-                        skipBiometricSetup={skipBiometricSetup}
-                    />
+                    <AppShell />
                 }>
                     <Route path="/" element={<MainPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
@@ -456,7 +413,6 @@ export function App() {
                     {showSplash && <SplashScreen onDone={handleSplashDone} />}
                     <UpdateBanner />
                     <InstallPrompt />
-                    <CookieBridgeHandler />
                     <AppRoutes />
                 </BrowserRouter>
             </AuthProvider>

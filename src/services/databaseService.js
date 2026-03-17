@@ -145,6 +145,45 @@ class DatabaseService {
     }
 
     // ========================================
+    // DEVICE SECRET STORAGE
+    // Nota: NON viene mai esportato in exportData().
+    // ========================================
+
+    /**
+     * Salva la DSK avvolta con il PRF output del credenziale biometrico.
+     * { wrappedDSK: base64, wrapIv: base64 }
+     */
+    async saveDeviceSecret({ wrappedDSK, wrapIv }) {
+        await db.config.put({
+            id: 'deviceSecret',
+            wrappedDSK,
+            wrapIv,
+            savedAt: new Date().toISOString()
+        });
+    }
+
+    /**
+     * Recupera il device secret wrapper (se presente).
+     * Ritorna { wrappedDSK, wrapIv } oppure null.
+     */
+    async getDeviceSecret() {
+        const record = await db.config.get('deviceSecret');
+        if (!record) return null;
+        return { wrappedDSK: record.wrappedDSK, wrapIv: record.wrapIv };
+    }
+
+    /** Elimina il device secret (quando si disabilita). */
+    async deleteDeviceSecret() {
+        await db.config.delete('deviceSecret');
+    }
+
+    /** Verifica se la DSK è disponibile localmente. */
+    async isDeviceSecretLocallyAvailable() {
+        const record = await db.config.get('deviceSecret');
+        return !!record?.wrappedDSK;
+    }
+
+    // ========================================
     // PROFILE OPERATIONS
     // ========================================
 
@@ -235,6 +274,9 @@ class DatabaseService {
         return {
             version: 3,
             exportDate: new Date().toISOString(),
+            // Il campo deviceSecret NON viene esportato intenzionalmente.
+            // Il flag deviceSecretEnabled è incluso per informare il device di destinazione
+            // che dovrà richiedere la recovery key o l'approvazione QR.
             crypto: config,
             identity: identity || null,
             profiles,
@@ -334,10 +376,25 @@ class DatabaseService {
                 .map(a => [a.profileId, { iv: a.iv, encryptedData: a.encryptedData }])
         );
 
+        // Salva i record device-local prima di cancellare il DB.
+        // Vengono ripristinati dopo l'import SOLO se il backup appartiene allo stesso vault
+        // (salt + encryptedDEK identici → stessa chiave → stessi dati).
+        // Se il vault è diverso (backup da altro device) non vengono ripristinati.
+        //
+        // - deviceSecret: wrappedDSK cifrato con PRF hardware, inutile su altri device
+        // - biometric:    credentialId specifico del device, non funziona altrove
+        // - integrity:    HMAC non incluso: se assente, verifyHMAC ritorna firstRun=true
+        //                 e lo ricalcola automaticamente al primo login → nessun problema
+        const localDeviceSecret = await db.config.get('deviceSecret');
+        const localBiometric    = await db.config.get('biometric');
+        const localCrypto       = await db.config.get('crypto');
+
         // Pulisci DB
         await this.deleteAllData();
 
-        // Importa config — solo i campi attesi, niente extra
+        // Importa config — solo i campi attesi, niente extra.
+        // deviceSecretEnabled viene preservato: il device di destinazione saprà
+        // che deve richiedere la recovery key o l'approvazione QR al login.
         const cleanCrypto = {
             id: 'crypto',
             version: data.crypto.version,
@@ -346,9 +403,25 @@ class DatabaseService {
             salt: data.crypto.salt,
             iv: data.crypto.iv,
             encryptedDEK: data.crypto.encryptedDEK,
-            createdAt: data.crypto.createdAt || new Date().toISOString()
+            createdAt: data.crypto.createdAt || new Date().toISOString(),
+            ...(data.crypto.deviceSecretEnabled ? { deviceSecretEnabled: true } : {})
         };
         await db.config.put(cleanCrypto);
+
+        // Ripristina deviceSecret locale se il vault importato è lo stesso.
+        // Condizione: salt e encryptedDEK identici → la DSK locale è ancora valida.
+        // Se il vault è diverso (backup da altro device con DSK diversa), il record
+        // non viene ripristinato e il login chiederà recovery key / QR approval.
+        const isSameVault = localCrypto &&
+            localCrypto.salt === data.crypto.salt &&
+            localCrypto.encryptedDEK === data.crypto.encryptedDEK;
+
+        if (isSameVault && localDeviceSecret) {
+            await db.config.put(localDeviceSecret);
+        }
+        if (isSameVault && localBiometric) {
+            await db.config.put(localBiometric);
+        }
 
         // Importa identity (keypair ECDH) — presente solo nei backup v3+
         // La private key è già cifrata con la DEK: sicura da ripristinare così com'è.

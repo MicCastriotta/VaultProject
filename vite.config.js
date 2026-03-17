@@ -70,6 +70,8 @@ function cspPlugin() {
 
 export default defineConfig({
   build: {
+    sourcemap: true, // permette di vedere i file originali in DevTools
+    minify: false,  
     modulePreload: { polyfill: false }, // evita lo script inline del polyfill (incompatibile con CSP strict)
     rollupOptions: {
       output: {
@@ -158,7 +160,8 @@ export default defineConfig({
   server: {
       port: 3000,
       allowedHosts: [
-          'ownvault.eu'
+          'ownvault.eu',
+          'localhost'          
       ]
   },
   define: {

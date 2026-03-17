@@ -52,7 +52,8 @@
     "unlockVault": "Unlock Vault",
     "biometricHint": "Biometric verification will be requested automatically after your password",
     "e2eEncryption": "End-to-End Encryption",
-    "storageWarning": "Data is stored in this device's browser. Clearing browser cache or storage may cause irreversible loss of all your data."
+    "storageWarning": "Data is stored in this device's browser. Clearing browser cache or storage may cause irreversible loss of all your data.",
+    "iosClipboardHint": "When tapping 'Unlock Vault', iOS may ask for permission to access the clipboard. This is needed to receive encrypted profiles and contact requests shared by other users."
   },
   "signup": {
     "letsBegin": "Let's begin!",
@@ -439,9 +440,9 @@
     "importError": "Import failed. Try again.",
     "decryptError": "Decryption failed. Wrong key or corrupted link.",
     "invalidLink": "Invalid or corrupted share link.",
-    "openInApp": "Prepare for OwnVault",
-    "iosNotice": "Your vault is in the installed OwnVault app. Tap the button, then open OwnVault from your Home Screen.",
-    "iosCookieSet": "Ready! Open OwnVault from your Home Screen to complete the import."
+    "copyLink": "Copy link",
+    "iosNotice": "Have OwnVault installed? Copy the link, open it from your Home Screen and unlock the vault.",
+    "iosCopied": "Link copied! Open OwnVault from your Home Screen and unlock the vault to complete the import."
   },
   "storage": {
     "title": "Storage",
@@ -584,5 +585,107 @@
     "userControl": "Data remains under the full control of the user. Clearing browser data, using private browsing mode, or changing devices may result in the loss of saved information.",
     "disclaimer": "This software is provided \"as is\", without warranties of any kind. The author is not responsible for any data loss, unauthorized access, or damages arising from the use of the application.",
     "acceptance": "By using the application, the user accepts these terms."
+  },
+
+  "deviceSecret": {
+    "badge": "Device Secret",
+
+    "setup": {
+      "title": "Enable Device Secret",
+      "whatIsIt": "What is the Device Secret?",
+      "description": "A cryptographic key tied to your device that combines with your master password to protect the vault. Even if someone knows your password and obtains the backup, they cannot decrypt anything without this key.",
+      "warning": "Your device will ask for biometrics twice: once to register the credential, once to generate the key. A Recovery Key will then be shown that you must save in a safe place.",
+      "passwordLabel": "Confirm your master password",
+      "activating": "Activating...",
+      "activateBtn": "Activate Device Secret"
+    },
+
+    "key": {
+      "title": "Recovery Key",
+      "successHint": "Device Secret successfully activated. Save this key in a safe place.",
+      "recoveryKeyLabel": "Your Recovery Key",
+      "copy": "Copy",
+      "savedBtn": "I have saved the key",
+      "saveWarningTitle": "Save this key!",
+      "saveWarningBody": "It will not be shown again. If you lose your device and do not have this key, you will lose access to the vault."
+    },
+
+    "confirm": {
+      "title": "Confirm you saved it",
+      "description": "Make sure you have saved the Recovery Key. You can see it one last time below.",
+      "checkboxLabel": "I have saved the Recovery Key in a safe place and understand it will not be shown again.",
+      "doneBtn": "Done, I saved the key"
+    },
+
+    "settings": {
+      "enabledDescription": "The vault is protected by Device Secret + biometrics. Without both (or the Recovery Key) data cannot be decrypted.",
+      "protectionActive": "Cryptographic protection active: master password + device key required for every login.",
+      "upgradeHint": "Your device supports Device Secret (WebAuthn PRF). Disable and re-enable biometrics to activate enhanced protection.",
+      "prfAvailable": "Your device supports Device Secret. Enable biometrics to protect the vault with a key tied to this device.",
+      "approveDeviceBtn": "Approve new device",
+      "enableWithDSKBtn": "Enable with Device Secret",
+      "disableBtn": "Disable Device Secret",
+      "disableConfirmTitle": "Disable Device Secret?",
+      "disableConfirmBody": "The vault will be re-encrypted with the master password only. The additional device protection will be removed.",
+      "disablePasswordLabel": "Master password (required for re-encryption)",
+      "reEnrollTitle": "Register biometrics on this device",
+      "reEnrollDescription": "The vault already has an active Device Secret. Enter your Recovery Key to register biometrics on this device without generating a new key.",
+      "reEnrollBtn": "Register biometrics",
+      "reEnrollEnrolling": "Registering...",
+      "reEnrollViaQR": "Approve via QR from another device"
+    },
+
+    "login": {
+      "recoveryKeyLabel": "Recovery Key",
+      "recoveryKeyRequired": "Enter the Recovery Key to access",
+      "recoveryKeyNeeded": "This vault is protected by Device Secret. Enter the Recovery Key or use QR approval.",
+      "recoveryKeyHint": "Enter the Recovery Key from the original device (format: OV-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX).",
+      "approvalQRBtn": "Approve via QR (from another device)",
+      "useRecoveryKeyLink": "Use Recovery Key manually"
+    },
+
+    "enrollBiometric": {
+      "title": "Register biometrics on this device",
+      "description": "Would you like to enable biometric unlock on this device? In the future you won't need to enter the Recovery Key.",
+      "enrollBtn": "Enable biometrics",
+      "enrolling": "Registering...",
+      "skipBtn": "Skip, I'll use the Recovery Key"
+    }
+  },
+
+  "deviceApproval": {
+    "sender": {
+      "title": "Approve new device",
+      "authInstruction": "Before proceeding, authenticate your identity to unlock the device key.",
+      "authBtn": "Authenticate with biometrics",
+      "scanInstruction": "Scan the QR Code shown by the new device to approve it.",
+      "scanBtn": "Scan new device QR",
+      "unlocking": "Authenticating...",
+      "generating": "Generating transfer key...",
+      "pinLabel": "PIN to enter on the new device",
+      "pinHint": "Show this PIN to the owner of the new device.",
+      "showQRHint": "Show this QR Code to the new device, then type the PIN.",
+      "doneBtn": "Done",
+      "noBiometric": "No biometric credentials configured.",
+      "biometricFailed": "Biometric authentication failed.",
+      "noDSK": "Device Secret not available on this device.",
+      "invalidQR": "Invalid QR Code. Make sure you are scanning an OwnVault QR."
+    },
+    "receiver": {
+      "title": "Add this device",
+      "initializing": "Initializing...",
+      "showQRInstruction": "Show this QR Code to the already authorized device.",
+      "afterScanInstruction": "After the other device scans the QR, scan the response QR.",
+      "scanResponseBtn": "Scan response QR",
+      "enterPinInstruction": "Enter the PIN shown on the other device.",
+      "pinInvalid": "The PIN must be 6 digits.",
+      "pinWrong": "Wrong PIN or invalid QR. Please try again.",
+      "decryptError": "Decryption error. Please try again.",
+      "decrypting": "Verifying...",
+      "confirmPin": "Confirm PIN",
+      "success": "Device approved!",
+      "successHint": "You can now register biometrics for future logins without the Recovery Key.",
+      "qrInvalid": "Invalid response QR Code."
+    }
   }
 }

@@ -70,6 +70,7 @@ DEK — Data Encryption Key (random, 256-bit)
 ### Backup e Sync
 - Export/Import JSON cifrato v3 (portabile su qualsiasi device con la stessa password, include allegati, identità e contatti)
 - Sync **Google Drive** opzionale (backup automatico, risoluzione conflitti, allegati lazy-loaded)
+- Import/restore da Drive: se il backup corrisponde al vault locale (stesso `salt` + `encryptedDEK`), i record `deviceSecret` e `biometric` vengono preservati — nessun re-enroll necessario
 
 ### UX
 - PWA installabile (Add to Home Screen)
@@ -84,20 +85,84 @@ DEK — Data Encryption Key (random, 256-bit)
 
 ## Architettura di Sicurezza
 
-### Schema biometrico (WebAuthn)
+### Device Secret Key (DSK) e WebAuthn PRF
 
-Il vecchio schema salvava una chiave simmetrica derivata dalla DEK nel database — permettendo di recuperare la DEK senza password. L'attuale implementazione è corretta:
+La DSK è una chiave casuale a 160 bit generata localmente e conservata **solo su questo dispositivo** (IndexedDB). Non viene mai inclusa nei backup né nel sync cloud.
+
+Quando abilitata, la vault key viene derivata dalla combinazione di password + DSK:
+
+```
+masterKeyMaterial = PBKDF2(masterPassword, salt)
+vaultKey = HKDF(masterKeyMaterial, salt=DSK, info="OwnVault-vault-v2")
+DEK = AES-GCM.decrypt(vaultKey, encryptedDEK)
+```
+
+Il database rubato è inutilizzabile senza **sia** la master password **che** la DSK sul dispositivo.
+
+#### Wrapping della DSK con WebAuthn PRF (v3)
+
+La DSK è avvolta con l'output dell'estensione PRF del credenziale WebAuthn biometrico:
+
+```
+prfOutput = WebAuthn.get(prf: { eval: { first: "OwnVault-device-secret-v1" } })
+wrapKey = HKDF(prfOutput, info="OwnVault-wrap-v1")
+wrappedDSK = AES-GCM(wrapKey, DSK)   → salvato in IndexedDB
+```
+
+L'output PRF è deterministico (stesso credenziale + stesso input = stesso output) e non estraibile dall'autenticatore.
+
+**Sicurezza**: IndexedDB rubato → inutile senza master password + autenticatore fisico.
+
+#### Architettura biometrica legacy (v2)
+
+Il vecchio schema (v2) usa WebAuthn solo come gate UI — nessuna chiave derivata. La DEK non è mai derivabile dalla biometria da sola. Un database rubato è inutilizzabile senza la master password.
 
 ```
 Master Password → KEK → decifra DEK → DEK in RAM
                                           ↓
-                              Se biometria abilitata:
+                              Se biometria abilitata (v2):
                               WebAuthn assertion → conferma presenza utente
                                           ↓
                                    isUnlocked = true
 ```
 
-WebAuthn è un **gate di accesso UI** (2FA locale), non un meccanismo crittografico. La DEK non è mai derivabile dalla biometria da sola. Un database rubato è inutilizzabile senza la master password, anche con la configurazione biometrica registrata.
+#### Compatibilità WebAuthn PRF
+
+| Piattaforma | Stato |
+|---|---|
+| Chrome 116+ / macOS Touch ID | Supportato |
+| Chrome 116+ / Windows Hello | Supportato |
+| Chrome 128+ / Android (passkey locale) | Supportato — richiede `residentKey: required` |
+| Android Chrome + Google Password Manager | Non supportato — i passkey GPM cloud non espongono PRF |
+| Firefox | Non supportato |
+| Safari | Non supportato |
+
+**Nota Android**: la registrazione usa `residentKey: required` per impedire a Google Password Manager di salvare il passkey in cloud (i passkey GPM non supportano PRF). Il flag `prf.enabled` nella risposta di `create()` viene verificato su mobile per rilevare subito i passkey GPM e fare fallback al v2.
+
+Se PRF non è supportato, OwnVault fallisce silenziosamente al 2FA legacy (solo gate UI) — la funzionalità DSK rimane disabilitata.
+
+### Pairing multi-device via QR (ECDH + PIN, senza server)
+
+Permette di trasferire la DSK su un nuovo dispositivo senza server né cloud:
+
+```
+Nuovo device  → genera keypair effimero EC P-256 → mostra QR (pubKeyNew)
+Vecchio device → scansiona QR, genera il suo keypair
+               → ECDH(privOld, pubNew) = sharedSecret
+               → PIN = 6 cifre casuali
+               → transferKey = HKDF(sharedSecret, salt=PIN, info="OwnVault-transfer-v1")
+               → encryptedDSK = AES-GCM(transferKey, DSK)
+               → mostra: PIN + QR(pubOld, encryptedDSK, iv)
+Nuovo device  → scansiona QR, utente inserisce PIN → ECDH(privNew, pubOld) → decifra DSK
+```
+
+Il PIN autentica il canale QR contro un MITM che intercetta il codice.
+
+### Recovery key DSK
+
+Formato: `OV-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX` (Crockford Base32, 20 byte = 160 bit, 4 gruppi da 8 caratteri).
+
+Da conservare offline come backup della DSK. Permette di ri-enrollare la biometria su un device dopo reset o se il credenziale WebAuthn viene eliminato.
 
 ### Identità crittografica e condivisione profili (ECDH)
 
@@ -203,6 +268,8 @@ upgrade-insecure-requests
 | Minaccia | Protezione |
 |---|---|
 | DB rubato (senza password) | AES-256-GCM + PBKDF2 600k iter — inutilizzabile |
+| DB rubato + password (con DSK abilitata) | Senza DSK sul device la vault key non è derivabile |
+| IndexedDB rubato (DSK + wrappedDSK) | Inutile senza master password + autenticatore fisico (PRF non estraibile) |
 | Rainbow table / dizionario | Salt 256-bit random per utente |
 | Replay attack | IV 96-bit random per ogni record |
 | Bit flipping / corruzione | GCM rileva qualsiasi modifica |
@@ -292,8 +359,10 @@ src/
 │   ├── IconPicker.jsx             # Selettore icona profilo
 │   ├── OTPDisplay.jsx             # Display TOTP con countdown
 │   ├── QRScanner.jsx              # Scanner QR per setup 2FA
-│   ├── BiometricSetupDialog.jsx   # Dialog abilitazione biometria
-│   ├── BiometricSettingsSection.jsx # Gestione biometria nelle impostazioni
+│   ├── BiometricSetupDialog.jsx        # Dialog abilitazione biometria legacy
+│   ├── BiometricSettingsSection.jsx    # Gestione DSK + biometria nelle impostazioni
+│   ├── DeviceSecretSetupDialog.jsx     # Wizard attivazione DSK
+│   ├── DeviceApprovalDialog.jsx        # Sblocco via biometria + DSK al login
 │   ├── IntegrityWarningBanner.jsx # Avviso tampering database
 │   ├── LanguageSelector.jsx       # Cambio lingua
 │   ├── SyncConflictDialog.jsx     # Risoluzione conflitti sync
@@ -303,7 +372,8 @@ src/
 │   ├── cryptoService.js           # PBKDF2, AES-GCM, HKDF, HMAC, blob encryption con AAD
 │   ├── databaseService.js         # IndexedDB (Dexie), export/import v3, validazione
 │   ├── contactsService.js         # Identità ECDH, rubrica, invite link, encrypt/decrypt profili
-│   ├── biometricService.js        # WebAuthn registration + assertion
+│   ├── biometricService.js        # WebAuthn registration + PRF authentication
+│   ├── deviceSecretService.js     # DSK generazione/wrap/unwrap, QR pairing ECDH, recovery key
 │   ├── healthCacheService.js      # Cache in-memoria per risultati Password Health
 │   ├── googledriveService.js      # OAuth2 + Drive API
 │   ├── syncService.js             # Logica sync + conflict resolution + allegati lazy
@@ -333,17 +403,48 @@ Utente sceglie master password
    → AES-GCM(KEK, DEK) → encryptedDEK salvato in IndexedDB
    → HKDF(DEK, "OwnVault-Integrity-v1") → IntegrityKey
    → HMAC(IntegrityKey, DB state v2) → salvato in IndexedDB
-   → (opzionale) WebAuthn registration → credentialId salvato in IndexedDB
 ```
+
+### Attivazione DSK (dalle Impostazioni)
+
+```
+# Con WebAuthn PRF (v3, default se supportato):
+   → genera DSK 160-bit random
+   → WebAuthn registration con prf extension → credentialId
+   → WebAuthn get() → prfOutput (32 byte deterministico)
+   → wrapKey = HKDF(prfOutput, info="OwnVault-wrap-v1")
+   → wrappedDSK = AES-GCM(wrapKey, DSK) → salvato in IndexedDB
+   → encryptedDEK aggiornato: vaultKey = HKDF(PBKDF2(password), salt=DSK)
+
+# Senza PRF (v2 fallback):
+   → DSK non disponibile — WebAuthn usato solo come gate UI 2FA
+```
+
+La recovery key `OV-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX` viene mostrata all'utente al momento dell'attivazione e deve essere conservata offline.
 
 ### Login
 
 ```
 Utente inserisce master password
    → PBKDF2-SHA512(password, salt, 600k) → KEK
-   → AES-GCM-decrypt(KEK, encryptedDEK) → DEK in RAM
+
+   # Senza DSK:
+   → vaultKey = HKDF(masterKeyMaterial, info="OwnVault-vault-v1")
+   → AES-GCM-decrypt(vaultKey, encryptedDEK) → DEK in RAM
+
+   # Con DSK + biometria PRF (v3):
+   → WebAuthn get() → prfOutput
+   → unwrapDSK = AES-GCM-decrypt(HKDF(prfOutput), wrappedDSK)
+   → vaultKey = HKDF(masterKeyMaterial, salt=DSK, info="OwnVault-vault-v2")
+   → AES-GCM-decrypt(vaultKey, encryptedDEK) → DEK in RAM
+
+   # Con DSK + biometria legacy (v2):
+   → WebAuthn assertion → conferma presenza
+   → DSK da IndexedDB (non avvolta)
+   → vaultKey = HKDF(masterKeyMaterial, salt=DSK, info="OwnVault-vault-v2")
+   → AES-GCM-decrypt(vaultKey, encryptedDEK) → DEK in RAM
+
    → HMAC verify → controlla integrità DB (profili + allegati)
-   → [se biometria abilitata] WebAuthn assertion → conferma presenza
    → isUnlocked = true
 ```
 
@@ -454,7 +555,8 @@ VITE_GOOGLE_API_KEY=your-api-key
 | AES mode | CBC | GCM (autenticato) |
 | Salt | Fisso | Random 256-bit |
 | Integrità dati | Nessuna | HMAC-SHA256 v2 anti-tampering (profili + allegati) |
-| Biometria | N/A | WebAuthn 2FA locale |
+| Biometria | N/A | WebAuthn 2FA locale + PRF per DSK wrapping |
+| Device Secret Key | N/A | DSK locale 160-bit + pairing QR ECDH multi-device |
 | Rate limiting | Nessuno | 5 tentativi / 5 min, persistente |
 | Auto-lock | Nessuno | Timer configurabile + background detection |
 | XSS protection | N/A (nativo) | DOMPurify + CSP |
@@ -494,9 +596,11 @@ VITE_GOOGLE_API_KEY=your-api-key
 - [x] Condivisione profili cifrati (ECDH effimero + AES-256-GCM, forward secrecy)
 - [x] Export/Import v3 (include identità + contatti)
 - [x] Setup guidato al primo avvio (nuovo dispositivo o ripristino backup)
+- [x] Device Secret Key (DSK) — chiave locale a 160 bit, secondo fattore crittografico
+- [x] WebAuthn PRF extension — DSK avvolta con output PRF del credenziale biometrico
+- [x] Pairing multi-device via QR (ECDH P-256 + PIN a 6 cifre, senza server)
+- [x] Recovery key DSK in formato Crockford Base32 (`OV-XXXXXXXX-...`)
 - [ ] Firme Ed25519 per autenticazione mittente nello share (v2 protocollo)
-- [ ] Argon2id come KDF (più resistente a brute-force GPU)
-- [ ] Secret Key (entropia extra indipendente dalla password)
 - [ ] Export/Import da altri password manager (Bitwarden, 1Password CSV)
 - [ ] Campi personalizzati nella creazione profilo
 - [ ] Logging centralizzato

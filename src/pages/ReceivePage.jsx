@@ -179,8 +179,8 @@ export function ReceivePage() {
                     <p className="text-center text-red-400 text-sm py-3">{t('share.decryptError')}</p>
                 ) : !isUnlocked ? (
                     <div>
-                        {isIosNonStandalone && !userExists ? (
-                            <IosBridgePrompt cookieName="ov_cb_receive" />
+                        {isIosNonStandalone ? (
+                            <IosBridgePrompt />
                         ) : (
                             <>
                                 <p className="text-sm text-gray-400 text-center mb-4">{t('contacts.loginRequired')}</p>

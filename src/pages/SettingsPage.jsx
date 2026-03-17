@@ -185,7 +185,7 @@ function DonationModal({ onClose }) {
                                     onClick={() => { setSelectedAmount(amt); setCustomAmount(''); setAmountError(false); }}
                                     className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition-all border-2 ${
                                         selectedAmount === amt && customAmount === ''
-                                            ? 'border-amber-500 bg-amber-500/15 text-amber-300'
+                                            ? 'border-amber-500 bg-amber-500/15 text-amber-500'
                                             : isLight
                                                 ? 'border-slate-300 text-slate-700 hover:border-slate-400'
                                                 : 'border-slate-600 text-gray-300 hover:border-slate-500'

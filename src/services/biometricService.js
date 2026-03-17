@@ -1,27 +1,32 @@
 /**
  * Biometric Authentication Service
  * Implementa WebAuthn come secondo fattore di accesso locale (2FA)
+ * e come fonte dell'output PRF per la Device Secret Key.
  *
- * ARCHITETTURA (v2 - sicura):
- * - La master password è l'UNICO segreto crittografico reale
- * - WebAuthn è un gate di accesso UI, NON un meccanismo di recupero chiavi
- * - Nessuna chiave simmetrica viene salvata nel DB per sblocco biometrico
+ * ARCHITETTURA:
+ *   v2 (legacy): WebAuthn è solo un gate UI — nessuna chiave derivata
+ *   v3 (PRF):    WebAuthn partecipa alla crittografia tramite l'estensione PRF
+ *                L'output PRF avvolge la DSK conservata in IndexedDB.
  *
- * FLUSSO:
- * 1. Utente inserisce master password → KEK → decifra DEK (invariato)
- * 2. Se biometria abilitata → richiedi WebAuthn come 2FA locale
- * 3. Solo se WebAuthn ha successo → isUnlocked = true
+ * FLUSSO v3 (PRF abilitato):
+ * 1. Utente inserisce master password
+ * 2. authenticateWithPRF() → output PRF deterministico dall'autenticatore
+ * 3. PRF output → unwrap DSK da IndexedDB
+ * 4. HKDF(PBKDF2(password), DSK) → vault key → decrypt DEK
  *
  * SICUREZZA:
- * - IndexedDB rubato → inutile senza master password (DEK non recuperabile)
- * - WebAuthn non può essere bypassato offline (richiede device reale)
- * - Nessuna chiave salvata in chiaro o cifrata nel DB
+ * - IndexedDB rubato → inutile senza master password + autenticatore fisico
+ * - PRF output non è estraibile dall'autenticatore
+ * - La DSK in IndexedDB è cifrata con il PRF output: inutilizzabile senza il device
  */
 
 const RP_NAME = 'OwnVault';
 const RP_ID = window.location.hostname;
 const USER_ID = 'ownvault-user';
 const USER_NAME = 'OwnVault User';
+
+// Input fisso per la PRF extension — deterministico per lo stesso credenziale
+const PRF_EVAL_INPUT = new TextEncoder().encode('OwnVault-device-secret-v1');
 
 class BiometricService {
     constructor() {
@@ -74,6 +79,165 @@ class BiometricService {
 
     // ========================================
     // REGISTRAZIONE WEBAUTHN
+    // ========================================
+
+    // ========================================
+    // REGISTRAZIONE E AUTENTICAZIONE CON PRF
+    // ========================================
+
+    /**
+     * Registra una credenziale WebAuthn con l'estensione PRF abilitata,
+     * poi ottiene subito il PRF output tramite una authenticate().
+     *
+     * Perché due chiamate:
+     *   - create() può restituire prf.results.first ma molte implementazioni
+     *     (Chrome su Windows Hello, macOS) lo omettono e ritornano solo prf.enabled=true.
+     *   - L'output PRF reale è garantito solo da get() (authentication).
+     *   Quindi dopo la registrazione eseguiamo subito un'autenticazione per
+     *   ottenere l'output PRF deterministico.
+     *
+     * L'utente vedrà due richieste biometriche consecutive:
+     *   1. Registrazione (create)
+     *   2. Autenticazione per ottenere l'output PRF (get)
+     *
+     * Ritorna:
+     *   { credentialId, prfOutput: Uint8Array, prfSupported: bool, registeredAt, version: 3 }
+     */
+    async registerWithPRF() {
+        if (!this.isSupported) throw new Error('WebAuthn not supported');
+
+        // Su Android: residentKey 'required' forza il passkey sul dispositivo locale,
+        // impedendo il salvataggio su Google Password Manager (i passkey GPM non supportano PRF).
+        // Su desktop (Windows Hello, macOS Touch ID): 'preferred' mantiene il comportamento
+        // originale che funziona correttamente senza vincoli aggiuntivi.
+        const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+
+        try {
+            // ---- Step 1: crea il credenziale con PRF extension ----
+            const challenge = new Uint8Array(32);
+            crypto.getRandomValues(challenge);
+
+            const credential = await navigator.credentials.create({
+                publicKey: {
+                    challenge,
+                    rp: { name: RP_NAME, id: RP_ID },
+                    user: {
+                        id: new TextEncoder().encode(USER_ID),
+                        name: USER_NAME,
+                        displayName: USER_NAME
+                    },
+                    pubKeyCredParams: [
+                        { type: 'public-key', alg: -7 },
+                        { type: 'public-key', alg: -257 }
+                    ],
+                    authenticatorSelection: {
+                        authenticatorAttachment: 'platform',
+                        userVerification: 'required',
+                        residentKey: isMobile ? 'required' : 'preferred'
+                    },
+                    timeout: 60000,
+                    attestation: 'none',
+                    extensions: {
+                        prf: { eval: { first: PRF_EVAL_INPUT } }
+                    }
+                }
+            });
+
+            if (!credential) throw new Error('Failed to create credential');
+
+            const credentialId = this.arrayBufferToBase64(credential.rawId);
+            const transports = credential.response.getTransports?.() ?? ['internal'];
+
+            // ---- Verifica PRF dopo create() (solo mobile) ----
+            // Su Android, prf.enabled=false/assente indica passkey GPM non compatibile con PRF.
+            // Su desktop Chrome non popola sempre prf.enabled in create(), quindi skippare
+            // il check evita falsi negativi su Windows Hello / macOS Touch ID.
+            if (isMobile) {
+                const createPrfResult = credential.getClientExtensionResults?.()?.prf;
+                if (!createPrfResult?.enabled) {
+                    return {
+                        version: 3,
+                        credentialId,
+                        transports,
+                        prfOutput: null,
+                        prfSupported: false,
+                        registeredAt: Date.now()
+                    };
+                }
+            }
+
+            // ---- Step 2: ottieni l'output PRF tramite get() ----
+            // create() non restituisce prf.results.first (solo prf.enabled=true).
+            // L'output deterministico è disponibile solo durante l'autenticazione.
+            const authResult = await this.authenticateWithPRF(credentialId);
+
+            return {
+                version: 3,
+                credentialId,
+                transports,
+                prfOutput: authResult.prfOutput,
+                prfSupported: !!authResult.prfOutput,
+                registeredAt: Date.now()
+            };
+        } catch (error) {
+            if (error.name === 'NotAllowedError') throw new Error('Biometric registration cancelled or denied');
+            if (error.name === 'NotSupportedError') throw new Error('Biometric authentication not supported on this device');
+            throw new Error('Failed to register biometric: ' + error.message);
+        }
+    }
+
+    /**
+     * Autentica l'utente e ottiene l'output PRF del credenziale.
+     * L'output PRF serve per sbloccare la DSK conservata in IndexedDB.
+     *
+     * Ritorna:
+     *   { success: true, prfOutput: Uint8Array }
+     *   { success: false, prfOutput: null }  — se PRF non supportata dal device
+     */
+    async authenticateWithPRF(credentialId) {
+        if (!this.isSupported) throw new Error('WebAuthn not supported');
+        if (!credentialId) throw new Error('No biometric credentials configured');
+
+        try {
+            const challenge = new Uint8Array(32);
+            crypto.getRandomValues(challenge);
+
+            const credentialDescriptor = {
+                type: 'public-key',
+                id: this.base64ToArrayBuffer(credentialId),
+                // I credential PRF sono sempre platform/internal (residentKey: 'required').
+                // Forzare ['internal'] evita il picker cross-device di Chrome su Windows/Android.
+                transports: ['internal']
+            };
+
+            const assertion = await navigator.credentials.get({
+                publicKey: {
+                    challenge,
+                    rpId: RP_ID,
+                    allowCredentials: [credentialDescriptor],
+                    userVerification: 'required',
+                    timeout: 60000,
+                    extensions: {
+                        prf: { eval: { first: PRF_EVAL_INPUT } }
+                    }
+                }
+            });
+
+            const prfResult = assertion.getClientExtensionResults()?.prf;
+            const prfOutput = prfResult?.results?.first
+                ? new Uint8Array(prfResult.results.first)
+                : null;
+
+            return { success: !!assertion, prfOutput };
+        } catch (error) {
+            if (error.name === 'NotAllowedError') throw new Error('Biometric authentication cancelled or denied');
+            if (error.name === 'InvalidStateError') throw new Error('Biometric credential not found. Please re-enable biometrics.');
+            throw new Error('Biometric authentication failed: ' + error.message);
+        }
+    }
+
+    // ========================================
+    // REGISTRAZIONE WEBAUTHN (legacy 2FA)
     // ========================================
 
     /**

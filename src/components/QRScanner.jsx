@@ -9,7 +9,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { X, Camera, AlertCircle, Loader } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-export function QRScanner({ isOpen, onClose, onScan }) {
+export function QRScanner({ isOpen, onClose, onScan, rawMode = false }) {
     const { t } = useTranslation();
     const [status, setStatus] = useState('loading'); // loading | scanning | error
     const [errorType, setErrorType] = useState('');  // permission | notfound | generic
@@ -50,6 +50,19 @@ export function QRScanner({ isOpen, onClose, onScan }) {
                     cameraIdOrConstraint,
                     { fps: 10, qrbox: { width: 220, height: 220 } },
                     (decodedText) => {
+                        const stopScanner = (instance) => {
+                            try { instance.stop().catch(() => {}); } catch {}
+                        };
+
+                        // rawMode: passa il testo grezzo direttamente (es. OWNVAULT_APPROVAL:...)
+                        if (rawMode) {
+                            const scanner = html5QrCode;
+                            html5QrCode = null;
+                            stopScanner(scanner);
+                            onScan(decodedText);
+                            onClose();
+                            return;
+                        }
                         try {
                             const url = new URL(decodedText);
                             if (url.protocol !== 'otpauth:') {
@@ -65,7 +78,7 @@ export function QRScanner({ isOpen, onClose, onScan }) {
                             // il cleanup dell'useEffect troverà null e non chiamerà stop() di nuovo
                             const scanner = html5QrCode;
                             html5QrCode = null;
-                            scanner.stop().catch(() => {});
+                            stopScanner(scanner);
                             onScan(secret);
                             onClose();
                         } catch {
@@ -93,7 +106,7 @@ export function QRScanner({ isOpen, onClose, onScan }) {
         return () => {
             stopped = true;
             if (html5QrCode) {
-                html5QrCode.stop().catch(() => {});
+                try { html5QrCode.stop().catch(() => {}); } catch {}
             }
         };
     }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps

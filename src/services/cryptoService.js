@@ -16,6 +16,9 @@ const IV_LENGTH = 12; // 96 bit per GCM
 const SALT_LENGTH = 32; // 256 bit
 const HMAC_CONTEXT = 'OwnVault-Integrity-v1'; // Domain separation per HKDF
 
+// Context string per derivazione vault key con DSK
+const VAULT_V2_INFO = new TextEncoder().encode('OwnVault-vault-v2');
+
 // Versione algoritmo HMAC — incrementare quando il payload cambia struttura.
 // Su mismatch di versione, il login tratta l'HMAC come "firstRun" e lo rigenera
 // senza mostrare falsi positivi di tamper.
@@ -168,6 +171,119 @@ class CryptoService {
         this.dek = null;
         this.integrityKey = null;
         this.isUnlocked = false;
+    }
+
+    // ========================================
+    // DEVICE SECRET KEY (DSK) — vault key derivation
+    // ========================================
+
+    /**
+     * Deriva la vault key usando PBKDF2(password) + HKDF(DSK come salt).
+     * Senza DSK è matematicamente impossibile derivare la vault key,
+     * anche conoscendo la master password.
+     *
+     *   masterKeyBytes = PBKDF2(password, salt, 600k)
+     *   vaultKey = HKDF(masterKeyBytes, salt=DSK, info="OwnVault-vault-v2")
+     */
+    async deriveKEKWithDSK(password, saltBase64, dskBytes) {
+        const passwordBytes = new TextEncoder().encode(password);
+        const salt = this.base64ToArrayBuffer(saltBase64);
+
+        const masterKeyBytes = await pbkdf2({
+            password: passwordBytes,
+            salt,
+            iterations: PBKDF2_ITERATIONS,
+            hashLength: KEY_LENGTH,
+            hashFunction: createSHA512(),
+            outputType: 'binary'
+        });
+
+        const hkdfKey = await crypto.subtle.importKey(
+            'raw', masterKeyBytes, { name: 'HKDF' }, false, ['deriveKey']
+        );
+
+        return await crypto.subtle.deriveKey(
+            { name: 'HKDF', hash: 'SHA-256', salt: dskBytes, info: VAULT_V2_INFO },
+            hkdfKey,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+        );
+    }
+
+    /**
+     * Sblocca il vault usando master password + Device Secret Key.
+     * Usato quando il vault è protetto con DSK (cryptoConfig.deviceSecretEnabled = true).
+     */
+    async unlockWithDSK(password, cryptoConfig, dskBytes) {
+        try {
+            const kek = await this.deriveKEKWithDSK(password, cryptoConfig.salt, dskBytes);
+            const iv = this.base64ToArrayBuffer(cryptoConfig.iv);
+            const encryptedDEK = this.base64ToArrayBuffer(cryptoConfig.encryptedDEK);
+
+            const dekBytes = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv },
+                kek,
+                encryptedDEK
+            );
+
+            this.dek = new Uint8Array(dekBytes);
+            this.integrityKey = await this.deriveIntegrityKey(this.dek);
+            this.isUnlocked = true;
+            return true;
+        } catch {
+            this.isUnlocked = false;
+            return false;
+        }
+    }
+
+    /**
+     * Re-cifra la DEK corrente con una vault key che include la DSK.
+     * Usato quando si ABILITA il device secret (vault già sbloccato in memoria).
+     * Ritorna { iv: base64, encryptedDEK: base64 } da salvare in cryptoConfig.
+     */
+    async reencryptDEKWithDSK(password, saltBase64, dskBytes) {
+        if (!this.isUnlocked || !this.dek) {
+            throw new Error('Vault must be unlocked to re-encrypt');
+        }
+        const kek = await this.deriveKEKWithDSK(password, saltBase64, dskBytes);
+        const iv = this.generateIV();
+
+        const encryptedDEK = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            kek,
+            this.dek
+        );
+
+        return {
+            iv: this.arrayBufferToBase64(iv),
+            encryptedDEK: this.arrayBufferToBase64(encryptedDEK)
+        };
+    }
+
+    /**
+     * Re-cifra la DEK corrente senza DSK (solo master password).
+     * Usato quando si DISABILITA il device secret.
+     * Ritorna { iv: base64, encryptedDEK: base64 } da salvare in cryptoConfig.
+     */
+    async reencryptDEKWithoutDSK(password, saltBase64) {
+        if (!this.isUnlocked || !this.dek) {
+            throw new Error('Vault must be unlocked to re-encrypt');
+        }
+        const salt = this.base64ToArrayBuffer(saltBase64);
+        const kek = await this.deriveKEK(password, salt);
+        const iv = this.generateIV();
+
+        const encryptedDEK = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            kek,
+            this.dek
+        );
+
+        return {
+            iv: this.arrayBufferToBase64(iv),
+            encryptedDEK: this.arrayBufferToBase64(encryptedDEK)
+        };
     }
 
     // ========================================
