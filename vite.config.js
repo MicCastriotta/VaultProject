@@ -110,8 +110,10 @@ export default defineConfig({
         share_target: {
           action: '/share-receive',
           method: 'GET',
+          enctype: 'application/x-www-form-urlencoded',
           params: {
-            url: 'url'
+            url: 'url',
+            text: 'text'
           }
         },
         icons: [

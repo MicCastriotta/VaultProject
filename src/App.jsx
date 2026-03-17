@@ -161,7 +161,10 @@ function ShareReceivePage() {
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        const sharedUrl = params.get('url');
+        // iOS Safari a volte passa il link in 'text' invece che in 'url'
+        const rawText = params.get('text') || '';
+        const urlFromText = rawText.match(/https?:\/\/\S+/)?.[0] || '';
+        const sharedUrl = params.get('url') || urlFromText;
 
         if (!sharedUrl) {
             navigate('/', { replace: true });
@@ -409,7 +412,7 @@ export function App() {
     return (
         <ThemeProvider>
             <AuthProvider>
-                <BrowserRouter>
+                <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                     {showSplash && <SplashScreen onDone={handleSplashDone} />}
                     <UpdateBanner />
                     <InstallPrompt />

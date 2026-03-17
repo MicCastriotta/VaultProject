@@ -381,7 +381,10 @@ export function checkCSP() {
 export function configureDOMPurify() {
     // Hook per logging dei tentativi di XSS
     DOMPurify.addHook('uponSanitizeElement', (node, data) => {
-        if (data.allowedTags && !data.allowedTags[data.tagName]) {
+        // 'body' e 'head' sono tag interni che DOMPurify crea durante il parsing
+        // (es. sanitizzazione di SVG inner HTML): non sono veri tentativi XSS
+        const internalTags = new Set(['body', 'head', 'html']);
+        if (data.allowedTags && !data.allowedTags[data.tagName] && !internalTags.has(data.tagName)) {
             console.warn('🚫 XSS attempt blocked:', data.tagName);
         }
     });

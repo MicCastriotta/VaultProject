@@ -125,6 +125,7 @@ export function DeviceApprovalSender({ onClose }) {
     }
 
     return (
+    <>
         <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
             <div className="bg-slate-800 border border-slate-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between p-5 border-b border-slate-700">
@@ -223,16 +224,17 @@ export function DeviceApprovalSender({ onClose }) {
                     )}
                 </div>
             </div>
-
-            {showScanner && (
-                <QRScanner
-                    isOpen={showScanner}
-                    onClose={() => setShowScanner(false)}
-                    onScan={handleQRScan}
-                    rawMode
-                />
-            )}
         </div>
+
+        {showScanner && (
+            <QRScanner
+                isOpen={showScanner}
+                onClose={() => setShowScanner(false)}
+                onScan={handleQRScan}
+                rawMode
+            />
+        )}
+    </>
     );
 }
 
@@ -316,6 +318,7 @@ export function DeviceApprovalReceiver({ onApproved, onClose }) {
     }
 
     return (
+    <>
         <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
             <div className="bg-slate-800 border border-slate-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between p-5 border-b border-slate-700">
@@ -427,15 +430,16 @@ export function DeviceApprovalReceiver({ onApproved, onClose }) {
                     )}
                 </div>
             </div>
-
-            {showScanner && (
-                <QRScanner
-                    isOpen={showScanner}
-                    onClose={() => setShowScanner(false)}
-                    onScan={handleQRScan}
-                    rawMode
-                />
-            )}
         </div>
+
+        {showScanner && (
+            <QRScanner
+                isOpen={showScanner}
+                onClose={() => setShowScanner(false)}
+                onScan={handleQRScan}
+                rawMode
+            />
+        )}
+    </>
     );
 }
