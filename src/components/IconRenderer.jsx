@@ -8,7 +8,37 @@
  */
 
 import { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { getIconBySlug, FALLBACK_ICONS } from '../icons/brandIcons';
+
+// Sanifica il contenuto interno dell'SVG da simple-icons.
+// Preserva tutti i tag grafici SVG validi ma rimuove script ed event handler.
+const SVG_ALLOWED_TAGS = [
+    'animate', 'animateTransform', 'circle', 'clipPath', 'defs',
+    'desc', 'ellipse', 'feBlend', 'feColorMatrix', 'feComponentTransfer',
+    'feComposite', 'feConvolveMatrix', 'feDiffuseLighting', 'feDisplacementMap',
+    'feDistantLight', 'feFlood', 'feFuncA', 'feFuncB', 'feFuncG', 'feFuncR',
+    'feGaussianBlur', 'feImage', 'feMerge', 'feMergeNode', 'feMorphology',
+    'feOffset', 'fePointLight', 'feSpecularLighting', 'feSpotLight',
+    'feTile', 'feTurbulence', 'filter', 'g', 'image', 'line', 'linearGradient',
+    'marker', 'mask', 'metadata', 'path', 'pattern', 'polygon', 'polyline',
+    'radialGradient', 'rect', 'stop', 'symbol', 'text', 'textPath',
+    'tspan', 'use', 'view',
+];
+
+export function sanitizeSvgInner(svgInner) {
+    // Avvolge in un <svg> fittizio, sanifica, poi restituisce solo il contenuto interno
+    const wrapped = `<svg xmlns="http://www.w3.org/2000/svg">${svgInner}</svg>`;
+    const clean = DOMPurify.sanitize(wrapped, {
+        USE_PROFILES: { svg: true, svgFilters: true },
+        ALLOWED_TAGS: SVG_ALLOWED_TAGS,
+        FORBID_TAGS: ['script', 'style', 'foreignObject'],
+        FORBID_ATTR: ['onload', 'onerror', 'onclick', 'onmouseover', 'onfocus', 'onblur'],
+    });
+    // Estrai solo il contenuto interno del tag <svg> pulito
+    const match = clean.match(/^<svg[^>]*>([\s\S]*)<\/svg>$/i);
+    return match ? match[1] : '';
+}
 
 /**
  * Renderizza l'icona da uno slug
@@ -43,7 +73,7 @@ export function IconRenderer({
     return (
         <svg
             viewBox="0 0 24 24"
-            dangerouslySetInnerHTML={{ __html: displayIcon.svg }}
+            dangerouslySetInnerHTML={{ __html: sanitizeSvgInner(displayIcon.svg) }}
             className={className}
             style={{
                 width: size,

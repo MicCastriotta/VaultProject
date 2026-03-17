@@ -13,6 +13,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, X } from 'lucide-react';
 import { getBrandIcons, FALLBACK_ICONS } from '../icons/brandIcons';
+import { sanitizeSvgInner } from './IconRenderer';
 import './IconPicker.css';
 
 export function IconPicker({
@@ -104,7 +105,7 @@ export function IconPicker({
                         >
                             <svg
                                 viewBox="0 0 24 24"
-                                dangerouslySetInnerHTML={{ __html: icon.svg }}
+                                dangerouslySetInnerHTML={{ __html: sanitizeSvgInner(icon.svg) }}
                                 className="icon-picker__result-svg"
                             />
                             <span className="icon-picker__result-name">{icon.name}</span>
@@ -139,7 +140,7 @@ export function IconPicker({
                                 >
                                     <svg
                                         viewBox="0 0 24 24"
-                                        dangerouslySetInnerHTML={{ __html: icon.svg }}
+                                        dangerouslySetInnerHTML={{ __html: sanitizeSvgInner(icon.svg) }}
                                         className="icon-picker__result-svg"
                                     />
                                     <span className="icon-picker__result-name">{icon.name}</span>
