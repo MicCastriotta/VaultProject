@@ -6,21 +6,13 @@
  *   1. Standard      : solo master password
  *   2. Recovery Key  : master password + recovery key OV-XXXX (DSK abilitata, nuovo device)
  *   3. Device QR     : approvazione da vecchio device via QR+PIN
- *
- * iOS clipboard bridge: al tap del bottone di sblocco (gesto utente),
- * avvia in parallelo la lettura della clipboard. Se dopo lo sblocco
- * la clipboard contiene un link /receive o /invite, naviga direttamente.
  */
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, AlertTriangle, Info, KeyRound, QrCode, Fingerprint } from 'lucide-react';
+import { Eye, EyeOff, AlertTriangle, KeyRound, QrCode, Fingerprint } from 'lucide-react';
 import { DeviceApprovalReceiver } from '../components/DeviceApprovalDialog';
-
-const isIosStandalone = /iPhone|iPad|iPod/.test(navigator.userAgent)
-    && window.navigator.standalone === true;
 
 export function LoginPage() {
     const {
@@ -34,7 +26,6 @@ export function LoginPage() {
         deviceSecretEnabled
     } = useAuth();
     const { t } = useTranslation();
-    const navigate = useNavigate();
 
     const [password, setPassword]     = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -68,10 +59,6 @@ export function LoginPage() {
 
         setIsLoading(true);
 
-        const clipboardPromise = (isIosStandalone && navigator.clipboard)
-            ? navigator.clipboard.readText().catch(() => null)
-            : Promise.resolve(null);
-
         try {
             let result;
 
@@ -100,10 +87,8 @@ export function LoginPage() {
             if (result.offerBiometricEnrollment && result.dskBytes && biometricAvailable) {
                 setPendingDSKBytes(result.dskBytes);
                 setOfferBiometric(true);
-                return; // non naviga ancora
+                return;
             }
-
-            await handlePostLogin(clipboardPromise);
         } catch {
             setError(t('auth.unexpectedError'));
         } finally {
@@ -130,7 +115,7 @@ export function LoginPage() {
                 setOfferBiometric(true);
                 return;
             }
-            await handlePostLogin(Promise.resolve(null));
+            // auth state change drives navigation automatically
         } catch {
             setError(t('auth.unexpectedError'));
         } finally {
@@ -154,25 +139,6 @@ export function LoginPage() {
         if (pendingDSKBytes) pendingDSKBytes.fill(0);
         setPendingDSKBytes(null);
         setOfferBiometric(false);
-    }
-
-    async function handlePostLogin(clipboardPromise) {
-        const clipText = await clipboardPromise;
-        if (clipText) {
-            try {
-                const url = new URL(clipText.trim());
-                if (url.pathname === '/receive' && url.hash) {
-                    navigate('/receive' + url.hash, { replace: true });
-                    return;
-                }
-                if (url.pathname === '/invite' && url.hash) {
-                    navigate('/invite' + url.hash, { replace: true });
-                    return;
-                }
-            } catch {
-                // non è un URL valido
-            }
-        }
     }
 
     // ---- OFFER BIOMETRIC ENROLLMENT ----
@@ -344,14 +310,6 @@ export function LoginPage() {
                         )}
                     </form>
                 </div>
-
-                {/* iOS hint */}
-                {isIosStandalone && (
-                    <div className="mt-4 flex items-start gap-2 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
-                        <Info size={14} className="text-blue-400 mt-0.5 flex-shrink-0" />
-                        <p className="text-xs text-gray-400 leading-relaxed">{t('login.iosClipboardHint')}</p>
-                    </div>
-                )}
 
                 {/* Storage warning */}
                 <div className="mt-4 flex items-start gap-2 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">

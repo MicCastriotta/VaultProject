@@ -414,20 +414,15 @@
     "invalidType": "Unsupported file type. Use images (JPEG, PNG, WebP) or PDF."
   },
   "contacts": {
-    "addFriend": "Add Friend",
+    "addFriend": "Contacts & Keys",
     "title": "Contacts",
-    "myLink": "My invite link",
     "myName": "Your name",
     "namePlaceholder": "Enter your name...",
     "nameNotSet": "Tap to set your name",
     "myFingerprint": "My fingerprint",
     "empty": "No contacts yet",
-    "emptyHint": "Share your invite link so friends can send you encrypted profiles.",
-    "inviteTitle": "Your invite link",
-    "inviteDescription": "Share this link however you like. Only the recipient can add you.",
-    "copyLink": "Copy link",
+    "emptyHint": "Share your invite file (.ownv) so friends can send you encrypted profiles.",
     "copied": "Copied!",
-    "inviteReceived": "Secure connection request",
     "wantsToConnect": "wants to connect with you",
     "loginRequired": "Unlock your vault first to add this contact.",
     "openVault": "Open OwnVault",
@@ -435,7 +430,30 @@
     "saving": "Saving...",
     "added": "Contact added!",
     "addError": "Error adding contact. Try again.",
-    "inviteInvalid": "Invalid or expired invite link."
+    "shareInvite": "Share invite",
+    "importFile": "Import .ownv file",
+    "parseError": "Invalid or unrecognized .ownv file.",
+    "nameRequiredTitle": "Set your name first",
+    "nameRequiredBody": "Enter a display name so your contacts know who you are before sharing your invite.",
+    "previewInviteTitle": "Contact request",
+    "previewInviteHint": "This person wants to connect with you.",
+    "previewProfileTitle": "Encrypted profile received",
+    "previewProfileHint": "This encrypted profile was sent to you. Import it into your vault?",
+    "previewProfileType": "Type",
+    "previewDecrypting": "Decrypting...",
+    "previewDecryptError": "Unable to decrypt this profile. It may not be addressed to you.",
+    "confirmAdd": "Add to contacts",
+    "confirmImport": "Import into vault",
+    "guide": {
+      "title": "Welcome to Contacts!",
+      "step1Title": "Share your invite",
+      "step1": "Tap \"Share invite\" to generate an invite.ownv file. Send it to a friend via any app (Messages, WhatsApp, email…).",
+      "step2Title": "Receive and import",
+      "step2": "When a friend sends you their invite or encrypted profile, tap \"Import .ownv file\" to add them in your contacts or import the profile into your vault.",
+      "step3Title": "Send encrypted profiles",
+      "step3": "Open any profile, tap the share icon and choose a contact to send an encrypted .ownv file. Only they can decrypt it.",
+      "dismiss": "Got it!"
+    }
   },
   "share": {
     "send": "Send encrypted",
@@ -444,7 +462,7 @@
     "noContacts": "No contacts yet",
     "noContactsHint": "Add a contact first from the Contacts page.",
     "shareVia": "Share via...",
-    "attachmentNotIncluded": "This profile has an attachment. The link will only include the profile data — the file will not be shared.",
+    "attachmentNotIncluded": "This profile has an attachment. The .ownv file will only include the profile data — the attachment will not be shared.",
     "receivedTitle": "Encrypted profile received",
     "encryptedProfile": "Encrypted profile",
     "encryptedProfileHint": "Unlock your vault to decrypt and preview.",
@@ -455,11 +473,12 @@
     "importing": "Importing...",
     "imported": "Profile imported!",
     "importError": "Import failed. Try again.",
-    "decryptError": "Decryption failed. Wrong key or corrupted link.",
-    "invalidLink": "Invalid or corrupted share link.",
-    "copyLink": "Copy link",
-    "iosNotice": "Have OwnVault installed? Copy the link, open it from your Home Screen and unlock the vault.",
-    "iosCopied": "Link copied! Open OwnVault from your Home Screen and unlock the vault to complete the import."
+    "decryptError": "Decryption failed. Wrong key or corrupted file.",
+    "invalidFile": "Invalid or corrupted .ownv file.",
+    "generating": "Generating file...",
+    "fileReady": "File ready",
+    "shareFile": "Share .ownv file",
+    "downloadFile": "Download .ownv file"
   },
   "storage": {
     "title": "Storage",
@@ -534,6 +553,11 @@
       "decryptionFailed": "Decryption failed. Check password and file.",
       "importFailed": "Import failed"
     }
+  },
+  "integrityWarning": {
+    "title": "Database Integrity Warning",
+    "body": "The database may have been modified outside of OwnVault. Your data could have been tampered with. If you did not make any external changes, consider exporting your data and resetting the app.",
+    "dismiss": "Understood"
   },
   "syncConflict": {
     "title": "Sync Conflict",

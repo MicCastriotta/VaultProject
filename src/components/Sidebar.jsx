@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
-import { Shield, Key, Activity, Settings, LogOut, HardDrive, UserPlus } from 'lucide-react';
+import { Shield, Key, Activity, Settings, LogOut, HardDrive, FileKey } from 'lucide-react';
 
 function formatBytes(bytes) {
     if (!bytes || bytes === 0) return '0 B';
@@ -122,7 +122,7 @@ export function Sidebar() {
                         onClick={() => navigate('/contacts')}
                         className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-gray-300 hover:bg-blue-500/10 transition-all mb-2"
                     >
-                        <UserPlus size={18} />
+                        <FileKey size={18} />
                         {t('contacts.addFriend')}
                     </button>
                     <StorageWidget storage={storage} t={t} />

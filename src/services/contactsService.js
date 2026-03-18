@@ -246,6 +246,69 @@ class ContactsService {
     }
 
     // ========================================
+    // FILE .ownv
+    // ========================================
+
+    /**
+     * Genera un file .ownv con l'identità dell'utente (invite).
+     * Il destinatario lo importa per aggiungere l'utente ai contatti.
+     */
+    async generateInviteFile() {
+        const identity = await this.getOrCreateIdentity();
+        const data = {
+            type: 'invite',
+            v: 1,
+            pk: identity.publicKey,
+            name: identity.displayName || ''
+        };
+        return new Blob([JSON.stringify(data)], { type: 'application/x-ownvault' });
+    }
+
+    /**
+     * Genera un file .ownv con un profilo cifrato per un contatto specifico.
+     */
+    async generateProfileFile(profileData, recipientPublicKeyB64) {
+        const payload = await this.encryptProfileForContact(profileData, recipientPublicKeyB64);
+        const data = { type: 'profile', v: 1, ...payload };
+        return new Blob([JSON.stringify(data)], { type: 'application/x-ownvault' });
+    }
+
+    /**
+     * Parsa il contenuto testuale di un file .ownv.
+     * Ritorna l'oggetto parsed oppure null se non valido.
+     */
+    parseOwnvFile(text) {
+        try {
+            const data = JSON.parse(text);
+            if (!data.type || !data.v) return null;
+            if (data.type === 'invite' && !data.pk) return null;
+            if (data.type === 'profile' && (!data.epk || !data.iv || !data.ct)) return null;
+            return data;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Condivide un file tramite Web Share API (se supportata con files)
+     * oppure lo scarica direttamente.
+     */
+    async shareOrDownload(blob, fileName) {
+        const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        const file = new File([blob], fileName, { type: 'application/x-ownvault' });
+        if (isMobile && navigator.canShare?.({ files: [file] })) {
+            await navigator.share({ files: [file], title: 'OwnVault' });
+        } else {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+    }
+
+    // ========================================
     // UTILITIES
     // ========================================
 

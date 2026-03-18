@@ -106,15 +106,14 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         orientation: 'portrait',
-        share_target: {
-          action: '/share-receive',
-          method: 'GET',
-          enctype: 'application/x-www-form-urlencoded',
-          params: {
-            url: 'url',
-            text: 'text'
+        file_handlers: [
+          {
+            action: '/',
+            accept: {
+              'application/x-ownvault': ['.ownv']
+            }
           }
-        },
+        ],
         icons: [
           {
             src: '/icons/icon-192x192.png',
