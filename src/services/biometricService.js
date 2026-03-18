@@ -20,6 +20,8 @@
  * - La DSK in IndexedDB è cifrata con il PRF output: inutilizzabile senza il device
  */
 
+import i18n from '../i18n/config';
+
 const RP_NAME = 'OwnVault';
 const RP_ID = window.location.hostname;
 const USER_ID = 'ownvault-user';
@@ -54,7 +56,7 @@ class BiometricService {
         if (!this.isSupported) {
             return {
                 available: false,
-                reason: 'WebAuthn not supported by this browser'
+                reason: i18n.t('settings.biometric.errors.notSupported')
             };
         }
 
@@ -64,7 +66,7 @@ class BiometricService {
             if (!available) {
                 return {
                     available: false,
-                    reason: 'No biometric authenticator available on this device'
+                    reason: i18n.t('settings.biometric.errors.noAuthenticator')
                 };
             }
 
@@ -72,7 +74,7 @@ class BiometricService {
         } catch (error) {
             return {
                 available: false,
-                reason: 'Error checking biometric availability: ' + error.message
+                reason: i18n.t('settings.biometric.errors.checkAvailabilityFailed', { message: error.message })
             };
         }
     }
@@ -104,7 +106,7 @@ class BiometricService {
      *   { credentialId, prfOutput: Uint8Array, prfSupported: bool, registeredAt, version: 3 }
      */
     async registerWithPRF() {
-        if (!this.isSupported) throw new Error('WebAuthn not supported');
+        if (!this.isSupported) throw new Error(i18n.t('settings.biometric.errors.webauthnNotSupported'));
 
         // Su Android: residentKey 'required' forza il passkey sul dispositivo locale,
         // impedendo il salvataggio su Google Password Manager (i passkey GPM non supportano PRF).
@@ -143,7 +145,7 @@ class BiometricService {
                 }
             });
 
-            if (!credential) throw new Error('Failed to create credential');
+            if (!credential) throw new Error(i18n.t('settings.biometric.errors.createCredentialFailed'));
 
             const credentialId = this.arrayBufferToBase64(credential.rawId);
             const transports = credential.response.getTransports?.() ?? ['internal'];
@@ -180,9 +182,9 @@ class BiometricService {
                 registeredAt: Date.now()
             };
         } catch (error) {
-            if (error.name === 'NotAllowedError') throw new Error('Biometric registration cancelled or denied');
-            if (error.name === 'NotSupportedError') throw new Error('Biometric authentication not supported on this device');
-            throw new Error('Failed to register biometric: ' + error.message);
+            if (error.name === 'NotAllowedError') throw new Error(i18n.t('settings.biometric.errors.registrationCancelled'));
+            if (error.name === 'NotSupportedError') throw new Error(i18n.t('settings.biometric.errors.registrationNotSupported'));
+            throw new Error(i18n.t('settings.biometric.errors.registrationFailed', { message: error.message }));
         }
     }
 
@@ -195,8 +197,8 @@ class BiometricService {
      *   { success: false, prfOutput: null }  — se PRF non supportata dal device
      */
     async authenticateWithPRF(credentialId) {
-        if (!this.isSupported) throw new Error('WebAuthn not supported');
-        if (!credentialId) throw new Error('No biometric credentials configured');
+        if (!this.isSupported) throw new Error(i18n.t('settings.biometric.errors.webauthnNotSupported'));
+        if (!credentialId) throw new Error(i18n.t('settings.biometric.errors.noCredentials'));
 
         try {
             const challenge = new Uint8Array(32);
@@ -230,9 +232,9 @@ class BiometricService {
 
             return { success: !!assertion, prfOutput };
         } catch (error) {
-            if (error.name === 'NotAllowedError') throw new Error('Biometric authentication cancelled or denied');
-            if (error.name === 'InvalidStateError') throw new Error('Biometric credential not found. Please re-enable biometrics.');
-            throw new Error('Biometric authentication failed: ' + error.message);
+            if (error.name === 'NotAllowedError') throw new Error(i18n.t('settings.biometric.errors.authCancelled'));
+            if (error.name === 'InvalidStateError') throw new Error(i18n.t('settings.biometric.errors.credentialNotFound'));
+            throw new Error(i18n.t('settings.biometric.errors.authFailed', { message: error.message }));
         }
     }
 
@@ -247,7 +249,7 @@ class BiometricService {
      */
     async registerBiometric() {
         if (!this.isSupported) {
-            throw new Error('WebAuthn not supported');
+            throw new Error(i18n.t('settings.biometric.errors.webauthnNotSupported'));
         }
 
         try {
@@ -283,7 +285,7 @@ class BiometricService {
             });
 
             if (!credential) {
-                throw new Error('Failed to create credential');
+                throw new Error(i18n.t('settings.biometric.errors.createCredentialFailed'));
             }
 
             // Salva solo credentialId e timestamp — nessuna chiave
@@ -315,11 +317,11 @@ class BiometricService {
      */
     async authenticateBiometric(biometricConfig) {
         if (!this.isSupported) {
-            throw new Error('WebAuthn not supported');
+            throw new Error(i18n.t('settings.biometric.errors.webauthnNotSupported'));
         }
 
         if (!biometricConfig || !biometricConfig.credentialId) {
-            throw new Error('No biometric credentials configured');
+            throw new Error(i18n.t('settings.biometric.errors.noCredentials'));
         }
 
         try {
@@ -346,11 +348,11 @@ class BiometricService {
             return { success: !!assertion };
         } catch (error) {
             if (error.name === 'NotAllowedError') {
-                throw new Error('Biometric authentication cancelled or denied');
+                throw new Error(i18n.t('settings.biometric.errors.authCancelled'));
             } else if (error.name === 'InvalidStateError') {
-                throw new Error('Biometric credential not found. Please re-enable biometrics.');
+                throw new Error(i18n.t('settings.biometric.errors.credentialNotFound'));
             } else {
-                throw new Error('Biometric authentication failed: ' + error.message);
+                throw new Error(i18n.t('settings.biometric.errors.authFailed', { message: error.message }));
             }
         }
     }

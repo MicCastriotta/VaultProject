@@ -58,11 +58,11 @@ class GoogleDriveService {
         await this.ensureSignedIn();
 
         // Cerca cartella esistente
-        const resp = await window.gapi.client.drive.files.list({
+        const resp = await this.withGapiRefresh(() => window.gapi.client.drive.files.list({
             q: `name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
             fields: 'files(id)',
             spaces: 'drive'
-        });
+        }));
         const files = resp.result.files;
         if (files.length > 0) {
             this.folderId = files[0].id;
@@ -70,12 +70,9 @@ class GoogleDriveService {
         }
 
         // Crea cartella
-        const createResp = await fetch('https://www.googleapis.com/drive/v3/files', {
+        const createResp = await this.fetchWithAuth('https://www.googleapis.com/drive/v3/files', {
             method: 'POST',
-            headers: {
-                Authorization: `Bearer ${this.accessToken}`,
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 name: DRIVE_FOLDER_NAME,
                 mimeType: 'application/vnd.google-apps.folder'
@@ -291,11 +288,11 @@ class GoogleDriveService {
         await this.ensureSignedIn();
 
         try {
-            const response = await window.gapi.client.drive.files.list({
+            const response = await this.withGapiRefresh(() => window.gapi.client.drive.files.list({
                 q: `name='${fileName}' and trashed=false`,
                 fields: 'files(id, name, modifiedTime)',
                 spaces: 'drive',
-            });
+            }));
 
             const files = response.result.files;
             return files.length > 0 ? files[0] : null;
@@ -332,14 +329,11 @@ class GoogleDriveService {
             close_delim;
 
         try {
-            const response = await fetch(
+            const response = await this.fetchWithAuth(
                 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
                 {
                     method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${this.accessToken}`,
-                        'Content-Type': `multipart/related; boundary="${boundary}"`,
-                    },
+                    headers: { 'Content-Type': `multipart/related; boundary="${boundary}"` },
                     body: multipartRequestBody,
                 }
             );
@@ -363,14 +357,11 @@ class GoogleDriveService {
         await this.ensureSignedIn();
 
         try {
-            const response = await fetch(
+            const response = await this.fetchWithAuth(
                 `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
                 {
                     method: 'PATCH',
-                    headers: {
-                        Authorization: `Bearer ${this.accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(content),
                 }
             );
@@ -393,13 +384,8 @@ class GoogleDriveService {
         await this.ensureSignedIn();
 
         try {
-            const response = await fetch(
-                `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${this.accessToken}`,
-                    },
-                }
+            const response = await this.fetchWithAuth(
+                `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
             );
 
             if (!response.ok) {
@@ -438,14 +424,11 @@ class GoogleDriveService {
 
         if (existingDriveId) {
             // PATCH: aggiorna contenuto file esistente
-            const response = await fetch(
+            const response = await this.fetchWithAuth(
                 `https://www.googleapis.com/upload/drive/v3/files/${existingDriveId}?uploadType=media`,
                 {
                     method: 'PATCH',
-                    headers: {
-                        Authorization: `Bearer ${this.accessToken}`,
-                        'Content-Type': 'application/octet-stream',
-                    },
+                    headers: { 'Content-Type': 'application/octet-stream' },
                     body: bytes,
                 }
             );
@@ -473,14 +456,11 @@ class GoogleDriveService {
         body.set(bytes, metaBytes.length);
         body.set(closeBytes, metaBytes.length + bytes.length);
 
-        const response = await fetch(
+        const response = await this.fetchWithAuth(
             'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
             {
                 method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${this.accessToken}`,
-                    'Content-Type': `multipart/related; boundary="${boundary}"`,
-                },
+                headers: { 'Content-Type': `multipart/related; boundary="${boundary}"` },
                 body,
             }
         );
@@ -496,9 +476,8 @@ class GoogleDriveService {
     async downloadAttachmentBinary(driveFileId) {
         await this.ensureSignedIn();
 
-        const response = await fetch(
-            `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
-            { headers: { Authorization: `Bearer ${this.accessToken}` } }
+        const response = await this.fetchWithAuth(
+            `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`
         );
         if (!response.ok) throw new Error('Failed to download attachment binary');
 
@@ -520,11 +499,11 @@ class GoogleDriveService {
     async listAttachmentFiles() {
         await this.ensureSignedIn();
 
-        const response = await window.gapi.client.drive.files.list({
+        const response = await this.withGapiRefresh(() => window.gapi.client.drive.files.list({
             q: `name contains 'ownvault-att-' and trashed=false`,
             fields: 'files(id, name)',
             spaces: 'drive',
-        });
+        }));
         return response.result.files || [];
     }
 
@@ -535,9 +514,9 @@ class GoogleDriveService {
         await this.ensureSignedIn();
 
         try {
-            const response = await window.gapi.client.drive.files.delete({
+            const response = await this.withGapiRefresh(() => window.gapi.client.drive.files.delete({
                 fileId: fileId,
-            });
+            }));
 
             return response;
         } catch (error) {
@@ -553,10 +532,10 @@ class GoogleDriveService {
         await this.ensureSignedIn();
 
         try {
-            const response = await window.gapi.client.drive.files.get({
+            const response = await this.withGapiRefresh(() => window.gapi.client.drive.files.get({
                 fileId: fileId,
                 fields: 'id, name, modifiedTime, size',
-            });
+            }));
 
             return response.result;
         } catch (error) {
@@ -569,12 +548,65 @@ class GoogleDriveService {
      * Verifica se l'utente è autenticato
      */
     async ensureSignedIn() {
-        if (this.isSignedIn && this.accessToken) return;
+        if (this.isSignedIn && this.accessToken) {
+            // Verifica che il token in cache non sia scaduto
+            const cached = this.loadCachedToken();
+            if (cached) return;
+            // Token scaduto: resetta lo stato e rinnova silenziosamente
+            this.accessToken = null;
+            this.isSignedIn = false;
+            window.gapi.client.setToken(null);
+        }
 
         try {
             await this.restoreSession();
         } catch {
             throw new Error('Not signed in to Google Drive');
+        }
+    }
+
+    /**
+     * Rinnova il token silenziosamente (bypass cache, forza nuova richiesta a Google).
+     * Chiamato automaticamente su risposta 401.
+     */
+    async refreshToken() {
+        this.accessToken = null;
+        this.isSignedIn = false;
+        this.clearCachedToken();
+        window.gapi.client.setToken(null);
+        await this.restoreSession();
+    }
+
+    /**
+     * fetch con Authorization header automatico + retry una volta su 401.
+     * Elimina la necessità di passare Authorization manualmente in ogni chiamata.
+     */
+    async fetchWithAuth(url, options = {}) {
+        const run = () => fetch(url, {
+            ...options,
+            headers: { ...options.headers, Authorization: `Bearer ${this.accessToken}` }
+        });
+
+        let response = await run();
+        if (response.status === 401) {
+            await this.refreshToken();
+            response = await run();
+        }
+        return response;
+    }
+
+    /**
+     * Esegue una chiamata gapi.client con retry una volta su 401.
+     */
+    async withGapiRefresh(fn) {
+        try {
+            return await fn();
+        } catch (e) {
+            if (e?.status === 401 || e?.result?.error?.code === 401) {
+                await this.refreshToken();
+                return await fn();
+            }
+            throw e;
         }
     }
 

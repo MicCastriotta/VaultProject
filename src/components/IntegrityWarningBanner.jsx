@@ -1,36 +1,49 @@
 /**
- * Integrity Warning Banner
- * Mostra un avviso quando viene rilevata manomissione del database.
- * Appare in cima all'app dopo il login se l'HMAC non corrisponde.
+ * Integrity Warning Dialog
+ * Mostra una dialog quando viene rilevata manomissione del database.
+ * Appare dopo il login se l'HMAC non corrisponde.
  */
 
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 
 export function IntegrityWarningBanner() {
     const { integrityError, dismissIntegrityError } = useAuth();
+    const { t } = useTranslation();
 
     if (!integrityError) return null;
 
     return (
-        <div className="bg-red-600 text-white px-4 py-3 flex items-start gap-3 shadow-lg">
-            <AlertTriangle className="flex-shrink-0 mt-0.5" size={20} />
-            <div className="flex-1">
-                <p className="font-bold text-sm">⚠ Database Integrity Warning</p>
-                <p className="text-xs mt-1 opacity-90">
-                    The database may have been modified externally. 
-                    Your data could have been tampered with. 
-                    If you did not make changes via DevTools or another tool, 
-                    consider exporting your data and resetting the app.
-                </p>
-            </div>
-            <button
+        <>
+            <div
+                className="fixed inset-0 bg-black/70 z-50"
                 onClick={dismissIntegrityError}
-                className="flex-shrink-0 p-1 hover:bg-red-700 rounded transition-colors"
-                aria-label="Dismiss"
-            >
-                <X size={18} />
-            </button>
-        </div>
+            />
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-11/12 max-w-md glass border border-red-500/40 rounded-2xl shadow-2xl z-50">
+                {/* Header */}
+                <div className="p-5 border-b border-slate-700 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                        <AlertTriangle size={22} className="text-red-400" />
+                    </div>
+                    <h3 className="text-base font-bold text-white">{t('integrityWarning.title')}</h3>
+                </div>
+
+                {/* Body */}
+                <div className="p-5">
+                    <p className="text-sm text-gray-300 leading-relaxed">{t('integrityWarning.body')}</p>
+                </div>
+
+                {/* Actions */}
+                <div className="px-5 pb-5">
+                    <button
+                        onClick={dismissIntegrityError}
+                        className="w-full bg-red-600 hover:bg-red-500 text-white py-3 px-4 rounded-xl font-medium text-sm transition-colors"
+                    >
+                        {t('integrityWarning.dismiss')}
+                    </button>
+                </div>
+            </div>
+        </>
     );
 }

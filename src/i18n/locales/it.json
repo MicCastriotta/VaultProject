@@ -228,8 +228,25 @@
       "enableBtn": "Abilita {{type}}",
       "disableBtn": "Disabilita {{type}}",
       "enableError": "Impossibile abilitare l'autenticazione biometrica",
-      "disableError": "Impossibile disabilitare l'autenticazione biometrica"
+      "disableError": "Impossibile disabilitare l'autenticazione biometrica",
+      "errors": {
+        "notSupported": "WebAuthn non supportato da questo browser",
+        "noAuthenticator": "Nessun autenticatore biometrico disponibile su questo dispositivo",
+        "checkAvailabilityFailed": "Errore nel controllo della disponibilità biometrica: {{message}}",
+        "webauthnNotSupported": "WebAuthn non supportato",
+        "createCredentialFailed": "Impossibile creare le credenziali",
+        "registrationCancelled": "Registrazione biometrica annullata o negata",
+        "registrationNotSupported": "Autenticazione biometrica non supportata su questo dispositivo",
+        "registrationFailed": "Registrazione biometrica fallita: {{message}}",
+        "noCredentials": "Nessuna credenziale biometrica configurata",
+        "authCancelled": "Autenticazione biometrica annullata o negata",
+        "credentialNotFound": "Credenziale biometrica non trovata. Riabilita la biometria.",
+        "authFailed": "Autenticazione biometrica fallita: {{message}}"
+      }
     }
+  },
+  "main": {
+    "backToExit": "Premi ancora per uscire"
   },
   "profiles": {
     "title": "Profili",
@@ -397,20 +414,15 @@
     "invalidType": "Tipo file non supportato. Usa immagini (JPEG, PNG, WebP) o PDF."
   },
   "contacts": {
-    "addFriend": "Aggiungi amico",
+    "addFriend": "Contatti e chiavi",
     "title": "Contatti",
-    "myLink": "Il mio link",
     "myName": "Il tuo nome",
     "namePlaceholder": "Inserisci il tuo nome...",
     "nameNotSet": "Tocca per impostare il nome",
     "myFingerprint": "Il mio fingerprint",
     "empty": "Nessun contatto",
-    "emptyHint": "Condividi il tuo link di invito per permettere agli amici di inviarti profili cifrati.",
-    "inviteTitle": "Il tuo link di invito",
-    "inviteDescription": "Condividi questo link come preferisci. Solo il destinatario può aggiungerti.",
-    "copyLink": "Copia link",
+    "emptyHint": "Condividi il tuo file di invito (.ownv) per permettere agli amici di inviarti profili cifrati.",
     "copied": "Copiato!",
-    "inviteReceived": "Richiesta di connessione sicura",
     "wantsToConnect": "vuole connettersi con te",
     "loginRequired": "Sblocca il vault per aggiungere questo contatto.",
     "openVault": "Apri OwnVault",
@@ -418,7 +430,30 @@
     "saving": "Salvataggio...",
     "added": "Contatto aggiunto!",
     "addError": "Errore nell'aggiunta del contatto. Riprova.",
-    "inviteInvalid": "Link di invito non valido o scaduto."
+    "shareInvite": "Condividi invito",
+    "importFile": "Importa file .ownv",
+    "parseError": "File .ownv non valido o non riconosciuto.",
+    "nameRequiredTitle": "Imposta prima il tuo nome",
+    "nameRequiredBody": "Inserisci un nome da visualizzare prima di condividere il tuo invito, così i tuoi contatti sapranno chi sei.",
+    "previewInviteTitle": "Richiesta di contatto",
+    "previewInviteHint": "Questa persona vuole connettersi con te.",
+    "previewProfileTitle": "Profilo cifrato ricevuto",
+    "previewProfileHint": "Questo profilo cifrato è stato inviato a te. Importarlo nel vault?",
+    "previewProfileType": "Tipo",
+    "previewDecrypting": "Decifratura...",
+    "previewDecryptError": "Impossibile decifrare questo profilo. Potrebbe non essere indirizzato a te.",
+    "confirmAdd": "Aggiungi ai contatti",
+    "confirmImport": "Importa nel vault",
+    "guide": {
+      "title": "Benvenuto nei Contatti!",
+      "step1Title": "Condividi il tuo invito",
+      "step1": "Tocca \"Condividi invito\" per generare un file invite.ownv. Invialo a un amico tramite qualsiasi app (Messaggi, WhatsApp, email…).",
+      "step2Title": "Ricevi e importa",
+      "step2": "Quando un amico ti invia il suo invito o un profilo cifrato, tocca \"Importa file .ownv\" per aggiungerlo come contatto o importare il profilo nel vault.",
+      "step3Title": "Invia profili cifrati",
+      "step3": "Apri qualsiasi profilo, tocca l'icona condividi e scegli un contatto per inviare un file .ownv cifrato. Solo lui potrà decifrarlo.",
+      "dismiss": "Capito!"
+    }
   },
   "share": {
     "send": "Invia cifrato",
@@ -427,7 +462,7 @@
     "noContacts": "Nessun contatto",
     "noContactsHint": "Aggiungi prima un contatto dalla pagina Contatti.",
     "shareVia": "Condividi con...",
-    "attachmentNotIncluded": "Questo profilo ha un allegato. Il link includerà solo i dati del profilo — il file non verrà condiviso.",
+    "attachmentNotIncluded": "Questo profilo ha un allegato. Il file .ownv includerà solo i dati del profilo — l'allegato non verrà condiviso.",
     "receivedTitle": "Profilo cifrato ricevuto",
     "encryptedProfile": "Profilo cifrato",
     "encryptedProfileHint": "Sblocca il vault per decifrare e visualizzare l'anteprima.",
@@ -438,11 +473,12 @@
     "importing": "Importazione...",
     "imported": "Profilo importato!",
     "importError": "Importazione fallita. Riprova.",
-    "decryptError": "Decifratura fallita. Chiave errata o link corrotto.",
-    "invalidLink": "Link di condivisione non valido o corrotto.",
-    "copyLink": "Copia link",
-    "iosNotice": "Hai OwnVault installata? Copia il link, aprila dalla Home Screen e sblocca il vault.",
-    "iosCopied": "Link copiato! Apri OwnVault dalla tua Home Screen e sblocca il vault per completare l'importazione."
+    "decryptError": "Decifratura fallita. Chiave errata o file corrotto.",
+    "invalidFile": "File .ownv non valido o corrotto.",
+    "generating": "Generazione file...",
+    "fileReady": "File pronto",
+    "shareFile": "Condividi file .ownv",
+    "downloadFile": "Scarica file .ownv"
   },
   "storage": {
     "title": "Storage",
@@ -517,6 +553,11 @@
       "decryptionFailed": "Decifratura fallita. Verifica la password e il file.",
       "importFailed": "Importazione fallita"
     }
+  },
+  "integrityWarning": {
+    "title": "Avviso di integrità del database",
+    "body": "Il database potrebbe essere stato modificato al di fuori di OwnVault. I tuoi dati potrebbero essere stati manomessi. Se non hai apportato modifiche esterne, considera di esportare i dati e reimpostare l'app.",
+    "dismiss": "Capito"
   },
   "syncConflict": {
     "title": "Conflitto di sincronizzazione",
@@ -641,7 +682,8 @@
       "recoveryKeyNeeded": "Questo vault è protetto da Device Secret. Inserisci la Recovery Key o usa l'approvazione QR.",
       "recoveryKeyHint": "Inserisci la Recovery Key del dispositivo originale (formato: OV-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX).",
       "approvalQRBtn": "Approva tramite QR (da altro dispositivo)",
-      "useRecoveryKeyLink": "Usa Recovery Key manualmente"
+      "useRecoveryKeyLink": "Usa Recovery Key manualmente",
+      "cancelRecoveryKey": "Annulla"
     },
 
     "enrollBiometric": {

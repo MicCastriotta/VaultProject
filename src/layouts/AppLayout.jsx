@@ -11,7 +11,7 @@ export function AppLayout({ children }) {
     return (
         <div className={bgClass}>
             <Sidebar />
-            <main className="flex-1 md:ml-64 h-full overflow-hidden pb-24 md:pb-0">
+            <main className="flex-1 md:ml-64 h-full overflow-hidden pb-16 md:pb-0">
                 {children}
             </main>
         </div>

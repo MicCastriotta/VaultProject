@@ -69,9 +69,7 @@ function cspPlugin() {
 }
 
 export default defineConfig({
-  build: {
-    sourcemap: true, // permette di vedere i file originali in DevTools
-    minify: false,  
+  build: {    
     modulePreload: { polyfill: false }, // evita lo script inline del polyfill (incompatibile con CSP strict)
     rollupOptions: {
       output: {
@@ -107,15 +105,15 @@ export default defineConfig({
         display: 'standalone',
         start_url: '/',
         scope: '/',
-        share_target: {
-          action: '/share-receive',
-          method: 'GET',
-          enctype: 'application/x-www-form-urlencoded',
-          params: {
-            url: 'url',
-            text: 'text'
+        orientation: 'portrait',
+        file_handlers: [
+          {
+            action: '/',
+            accept: {
+              'application/x-ownvault': ['.ownv']
+            }
           }
-        },
+        ],
         icons: [
           {
             src: '/icons/icon-192x192.png',

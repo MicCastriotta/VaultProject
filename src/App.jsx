@@ -15,7 +15,6 @@ import { SyncConflictDialog } from './components/SyncConflictDialog';
 import { AppLayout } from './layouts/AppLayout';
 import { InstallPrompt } from './components/InstallPrompt';
 import { syncService } from './services/syncService';
-import { contactsService } from './services/contactsService';
 
 /* global __APP_VERSION__ */
 
@@ -57,8 +56,6 @@ const PasswordGeneratorPage = lazy(() => import('./pages/PasswordGeneratorPage')
 const PasswordHealthPage = lazy(() => import('./pages/PasswordHealthPage').then(m => ({ default: m.PasswordHealthPage })));
 const ImportPage = lazy(() => import('./pages/ImportPage'));
 const ContactsPage = lazy(() => import('./pages/ContactsPage').then(m => ({ default: m.ContactsPage })));
-const InvitePage = lazy(() => import('./pages/InvitePage').then(m => ({ default: m.InvitePage })));
-const ReceivePage = lazy(() => import('./pages/ReceivePage').then(m => ({ default: m.ReceivePage })));
 
 // Spinner piccolo per transizioni interne (non sostituisce tutto lo schermo)
 const PageSpinner = () => (
@@ -151,84 +148,51 @@ function SyncLaunchCheck() {
 
 
 /**
- * Gestisce l'apertura via Web Share Target API (iOS).
- * iOS apre la PWA a /share-receive?url=<encoded_url> quando l'utente
- * sceglie OwnVault nello share sheet di Safari.
- * Estrae l'URL condiviso e reindirizza alla route interna corretta.
+ * Consuma window.launchQueue (File Handling API).
+ * Quando la PWA viene aperta con un file .ownv, legge il contenuto
+ * e lo salva in sessionStorage per processarlo dopo il login.
  */
-function ShareReceivePage() {
-    const navigate = useNavigate();
-
+function LaunchQueueConsumer() {
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        // iOS Safari a volte passa il link in 'text' invece che in 'url'
-        const rawText = params.get('text') || '';
-        const urlFromText = rawText.match(/https?:\/\/\S+/)?.[0] || '';
-        const sharedUrl = params.get('url') || urlFromText;
-
-        if (!sharedUrl) {
-            navigate('/', { replace: true });
-            return;
-        }
-
-        try {
-            const url = new URL(sharedUrl);
-            if (url.pathname === '/receive' && url.hash) {
-                navigate('/receive' + url.hash, { replace: true });
-            } else if (url.pathname === '/invite' && url.hash) {
-                navigate('/invite' + url.hash, { replace: true });
-            } else {
-                navigate('/', { replace: true });
+        if (!('launchQueue' in window)) return;
+        window.launchQueue.setConsumer(async (launchParams) => {
+            const files = launchParams.files ?? [];
+            if (files.length === 0) return;
+            try {
+                const file = await files[0].getFile();
+                const text = await file.text();
+                sessionStorage.setItem('ov_pending_ownv', text);
+            } catch {
+                // file non leggibile, ignora
             }
-        } catch {
-            navigate('/', { replace: true });
-        }
+        });
     }, []);
-
-    return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500" />
-        </div>
-    );
-}
-
-/**
- * Processa un invite pendente salvato in sessionStorage prima del login.
- * Scatta una sola volta dopo che il vault viene sbloccato.
- */
-function PendingInviteHandler() {
-    const navigate = useNavigate();
-
-    useEffect(() => {
-        const raw = sessionStorage.getItem('ov_pending_invite');
-        if (!raw) return;
-        sessionStorage.removeItem('ov_pending_invite');
-        try {
-            const payload = JSON.parse(raw);
-            contactsService
-                .addContact({ name: payload.name, publicKey: payload.publicKey })
-                .then(() => navigate('/contacts'))
-                .catch(console.error);
-        } catch {
-            // payload malformato, ignora
-        }
-    }, []);
-
     return null;
 }
 
 /**
- * Processa un profilo ricevuto pendente salvato in sessionStorage prima del login.
- * Reindirizza a /receive ripristinando il hash con il payload cifrato.
+ * Processa un file .ownv pendente salvato in sessionStorage prima del login.
+ * Scatta una sola volta dopo che il vault viene sbloccato.
+ * Delega sempre a ContactsPage per mostrare la preview modale.
  */
-function PendingReceiveHandler() {
+function PendingOwnvHandler() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        const hash = sessionStorage.getItem('ov_pending_receive');
-        if (!hash) return;
-        sessionStorage.removeItem('ov_pending_receive');
-        navigate('/receive' + hash);
+        const text = sessionStorage.getItem('ov_pending_ownv');
+        if (!text) return;
+        sessionStorage.removeItem('ov_pending_ownv');
+
+        import('./services/contactsService').then(({ contactsService }) => {
+            const data = contactsService.parseOwnvFile(text);
+            if (!data) return;
+
+            if (data.type === 'invite' || data.type === 'profile') {
+                // Lascia che ContactsPage mostri la preview modale
+                sessionStorage.setItem('ov_pending_for_contacts', text);
+                navigate('/contacts');
+            }
+        });
     }, []);
 
     return null;
@@ -243,8 +207,7 @@ function AppShell() {
     return (
         <AppLayout>
             <SyncLaunchCheck />
-            <PendingInviteHandler />
-            <PendingReceiveHandler />
+            <PendingOwnvHandler />
             <Suspense fallback={<PageSpinner />}>
                 <Outlet />
             </Suspense>
@@ -284,26 +247,6 @@ function AppRoutes() {
         return (
             <Suspense fallback={<PageLoader />}>
                 <PrivacyPage />
-            </Suspense>
-        );
-    }
-
-    if (location.pathname === '/share-receive') {
-        return <ShareReceivePage />;
-    }
-
-    if (location.pathname === '/invite') {
-        return (
-            <Suspense fallback={<PageLoader />}>
-                <InvitePage />
-            </Suspense>
-        );
-    }
-
-    if (location.pathname === '/receive') {
-        return (
-            <Suspense fallback={<PageLoader />}>
-                <ReceivePage />
             </Suspense>
         );
     }
@@ -413,6 +356,7 @@ export function App() {
         <ThemeProvider>
             <AuthProvider>
                 <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                    <LaunchQueueConsumer />
                     {showSplash && <SplashScreen onDone={handleSplashDone} />}
                     <UpdateBanner />
                     <InstallPrompt />
