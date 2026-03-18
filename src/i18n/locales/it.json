@@ -228,7 +228,21 @@
       "enableBtn": "Abilita {{type}}",
       "disableBtn": "Disabilita {{type}}",
       "enableError": "Impossibile abilitare l'autenticazione biometrica",
-      "disableError": "Impossibile disabilitare l'autenticazione biometrica"
+      "disableError": "Impossibile disabilitare l'autenticazione biometrica",
+      "errors": {
+        "notSupported": "WebAuthn non supportato da questo browser",
+        "noAuthenticator": "Nessun autenticatore biometrico disponibile su questo dispositivo",
+        "checkAvailabilityFailed": "Errore nel controllo della disponibilità biometrica: {{message}}",
+        "webauthnNotSupported": "WebAuthn non supportato",
+        "createCredentialFailed": "Impossibile creare le credenziali",
+        "registrationCancelled": "Registrazione biometrica annullata o negata",
+        "registrationNotSupported": "Autenticazione biometrica non supportata su questo dispositivo",
+        "registrationFailed": "Registrazione biometrica fallita: {{message}}",
+        "noCredentials": "Nessuna credenziale biometrica configurata",
+        "authCancelled": "Autenticazione biometrica annullata o negata",
+        "credentialNotFound": "Credenziale biometrica non trovata. Riabilita la biometria.",
+        "authFailed": "Autenticazione biometrica fallita: {{message}}"
+      }
     }
   },
   "profiles": {

@@ -388,7 +388,7 @@ export function ProfileDetailPage() {
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {profile.deadline && (
                                     <DetailField
                                         label={t('profiles.fields.expiration')}
@@ -672,7 +672,7 @@ function DetailField({ label, value, onCopy, copied, masked = false, action }) {
                 {label}
             </label>
             <div className="flex items-center gap-2">
-                <div className="flex-1 font-mono text-sm bg-slate-900/60 border border-slate-700 px-3 py-2 rounded-lg text-gray-200">
+                <div className="flex-1 min-w-0 font-mono text-sm bg-slate-900/60 border border-slate-700 px-3 py-2 rounded-lg text-gray-200 break-all">
                     {showValue ? value : '••••••••'}
                 </div>
                 {masked && (

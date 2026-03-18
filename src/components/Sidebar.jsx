@@ -22,7 +22,7 @@ function useStorageEstimate() {
                 setStorage({
                     used: usage ?? 0,
                     quota: quota ?? 0,
-                    percentage: quota ? Math.round(((usage ?? 0) / quota) * 100) : 0,
+                    percentage: quota ? parseFloat((((usage ?? 0) / quota) * 100).toFixed(1)) : 0,
                 });
             } catch {
                 // API non supportata

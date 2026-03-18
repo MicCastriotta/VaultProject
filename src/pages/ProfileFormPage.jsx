@@ -683,7 +683,7 @@ export function ProfileFormPage() {
                                         onChange={(e) => setFormData(prev => ({ ...prev, pin: e.target.value }))}
                                         className="w-full px-3 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-500"
                                         placeholder="••••"
-                                        maxLength="4"
+                                        maxLength="6"
                                     />
                                 </div>
                             </>

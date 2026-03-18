@@ -23,7 +23,7 @@ function useStorageEstimate() {
             if (!navigator.storage?.estimate) return;
             try {
                 const { usage, quota } = await navigator.storage.estimate();
-                setStorage({ used: usage ?? 0, quota: quota ?? 0, percentage: quota ? Math.round(((usage ?? 0) / quota) * 100) : 0 });
+                setStorage({ used: usage ?? 0, quota: quota ?? 0, percentage: quota ? parseFloat((((usage ?? 0) / quota) * 100).toFixed(1)) : 0});
             } catch {}
         }
         estimate();

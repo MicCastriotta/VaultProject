@@ -228,7 +228,21 @@
       "enableBtn": "Enable {{type}}",
       "disableBtn": "Disable {{type}}",
       "enableError": "Failed to enable biometric authentication",
-      "disableError": "Failed to disable biometric authentication"
+      "disableError": "Failed to disable biometric authentication",
+      "errors": {
+        "notSupported": "WebAuthn not supported by this browser",
+        "noAuthenticator": "No biometric authenticator available on this device",
+        "checkAvailabilityFailed": "Error checking biometric availability: {{message}}",
+        "webauthnNotSupported": "WebAuthn not supported",
+        "createCredentialFailed": "Failed to create credential",
+        "registrationCancelled": "Biometric registration cancelled or denied",
+        "registrationNotSupported": "Biometric authentication not supported on this device",
+        "registrationFailed": "Failed to register biometric: {{message}}",
+        "noCredentials": "No biometric credentials configured",
+        "authCancelled": "Biometric authentication cancelled or denied",
+        "credentialNotFound": "Biometric credential not found. Please re-enable biometrics.",
+        "authFailed": "Biometric authentication failed: {{message}}"
+      }
     }
   },
   "profiles": {

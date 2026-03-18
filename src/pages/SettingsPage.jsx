@@ -238,6 +238,8 @@ export function SettingsPage() {
     const [syncStatus, setSyncStatus] = useState(null);
     const [isSyncEnabled, setIsSyncEnabled] = useState(false);
     const [syncStatusLoaded, setSyncStatusLoaded] = useState(false);
+    const [isConnecting, setIsConnecting] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
     const [showDonation, setShowDonation] = useState(false);
 
     function toggleSection(key) {
@@ -294,6 +296,7 @@ export function SettingsPage() {
     }
 
     async function handleEnableSync() {
+        setIsConnecting(true);
         try {
             const result = await syncService.enableSync();
             await loadSyncStatus();
@@ -309,6 +312,8 @@ export function SettingsPage() {
         } catch (error) {
             console.error('Error enabling sync:', error);
             setMessage({ type: 'error', text: 'Failed to enable sync: ' + error.message });
+        } finally {
+            setIsConnecting(false);
         }
     }
 
@@ -324,10 +329,13 @@ export function SettingsPage() {
     }
 
     async function handleSyncNow() {
+        setIsSyncing(true);
         try {
             await syncService.sync();
         } catch (error) {
             console.error('Error syncing:', error);
+        } finally {
+            setIsSyncing(false);
         }
     }
 
@@ -566,9 +574,13 @@ export function SettingsPage() {
                                             </p>
                                             <button
                                                 onClick={handleEnableSync}
-                                                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                                                disabled={isConnecting}
+                                                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                             >
-                                                <Cloud size={20} />
+                                                {isConnecting
+                                                    ? <RefreshCw size={20} className="animate-spin" />
+                                                    : <Cloud size={20} />
+                                                }
                                                 <span>{syncStatus?.wasEnabled
                                                     ? t('settings.sync.reconnectDrive')
                                                     : t('settings.sync.connectDrive')}
@@ -607,15 +619,16 @@ export function SettingsPage() {
                                             <div className="space-y-2">
                                                 <button
                                                     onClick={handleSyncNow}
-                                                    disabled={syncStatus?.status === 'syncing' || !syncStatus?.isOnline}
+                                                    disabled={isSyncing || syncStatus?.status === 'syncing' || !syncStatus?.isOnline}
                                                     className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                                 >
-                                                    <RefreshCw size={20} />
+                                                    <RefreshCw size={20} className={isSyncing || syncStatus?.status === 'syncing' ? 'animate-spin' : ''} />
                                                     <span>{t('settings.sync.syncNowBtn')}</span>
                                                 </button>
                                                 <button
                                                     onClick={handleDisableSync}
-                                                    className="w-full bg-slate-700 hover:bg-slate-600 text-gray-300 py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                                                    disabled={isSyncing || syncStatus?.status === 'syncing'}
+                                                    className="w-full bg-slate-700 hover:bg-slate-600 text-gray-300 py-2 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                                 >
                                                     <LogOut size={20} />
                                                     <span>{t('settings.sync.disconnectBtn')}</span>

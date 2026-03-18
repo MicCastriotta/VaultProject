@@ -135,18 +135,18 @@ export function DeviceSecretSetupDialog({ onClose }) {
                         </div>
 
                         {/* Buttons */}
-                        <div className="flex gap-3 pt-1">
+                        <div className="flex flex-col sm:flex-row gap-3 pt-1">
                             <button
                                 onClick={onClose}
                                 disabled={step === 'activating'}
-                                className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-gray-300 rounded-xl font-medium transition-colors disabled:opacity-50"
+                                className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-gray-300 rounded-xl font-medium transition-colors disabled:opacity-50"
                             >
                                 {t('common.cancel')}
                             </button>
                             <button
                                 onClick={handleActivate}
                                 disabled={step === 'activating' || !password}
-                                className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 {step === 'activating' ? (
                                     <>
