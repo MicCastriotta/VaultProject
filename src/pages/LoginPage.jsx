@@ -301,11 +301,22 @@ export function LoginPage() {
                             )}
                         </button>
 
-                        {/* Hint biometria (solo standard, non recovery) */}
-                        {biometricEnabled && !loginRequiresRecoveryKey && (
+                        {/* Hint biometria (solo standard, non recovery e non manual recovery) */}
+                        {biometricEnabled && !loginRequiresRecoveryKey && !showRecoveryKeyField && (
                             <p className="text-xs text-center text-gray-500">
                                 {t('login.biometricHint')}
                             </p>
+                        )}
+
+                        {/* Annulla recovery key manuale (al posto dell'hint biometrico) */}
+                        {showRecoveryKeyField && !loginRequiresRecoveryKey && (
+                            <button
+                                type="button"
+                                onClick={() => { setRecoveryKey(''); setError(null); }}
+                                className="w-full text-xs text-gray-500 hover:text-gray-400 py-1 transition-colors flex items-center justify-center gap-1"
+                            >
+                                <span>{t('deviceSecret.login.cancelRecoveryKey')}</span>
+                            </button>
                         )}
 
                         {/* Alternativa QR approval (quando DSK richiesta) */}

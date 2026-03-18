@@ -245,6 +245,9 @@
       }
     }
   },
+  "main": {
+    "backToExit": "Premi ancora per uscire"
+  },
   "profiles": {
     "title": "Profili",
     "vault": "Il Tuo Vault",
@@ -655,7 +658,8 @@
       "recoveryKeyNeeded": "Questo vault è protetto da Device Secret. Inserisci la Recovery Key o usa l'approvazione QR.",
       "recoveryKeyHint": "Inserisci la Recovery Key del dispositivo originale (formato: OV-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX).",
       "approvalQRBtn": "Approva tramite QR (da altro dispositivo)",
-      "useRecoveryKeyLink": "Usa Recovery Key manualmente"
+      "useRecoveryKeyLink": "Usa Recovery Key manualmente",
+      "cancelRecoveryKey": "Annulla"
     },
 
     "enrollBiometric": {

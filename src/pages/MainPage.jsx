@@ -97,7 +97,30 @@ export function MainPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [showSortMenu, setShowSortMenu] = useState(false);
     const [iconColors, setIconColors] = useState({});
+    const [backToast, setBackToast] = useState(false);
+    const lastBackPress = useRef(0);
     const { logout } = useAuth();
+
+    // Intercetta il tasto back su mobile: primo press mostra toast, secondo press entro 2s esce
+    useEffect(() => {
+        history.pushState(null, '', window.location.href);
+
+        const handlePopState = () => {
+            const now = Date.now();
+            if (now - lastBackPress.current < 2000) {
+                // Secondo press entro 2s → esce davvero
+                return;
+            }
+            // Primo press → blocca e mostra toast
+            lastBackPress.current = now;
+            history.pushState(null, '', window.location.href);
+            setBackToast(true);
+            setTimeout(() => setBackToast(false), 2000);
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
 
     // Carica i colori hex brand in modo lazy, solo per gli slug presenti
     useEffect(() => {
@@ -398,10 +421,15 @@ export function MainPage() {
                     onClick={() => navigate('/profile/new')}
                     className="fixed right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-500 active:scale-95 transition-all z-[9999]"
                     style={{ bottom: '5.5rem' }}
-
                 >
                     <Plus size={28} />
                 </button>
+
+                {backToast && (
+                    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9998] px-4 py-3 rounded-xl shadow-lg bg-slate-700 text-white text-sm font-medium whitespace-nowrap">
+                        {t('main.backToExit')}
+                    </div>
+                )}
 
             </div>
     );
