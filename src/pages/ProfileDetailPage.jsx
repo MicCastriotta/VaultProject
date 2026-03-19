@@ -23,7 +23,8 @@ import {
     FileText,
     Image,
     Send,
-    Link
+    Link,
+    AlertCircle
 } from 'lucide-react';
 import { OTPDisplay } from '../components/OTPDisplay';
 import { IconRenderer } from '../components/IconRenderer';
@@ -523,6 +524,7 @@ function ShareContactSheet({ profile, attachmentMeta, onClose }) {
     const [generatingId, setGeneratingId] = useState(null);
     const [shareLink, setShareLink] = useState(null);
     const [linkCopied, setLinkCopied] = useState(false);
+    const [shareError, setShareError] = useState(null);
 
     useEffect(() => {
         contactsService.getAllContacts().then(setContacts);
@@ -531,6 +533,7 @@ function ShareContactSheet({ profile, attachmentMeta, onClose }) {
     async function handleSelectContact(contact) {
         if (generatingId) return;
         setGeneratingId(contact.id);
+        setShareError(null);
         try {
             const { title, category, username, password, website, note, secretKey, icon, lastModified,
                     cardNumber, expiration, cvv, cardOwner, pin } = profile;
@@ -580,8 +583,14 @@ function ShareContactSheet({ profile, attachmentMeta, onClose }) {
             } else {
                 setShareLink(url);
             }
-        } catch {
-            // utente ha annullato
+        } catch (err) {
+            if (err?.name !== 'AbortError') {
+                setShareError(
+                    err?.message === 'relay_too_large'
+                        ? t('share.tooLarge')
+                        : t('share.uploadFailed')
+                );
+            }
         } finally {
             setGeneratingId(null);
         }
@@ -606,6 +615,12 @@ function ShareContactSheet({ profile, attachmentMeta, onClose }) {
                 </div>
 
                 <div className="p-5">
+                    {shareError && (
+                        <div className="flex items-start gap-2 mb-4 px-3 py-2.5 bg-red-500/10 border border-red-500/30 rounded-xl">
+                            <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
+                            <p className="text-xs text-red-300">{shareError}</p>
+                        </div>
+                    )}
                     {shareLink ? (
                         /* Vista link generato — desktop: copia manuale con nuovo user gesture */
                         <div className="space-y-3">

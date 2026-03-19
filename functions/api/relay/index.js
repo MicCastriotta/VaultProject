@@ -12,7 +12,7 @@
  */
 
 const RELAY_TTL_SECONDS = 48 * 60 * 60; // 48 ore
-const MAX_PAYLOAD_BYTES = 512 * 1024;    // 512 KB (sufficiente per profili con allegati piccoli)
+const MAX_PAYLOAD_BYTES = 10 * 1024 * 1024; // 10 MB (copre allegati fino a ~6 MB effettivi con overhead base64)
 
 const ALLOWED_ORIGINS = [
     'https://ownvault.eu',

@@ -480,6 +480,8 @@
     "importing": "Importazione...",
     "imported": "Profilo importato!",
     "importError": "Importazione fallita. Riprova.",
+    "tooLarge": "Il profilo con allegato è troppo grande per il relay. Prova a rimuovere l'allegato prima di condividere.",
+    "uploadFailed": "Impossibile generare il link. Controlla la connessione e riprova.",
     "decryptError": "Decifratura fallita. Chiave errata o file corrotto.",
     "invalidFile": "File .ownv non valido o corrotto.",
     "generating": "Generazione file...",

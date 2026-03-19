@@ -282,6 +282,7 @@ class ContactsService {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
+        if (response.status === 413) throw new Error('relay_too_large');
         if (!response.ok) throw new Error('relay_upload_failed');
         const { id } = await response.json();
         return `${window.location.origin}/receive/${id}`;

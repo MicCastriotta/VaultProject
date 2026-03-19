@@ -480,6 +480,8 @@
     "importing": "Importing...",
     "imported": "Profile imported!",
     "importError": "Import failed. Try again.",
+    "tooLarge": "The profile with attachment is too large for the relay. Try removing the attachment before sharing.",
+    "uploadFailed": "Unable to generate link. Check your connection and try again.",
     "decryptError": "Decryption failed. Wrong key or corrupted file.",
     "invalidFile": "Invalid or corrupted .ownv file.",
     "generating": "Generating file...",
