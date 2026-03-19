@@ -313,36 +313,7 @@ class ContactsService {
         return 'copied';
     }
 
-    // ========================================
-    // FILE .ownv
-    // ========================================
-
-    /**
-     * Genera un file .ownv con l'identità dell'utente (invite).
-     * Il destinatario lo importa per aggiungere l'utente ai contatti.
-     */
-    async generateInviteFile() {
-        const identity = await this.getOrCreateIdentity();
-        const data = {
-            type: 'invite',
-            v: 1,
-            pk: identity.publicKey,
-            name: identity.displayName || ''
-        };
-        // application/octet-stream: riconosciuto da Android (Web Share API + file association)
-        // e da iOS (evita il filtro del picker per tipi MIME custom non registrati)
-        return new Blob([JSON.stringify(data)], { type: 'application/octet-stream' });
-    }
-
-    /**
-     * Genera un file .ownv con un profilo cifrato per un contatto specifico.
-     */
-    async generateProfileFile(profileData, recipientPublicKeyB64) {
-        const payload = await this.encryptProfileForContact(profileData, recipientPublicKeyB64);
-        const data = { type: 'profile', v: 1, ...payload };
-        return new Blob([JSON.stringify(data)], { type: 'application/octet-stream' });
-    }
-
+    
     /**
      * Parsa il contenuto testuale di un file .ownv.
      * Ritorna l'oggetto parsed oppure null se non valido.
@@ -357,29 +328,7 @@ class ContactsService {
         } catch {
             return null;
         }
-    }
-
-    /**
-     * Condivide un file tramite Web Share API (se supportata con files)
-     * oppure lo scarica direttamente.
-     */
-    async shareOrDownload(blob, fileName) {
-        // Usa application/octet-stream: Android Chrome Web Share API rifiuta tipi MIME custom
-        // (canShare ritorna false per application/x-ownvault).
-        // L'estensione .ownv nel fileName preserva l'associazione corretta sul destinatario.
-        const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        const file = new File([blob], fileName, { type: 'application/octet-stream' });
-        if (isMobile && navigator.canShare?.({ files: [file] })) {
-            await navigator.share({ files: [file], title: 'OwnVault' });
-        } else {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-        }
-    }
+    }    
 
     // ========================================
     // UTILITIES

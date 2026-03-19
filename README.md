@@ -61,10 +61,10 @@ DEK — Data Encryption Key (random, 256-bit)
 
 ### Contatti e Condivisione profili
 - **Identità crittografica** per ogni vault: keypair ECDH P-256 generata al primo accesso, chiave privata cifrata con la DEK
-- **Invite link** per aggiungere contatti: `#pk=<publicKey>&name=<name>` nel fragment URL (mai inviato al server)
+- **Invite via relay link**: l'invito viene caricato sul relay Cloudflare KV e condiviso come URL `/receive/<id>` — il server non ha accesso ai dati (zero-knowledge)
 - **Fingerprint visivo** del contatto: primi 8 byte SHA-256(publicKey) in esadecimale per verifica out-of-band
-- **Condivisione profilo cifrata**: ECDH effimero + HKDF-SHA256 + AES-256-GCM (forward secrecy per ogni share)
-- Flusso pendente: invite/receive salvati in `sessionStorage` se il vault è bloccato, ripristinati dopo l'unlock
+- **Condivisione profilo cifrata**: ECDH effimero + HKDF-SHA256 + AES-256-GCM (forward secrecy per ogni share); payload caricato sul relay, condiviso come link
+- Flusso pendente: se il vault è bloccato quando si apre un link `/receive/:id`, l'ID viene salvato in `sessionStorage` e il payload viene recuperato dopo l'unlock
 - Export/Import JSON v3: include identità e rubrica contatti
 
 ### Backup e Sync
@@ -164,6 +164,29 @@ Formato: `OV-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX` (Crockford Base32, 20 byte = 1
 
 Da conservare offline come backup della DSK. Permette di ri-enrollare la biometria su un device dopo reset o se il credenziale WebAuthn viene eliminato.
 
+### Relay server (Cloudflare KV — zero-knowledge)
+
+I payload di invito e profilo cifrato vengono caricati su un relay Cloudflare KV prima di condividere il link. Il server è **zero-knowledge**: riceve e restituisce solo testo opaco cifrato.
+
+```
+Mittente
+  → cifra payload (invite: pk+name in chiaro | profile: ECDH+AES-GCM ciphertext)
+  → POST /api/relay  → Cloudflare KV  → { id, expiresAt }
+  → condivide URL: <origin>/receive/<id>
+
+Destinatario
+  → apre /receive/<id>
+  → GET /api/relay/<id>  → Cloudflare KV  → payload JSON
+  → valida e mostra preview modale in ContactsPage
+  → conferma → salva profilo/contatto + refreshHMAC
+```
+
+- TTL: 48 ore (il relay non espone dati dopo la scadenza)
+- ID: 128 bit random esadecimale (32 char)
+- Payload max: 512 KB
+- Il relay non ha accesso alle chiavi private — i profili sono leggibili solo dal destinatario
+- Se il vault è bloccato all'apertura del link, l'ID viene salvato in `sessionStorage` e il fetch avviene dopo l'unlock
+
 ### Identità crittografica e condivisione profili (ECDH)
 
 ```
@@ -173,23 +196,24 @@ Vault sbloccato
    → chiave privata → cifrata con DEK (JWK → AES-GCM) → IndexedDB
 
 Condivisione profilo verso contatto:
-   sender:
-     → genera keypair effimero ECDH P-256 (usa-e-getta)
-     → ECDH(effimero_priv, destinatario_pub) → sharedBits 256-bit
-     → HKDF-SHA256(sharedBits, info="OwnVault-Share-v1") → wrapKey AES-256
-     → AES-256-GCM(wrapKey, profileData) → (ct, iv)
-     → payload = { v:1, epk, iv, ct } → base64url → URL fragment /receive#...
+  sender:
+    → genera keypair effimero ECDH P-256 (usa-e-getta)
+    → ECDH(effimero_priv, destinatario_pub) → sharedBits 256-bit
+    → HKDF-SHA256(sharedBits, info="OwnVault-Share-v1") → wrapKey AES-256
+    → AES-256-GCM(wrapKey, profileData) → (ct, iv)
+    → payload = { v:1, epk, iv, ct } → POST /api/relay → URL /receive/<id>
 
-   destinatario (vault sbloccato):
-     → decifra chiave privata con DEK
-     → ECDH(priv, epk) → sharedBits → wrapKey
-     → AES-256-GCM-decrypt → profileData
-     → re-cifra con propria DEK → salva in IndexedDB + refreshHMAC
+  destinatario (vault sbloccato):
+    → GET /api/relay/<id> → payload JSON
+    → decifra chiave privata con DEK
+    → ECDH(priv, epk) → sharedBits → wrapKey
+    → AES-256-GCM-decrypt → profileData
+    → re-cifra con propria DEK → salva in IndexedDB + refreshHMAC
 ```
 
-La chiave effimera del mittente garantisce **forward secrecy**: compromettere la chiave privata dell'identità non espone share passati. Il payload viaggia nel fragment URL (mai inviato al server).
+La chiave effimera del mittente garantisce **forward secrecy**: compromettere la chiave privata dell'identità non espone share passati. Il relay è zero-knowledge: conosce solo il ciphertext, non le chiavi.
 
-**Limiti noti (v1):** nessuna firma del mittente (chiunque con la chiave pubblica del destinatario può cifrare un payload), nessuna scadenza o monouso sui link. Previsti in una versione futura con firme Ed25519.
+**Limiti noti (v1):** nessuna firma del mittente (chiunque con la chiave pubblica del destinatario può cifrare un payload valido). Previsto in una versione futura con firme Ed25519.
 
 ### Integrità database (HMAC v2 — anti-tampering)
 
@@ -247,7 +271,7 @@ default-src 'self'
 script-src 'self' 'wasm-unsafe-eval' https://apis.google.com https://accounts.google.com
 style-src 'self' 'unsafe-inline'
 img-src 'self' data: blob:
-connect-src 'self' https://www.googleapis.com https://api.pwnedpasswords.com
+connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://api.pwnedpasswords.com
 frame-src https://content.googleapis.com https://docs.google.com
 object-src 'none'
 base-uri 'self'
@@ -275,9 +299,9 @@ upgrade-insecure-requests
 | Bit flipping / corruzione | GCM rileva qualsiasi modifica |
 | Padding oracle | GCM non usa padding |
 | Tampering IndexedDB | HMAC-SHA256 v2 con chiave derivata dalla DEK (copre anche allegati) |
-| Profilo importato senza HMAC update | refreshHMAC() chiamato dopo ogni import da contatto |
-| Share profilo intercettato | AES-256-GCM con chiave ECDH effimera — illeggibile senza chiave privata destinatario |
-| Eavesdropping link condivisione | Payload nel fragment URL — mai inviato al server |
+| Profilo importato senza HMAC update | refreshHMAC() chiamato dopo ogni import da contatto/relay |
+| Share profilo intercettato sul relay | Il relay riceve solo ciphertext AES-256-GCM — illeggibile senza chiave privata destinatario |
+| Share profilo intercettato in transito | HTTPS + payload E2E cifrato con chiave ECDH effimera |
 | Eliminazione silenziosa record | Conteggio profili + allegati nel payload HMAC |
 | Allegati spostati tra profili | AAD con profileId — decifratura fallisce cross-profile |
 | Brute-force locale | Rate limiting persistente + 600k iterazioni KDF |
@@ -298,8 +322,8 @@ upgrade-insecure-requests
 | Modalità privata del browser | Storage separato — rate limit non persiste tra sessioni private |
 | Brute-force GPU su DB rubato | PBKDF2 non è memory-hard (Argon2id sarebbe più resistente) |
 | Mittente non autenticato nello share | Nessuna firma Ed25519 in v1 — chiunque con la pubkey del destinatario può inviare |
-| Sostituzione chiave pubblica nel link invito | TOFU — l'utente deve verificare il fingerprint out-of-band |
-| Invite link non scade | Nessun meccanismo di revoca o TTL in v1 |
+| Sostituzione chiave pubblica nell'invito | TOFU — l'utente deve verificare il fingerprint out-of-band |
+| Relay link compromesso prima dell'apertura | ID a 128 bit — forza bruta impraticabile; scade dopo 48h |
 
 ---
 
@@ -318,6 +342,7 @@ upgrade-insecure-requests
 | Autenticazione biometrica | WebAuthn (Platform Authenticator) |
 | XSS protection | DOMPurify |
 | PWA | Vite PWA Plugin + Service Worker (Workbox) |
+| Relay condivisione | Cloudflare Pages Functions + Cloudflare KV |
 | Sync cloud | Google Drive API v3 |
 | Password health | HaveIBeenPwned API (k-anonymity) |
 | Internazionalizzazione | i18next |
@@ -329,6 +354,8 @@ upgrade-insecure-requests
 ```
 src/
 ├── App.jsx                        # Router + Auth guard + UpdateBanner + InstallPrompt
+│                                  # PendingRelayHandler (fetch relay dopo unlock)
+│                                  # ReceivePage (intercetta /receive/:id da vault sbloccato)
 ├── main.jsx                       # Entry point PWA
 ├── index.css                      # Tailwind + glass effects + light theme overrides
 │
@@ -343,15 +370,13 @@ src/
 │   ├── LoginPage.jsx              # Unlock con password (+ 2FA biometrico)
 │   ├── SignUpPage.jsx             # Setup guidato: nuovo dispositivo | ripristina da file/Drive
 │   ├── MainPage.jsx               # Vault — lista profili con ricerca/ordinamento
-│   ├── ProfileDetailPage.jsx      # Visualizzazione profilo + OTP + allegati + share ECDH
+│   ├── ProfileDetailPage.jsx      # Visualizzazione profilo + OTP + allegati + share ECDH via relay
 │   ├── ProfileFormPage.jsx        # Creazione / modifica profilo
 │   ├── PasswordGeneratorPage.jsx  # Generatore password e passphrase
 │   ├── PasswordHealthPage.jsx     # Analisi sicurezza password (HIBP + duplicati + forza)
 │   ├── SettingsPage.jsx           # Impostazioni (biometria, sync, auto-lock, tema)
 │   ├── ImportPage.jsx             # Import da database legacy
-│   ├── ContactsPage.jsx           # Rubrica contatti + identità + invite link
-│   ├── InvitePage.jsx             # Pagina pubblica riscatto invite link
-│   └── ReceivePage.jsx            # Pagina pubblica ricezione profilo cifrato
+│   └── ContactsPage.jsx          # Rubrica contatti + identità + invite/receive via relay
 │
 ├── components/
 │   ├── Sidebar.jsx                # Navigazione desktop + mobile bottom nav
@@ -371,7 +396,7 @@ src/
 ├── services/
 │   ├── cryptoService.js           # PBKDF2, AES-GCM, HKDF, HMAC, blob encryption con AAD
 │   ├── databaseService.js         # IndexedDB (Dexie), export/import v3, validazione
-│   ├── contactsService.js         # Identità ECDH, rubrica, invite link, encrypt/decrypt profili
+│   ├── contactsService.js         # Identità ECDH, rubrica, relay upload/fetch, encrypt/decrypt profili
 │   ├── biometricService.js        # WebAuthn registration + PRF authentication
 │   ├── deviceSecretService.js     # DSK generazione/wrap/unwrap, QR pairing ECDH, recovery key
 │   ├── healthCacheService.js      # Cache in-memoria per risultati Password Health
@@ -387,6 +412,12 @@ src/
 └── i18n/
     ├── config.js
     └── locales/                   # Traduzioni (it, en, ...)
+
+functions/
+└── api/
+    ├── relay/
+    │   ├── index.js               # POST /api/relay — crea entry su Cloudflare KV (48h TTL)
+    │   └── [id].js                # GET /api/relay/:id — recupera payload dal KV
 ```
 
 ---
@@ -459,11 +490,11 @@ isUnlocked = false
 
 ---
 
-## Export / Import (formato v2)
+## Export / Import (formato v3)
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "exportDate": "2025-01-01T00:00:00.000Z",
   "crypto": {
     "version": 2,
@@ -496,18 +527,7 @@ isUnlocked = false
       "metaData": "<base64>",
       "driveFileId": null
     }
-  ]
-}
-```
-
-Il file è portabile: funziona su qualsiasi device con la stessa master password. L'import valida rigorosamente la struttura prima di sovrascrivere il database.
-
-**Versioni supportate in import:** v1 (senza allegati), v2 (con allegati), v3 (con allegati + identità ECDH + contatti).
-
-**Formato v3** aggiunge:
-```json
-{
-  "version": 3,
+  ],
   "identity": {
     "publicKey": "<base64url>",
     "encryptedPrivateKey": { "iv": "...", "data": "..." },
@@ -519,6 +539,10 @@ Il file è portabile: funziona su qualsiasi device con la stessa master password
 }
 ```
 
+Il file è portabile: funziona su qualsiasi device con la stessa master password. L'import valida rigorosamente la struttura prima di sovrascrivere il database.
+
+**Versioni supportate in import:** v1 (senza allegati), v2 (con allegati), v3 (con allegati + identità ECDH + contatti).
+
 ---
 
 ## Setup e Sviluppo
@@ -527,7 +551,7 @@ Il file è portabile: funziona su qualsiasi device con la stessa master password
 # Installa dipendenze
 npm install
 
-# Avvia in dev (hot reload)
+# Avvia in dev (hot reload) — il relay /api/relay è mockato in memoria da Vite
 npm run dev
 
 # Build produzione
@@ -537,12 +561,22 @@ npm run build
 npm run preview
 ```
 
+Il relay in sviluppo è simulato da un middleware Vite in-memory (vedere `vite.config.js`), senza bisogno di Cloudflare Wrangler.
+
 ### Variabili d'ambiente (opzionali — solo per sync Google Drive)
 
 ```env
 VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 VITE_GOOGLE_API_KEY=your-api-key
 ```
+
+### Deploy (Cloudflare Pages)
+
+Il progetto usa **Cloudflare Pages Functions** per il relay:
+
+- `functions/api/relay/index.js` — gestisce `POST /api/relay`
+- `functions/api/relay/[id].js` — gestisce `GET /api/relay/:id`
+- Binding KV richiesto: variabile `OV_RELAY` collegata a un namespace Cloudflare KV
 
 ---
 
@@ -563,6 +597,7 @@ VITE_GOOGLE_API_KEY=your-api-key
 | Password health | Nessuna | HIBP k-anonymity + duplicati + forza |
 | Allegati | Nessuno | File cifrati con AAD, fino a 15 MB |
 | Backup | Manuale | Google Drive automatico |
+| Condivisione profili | Nessuna | E2E cifrata via relay zero-knowledge (ECDH + AES-GCM) |
 | Platform | Android/iOS | Web (qualsiasi OS/device) |
 
 ---
@@ -592,8 +627,8 @@ VITE_GOOGLE_API_KEY=your-api-key
 - [x] Content Security Policy (produzione)
 - [x] Identità crittografica ECDH P-256 per vault
 - [x] Rubrica contatti con fingerprint visivo
-- [x] Invite link (fragment URL, mai inviato al server)
-- [x] Condivisione profili cifrati (ECDH effimero + AES-256-GCM, forward secrecy)
+- [x] Condivisione profili cifrata E2E (ECDH effimero + AES-256-GCM, forward secrecy)
+- [x] Relay server zero-knowledge (Cloudflare KV, 48h TTL) per condivisione via link
 - [x] Export/Import v3 (include identità + contatti)
 - [x] Setup guidato al primo avvio (nuovo dispositivo o ripristino backup)
 - [x] Device Secret Key (DSK) — chiave locale a 160 bit, secondo fattore crittografico
