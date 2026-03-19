@@ -31,14 +31,86 @@ function cspPlugin() {
 
     // Dev: mock in-memory del relay Cloudflare KV (non serve wrangler in locale)
     configureServer(server) {
-      const relayStore = new Map(); // id → { payload, expiresAt }
-      const RELAY_TTL_MS = 48 * 60 * 60 * 1000;
+      const relayStore = new Map();    // id → { payload, expiresAt }
+      const identityStore = new Map(); // fingerprint → { pk, deleteTokenHash }
+      const RELAY_TTL_MS = 24 * 60 * 60 * 1000;
 
+      // Mock /api/identity
+      server.middlewares.use('/api/identity', (req, res, next) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Cache-Control', 'no-store');
+
+        const fp = req.url.length > 1 ? req.url.slice(1).replace(/^\//, '') : null;
+
+        // POST /api/identity — registra
+        if (req.method === 'POST' && !fp) {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', () => {
+            try {
+              const { fingerprint, pk, deleteTokenHash } = JSON.parse(body);
+              if (!fingerprint || !pk || !deleteTokenHash) throw new Error('Invalid');
+              identityStore.set(fingerprint, { pk, deleteTokenHash });
+              res.writeHead(200);
+              res.end(JSON.stringify({ ok: true }));
+            } catch {
+              res.writeHead(400);
+              res.end(JSON.stringify({ error: 'Invalid payload' }));
+            }
+          });
+          return;
+        }
+
+        // GET /api/identity/:fp — lookup
+        if (req.method === 'GET' && fp) {
+          const entry = identityStore.get(fp);
+          if (!entry) { res.writeHead(404); res.end(JSON.stringify({ error: 'Not found' })); return; }
+          res.writeHead(200);
+          res.end(JSON.stringify({ pk: entry.pk }));
+          return;
+        }
+
+        // DELETE /api/identity/:fp — rimuovi
+        if (req.method === 'DELETE' && fp) {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', () => {
+            identityStore.delete(fp);
+            res.writeHead(200);
+            res.end(JSON.stringify({ ok: true }));
+          });
+          return;
+        }
+
+        next();
+      });
+
+      // Mock /api/relay
       server.middlewares.use('/api/relay', (req, res, next) => {
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Cache-Control', 'no-store');
 
-        // POST /api/relay — crea entry
+        // GET /api/relay/inbox/:fp — lista ID pendenti per fingerprint
+        if (req.method === 'GET' && req.url.startsWith('/inbox/')) {
+          const fp = req.url.slice('/inbox/'.length);
+          if (!/^[0-9a-f]{16}$/.test(fp)) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: 'Invalid fingerprint' }));
+            return;
+          }
+          const prefix = `inbox:${fp}:`;
+          const ids = [];
+          for (const [key, entry] of relayStore.entries()) {
+            if (key.startsWith(prefix) && Date.now() <= new Date(entry.expiresAt).getTime()) {
+              ids.push(entry.id);
+            }
+          }
+          res.writeHead(200);
+          res.end(JSON.stringify({ ids }));
+          return;
+        }
+
+        // POST /api/relay — crea entry + inbox marker se recipientFp presente
         if (req.method === 'POST' && req.url === '/') {
           let body = '';
           req.on('data', chunk => { body += chunk; });
@@ -50,6 +122,10 @@ function cspPlugin() {
                 .map(b => b.toString(16).padStart(2, '0')).join('');
               const expiresAt = new Date(Date.now() + RELAY_TTL_MS).toISOString();
               relayStore.set(id, { payload: body, expiresAt });
+              // Salva marker inbox se il payload include recipientFp
+              if (parsed.recipientFp && /^[0-9a-f]{16}$/.test(parsed.recipientFp)) {
+                relayStore.set(`inbox:${parsed.recipientFp}:${id}`, { id, expiresAt });
+              }
               res.writeHead(201);
               res.end(JSON.stringify({ id, expiresAt }));
             } catch {
@@ -72,6 +148,22 @@ function cspPlugin() {
           }
           res.writeHead(200);
           res.end(entry.payload);
+          return;
+        }
+
+        // DELETE /api/relay/:id — elimina entry + inbox marker
+        if (req.method === 'DELETE' && req.url.length > 1) {
+          const id = req.url.slice(1);
+          const entry = relayStore.get(id);
+          if (entry) {
+            try {
+              const parsed = JSON.parse(entry.payload);
+              if (parsed.recipientFp) relayStore.delete(`inbox:${parsed.recipientFp}:${id}`);
+            } catch { /* silenzioso */ }
+          }
+          relayStore.delete(id);
+          res.writeHead(200);
+          res.end(JSON.stringify({ ok: true }));
           return;
         }
 

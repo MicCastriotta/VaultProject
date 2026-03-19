@@ -246,35 +246,168 @@ class ContactsService {
     }
 
     // ========================================
-    // RELAY SERVER (Cloudflare KV)
+    // DIRECTORY IDENTITÀ (Cloudflare KV OV_IDENTITY)
     // ========================================
 
     /**
-     * Carica il payload dell'invito cifrato sul relay e ritorna il link di condivisione.
-     * Il link ha la forma: <origin>/receive/<id>
+     * Normalizza un fingerprint: rimuove colons, lowercase, 16 hex chars.
+     * Accetta sia "AA:BB:CC:DD:EE:FF:11:22" che "aabbccddeeff1122".
+     * Ritorna null se il formato non è valido.
      */
-    async shareInviteViaRelay() {
-        const identity = await this.getOrCreateIdentity();
-        const data = {
-            type: 'invite',
-            v: 1,
-            pk: identity.publicKey,
-            name: identity.displayName || ''
-        };
-        return await this._uploadToRelay(data);
+    normalizeFingerprint(fp) {
+        const clean = fp.replace(/:/g, '').toLowerCase();
+        return /^[0-9a-f]{16}$/.test(clean) ? clean : null;
     }
+
+    /**
+     * Deriva il deleteToken dalla chiave privata dell'identità (HMAC deterministico).
+     * Funziona su qualsiasi device che ha il vault sbloccato con lo stesso backup.
+     */
+    async _deriveDeleteToken() {
+        const identity = await db.config.get('identity');
+        if (!identity) throw new Error('No identity');
+        const jwk = await cryptoService.decryptData(identity.encryptedPrivateKey);
+        // Usa il parametro 'd' (scalare privato base64url) come materiale HMAC
+        const keyBytes = this._fromBase64url(jwk.d);
+        const hmacKey = await crypto.subtle.importKey(
+            'raw', keyBytes,
+            { name: 'HMAC', hash: 'SHA-256' },
+            false, ['sign']
+        );
+        const info = new TextEncoder().encode('OwnVault-directory-delete-v1');
+        const sig = await crypto.subtle.sign('HMAC', hmacKey, info);
+        return this._toBase64url(sig);
+    }
+
+    /**
+     * Registra il fingerprint dell'utente nella directory globale (opt-in).
+     * Richiede vault sbloccato. TTL 6 mesi, auto-rinnovato dall'app.
+     */
+    async registerIdentity() {
+        const identity = await this.getOrCreateIdentity();
+        const fingerprint = await this.getFingerprint(identity.publicKey);
+        const fp16 = this.normalizeFingerprint(fingerprint);
+
+        const deleteToken = await this._deriveDeleteToken();
+        const deleteTokenHashBuf = await crypto.subtle.digest(
+            'SHA-256',
+            this._fromBase64url(deleteToken)
+        );
+        const deleteTokenHash = this._toBase64url(new Uint8Array(deleteTokenHashBuf));
+
+        const response = await fetch('/api/identity', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fingerprint: fp16, pk: identity.publicKey, deleteTokenHash })
+        });
+        if (!response.ok) throw new Error('identity_register_failed');
+    }
+
+    /**
+     * Rimuove la registrazione dalla directory.
+     * Richiede vault sbloccato (per derivare il deleteToken).
+     */
+    async unregisterIdentity() {
+        const identity = await db.config.get('identity');
+        if (!identity) return;
+        const fingerprint = await this.getFingerprint(identity.publicKey);
+        const fp16 = this.normalizeFingerprint(fingerprint);
+        const deleteToken = await this._deriveDeleteToken();
+
+        const response = await fetch(`/api/identity/${fp16}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deleteToken })
+        });
+        if (!response.ok && response.status !== 404) throw new Error('identity_unregister_failed');
+    }
+
+    /**
+     * Controlla se l'utente è registrato nella directory.
+     * Ritorna true/false senza richiedere vault sbloccato.
+     */
+    async isRegisteredInDirectory() {
+        const identity = await db.config.get('identity');
+        if (!identity) return false;
+        const fingerprint = await this.getFingerprint(identity.publicKey);
+        const fp16 = this.normalizeFingerprint(fingerprint);
+        const response = await fetch(`/api/identity/${fp16}`);
+        return response.ok;
+    }
+
+    /**
+     * Cerca un contatto per fingerprint nella directory globale.
+     * Verifica crittograficamente che SHA256(pk)[:8] == fingerprint.
+     * Ritorna { pk, fingerprint } oppure lancia un errore.
+     */
+    async lookupByFingerprint(rawFingerprint) {
+        const fp16 = this.normalizeFingerprint(rawFingerprint);
+        if (!fp16) throw new Error('invalid_fingerprint_format');
+
+        const response = await fetch(`/api/identity/${fp16}`);
+        if (response.status === 404) throw new Error('fingerprint_not_found');
+        if (!response.ok) throw new Error('directory_lookup_failed');
+
+        const { pk } = await response.json();
+
+        // Verifica crittografica: SHA256(pk)[:8 byte] deve corrispondere al fingerprint cercato
+        const pkBytes = this._fromBase64url(pk);
+        const hashBuf = await crypto.subtle.digest('SHA-256', pkBytes);
+        const computedFp = Array.from(new Uint8Array(hashBuf).slice(0, 8))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+
+        if (computedFp !== fp16) throw new Error('fingerprint_mismatch');
+
+        // Ritorna il fingerprint nel formato display con colons
+        const displayFp = Array.from(new Uint8Array(hashBuf).slice(0, 8))
+            .map(b => b.toString(16).padStart(2, '0').toUpperCase())
+            .join(':');
+
+        return { pk, fingerprint: displayFp };
+    }
+
+    // ========================================
+    // RELAY SERVER (Cloudflare KV OV_RELAY)
+    // ========================================
 
     /**
      * Carica il payload del profilo cifrato per il destinatario sul relay.
+     * recipientFp (opzionale): fingerprint display del destinatario — aggiunge il marker inbox
+     * così il destinatario può fare pull senza ricevere il link direttamente.
+     * Ritorna { url, id } — l'id serve per il delete-after-confirmation.
      */
-    async shareProfileViaRelay(profileData, recipientPublicKeyB64) {
+    async shareProfileViaRelay(profileData, recipientPublicKeyB64, recipientFp) {
         const payload = await this.encryptProfileForContact(profileData, recipientPublicKeyB64);
         const data = { type: 'profile', v: 1, ...payload };
+        if (recipientFp) {
+            const fp16 = this.normalizeFingerprint(recipientFp);
+            if (fp16) data.recipientFp = fp16;
+        }
         return await this._uploadToRelay(data);
     }
 
     /**
-     * POST il payload al relay, ritorna la URL di condivisione.
+     * Recupera la lista degli ID payload pendenti nell'inbox del proprio fingerprint.
+     * Ritorna un array di ID (stringhe hex 32 char).
+     */
+    async fetchInbox() {
+        const identity = await db.config.get('identity');
+        if (!identity) return [];
+        const fingerprint = await this.getFingerprint(identity.publicKey);
+        const fp16 = this.normalizeFingerprint(fingerprint);
+        try {
+            const response = await fetch(`/api/relay/inbox/${fp16}`);
+            if (!response.ok) return [];
+            const { ids } = await response.json();
+            return Array.isArray(ids) ? ids : [];
+        } catch {
+            return [];
+        }
+    }
+
+    /**
+     * POST il payload al relay. Ritorna { url, id }.
      */
     async _uploadToRelay(data) {
         const response = await fetch('/api/relay', {
@@ -282,14 +415,15 @@ class ContactsService {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
+        if (response.status === 413) throw new Error('relay_too_large');
         if (!response.ok) throw new Error('relay_upload_failed');
         const { id } = await response.json();
-        return `${window.location.origin}/receive/${id}`;
+        return { url: `${window.location.origin}/receive/${id}`, id };
     }
 
     /**
      * Recupera un payload dal relay tramite ID.
-     * Ritorna il testo JSON grezzo (compatibile con parseOwnvFile).
+     * Ritorna il testo JSON grezzo.
      * Lancia 'relay_expired' se il link non esiste più.
      */
     async fetchFromRelay(id) {
@@ -297,6 +431,18 @@ class ContactsService {
         if (response.status === 404) throw new Error('relay_expired');
         if (!response.ok) throw new Error('relay_fetch_failed');
         return await response.text();
+    }
+
+    /**
+     * Elimina un payload dal relay dopo import confermato.
+     * Fallisce silenziosamente — il TTL 24h è il fallback.
+     */
+    async deleteFromRelay(id) {
+        try {
+            await fetch(`/api/relay/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        } catch {
+            // silenzioso — TTL gestisce la scadenza
+        }
     }
 
     /**

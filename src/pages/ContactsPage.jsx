@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-    ArrowLeft, UserPlus, Trash2, User, Pencil,
-    X, Check, AlertCircle, CreditCard, Globe, Shield, Fingerprint, Paperclip, Link
+    ArrowLeft, Trash2, User, Pencil,
+    X, Check, AlertCircle, CreditCard, Globe, Shield, Fingerprint, Paperclip, Copy, Search, Inbox
 } from 'lucide-react';
 import { contactsService } from '../services/contactsService';
 import { useAuth } from '../contexts/AuthContext';
@@ -32,12 +32,20 @@ export function ContactsPage() {
     const [preview, setPreview] = useState(null);
     const [isConfirming, setIsConfirming] = useState(false);
 
-    // Modal "imposta nome" richiesto prima di condividere invito
-    const [showNameRequired, setShowNameRequired] = useState(false);
-    const [isSharing, setIsSharing] = useState(false);
 
-    // Import da link relay (workaround iOS PWA + desktop)
-    const [linkInput, setLinkInput] = useState('');
+    // Relay id pendente (da ReceivePage/PendingRelayHandler) — usato per delete-after-confirm
+    const [pendingRelayId, setPendingRelayId] = useState(null);
+
+    // Ricerca contatto per fingerprint
+    const [fingerprintInput, setFingerprintInput] = useState('');
+    const [isLookingUp, setIsLookingUp] = useState(false);
+
+    // Copia fingerprint
+    const [fingerprintCopied, setFingerprintCopied] = useState(false);
+
+    // Inbox pull
+    const [isPulling, setIsPulling] = useState(false);
+    const inboxQueueRef = useRef([]); // [{ id, text }] — profili in attesa dalla coda inbox
 
     useEffect(() => {
         loadContacts();
@@ -47,13 +55,20 @@ export function ContactsPage() {
         }
     }, []);
 
-    // Processa payload relay o file pendente (da PendingRelayHandler / LaunchQueueConsumer).
+    // Processa payload relay o file pendente (da PendingRelayHandler / ReceivePage).
     // Dipende da location.key così si ri-esegue ad ogni navigazione verso /contacts.
     useEffect(() => {
-        const pending = sessionStorage.getItem('ov_pending_for_contacts');
-        if (!pending) return;
+        const raw = sessionStorage.getItem('ov_pending_for_contacts');
+        if (!raw) return;
         sessionStorage.removeItem('ov_pending_for_contacts');
-        processOwnvText(pending);
+        try {
+            const { relayId, payload } = JSON.parse(raw);
+            if (relayId) setPendingRelayId(relayId);
+            processOwnvText(payload);
+        } catch {
+            // fallback per vecchio formato plain text
+            processOwnvText(raw);
+        }
     }, [location.key]);
 
     useEffect(() => {
@@ -96,44 +111,92 @@ export function ContactsPage() {
         }
     }
 
-    async function handleShareInvite() {
-        if (!displayName.trim()) {
-            setShowNameRequired(true);
-            return;
-        }
-        setIsSharing(true);
+    async function handleFingerprintLookup() {
+        const trimmed = fingerprintInput.trim();
+        if (!trimmed) return;
+        setIsLookingUp(true);
         try {
-            const url = await contactsService.shareInviteViaRelay();
-            const result = await contactsService.shareUrl(url, 'OwnVault – Invito');
-            if (result === 'copied') {
-                setImportStatus({ type: 'success', message: t('contacts.linkCopied') });
-                setTimeout(() => setImportStatus(null), 3000);
+            const result = await contactsService.lookupByFingerprint(trimmed);
+            if (!result) {
+                showImportError(t('contacts.fingerprintNotFound'));
+                return;
             }
-        } catch {
-            // utente ha annullato o relay non raggiungibile
+            // Mostra preview "aggiungi contatto" con fingerprint verificato
+            setPreview({ type: 'invite', data: { name: '', pk: result.pk }, fingerprint: result.fingerprint });
+        } catch (err) {
+            showImportError(
+                err.message === 'fingerprint_invalid'
+                    ? t('contacts.fingerprintInvalid')
+                    : err.message === 'fingerprint_mismatch'
+                        ? t('contacts.fingerprintMismatch')
+                        : t('contacts.fingerprintNotFound')
+            );
         } finally {
-            setIsSharing(false);
+            setFingerprintInput('');
+            setIsLookingUp(false);
         }
     }
 
-    async function handleImportFromLink() {
-        const trimmed = linkInput.trim();
-        // Accetta sia URL completa che solo l'ID (32 hex)
-        const match = trimmed.match(/\/receive\/([0-9a-f]{32})/) || trimmed.match(/^([0-9a-f]{32})$/);
-        if (!match) {
-            showImportError(t('contacts.invalidLink'));
-            return;
-        }
-        setLinkInput('');
+    async function handleCopyFingerprint() {
+        if (!myFingerprint) return;
         try {
-            const text = await contactsService.fetchFromRelay(match[1]);
-            await processOwnvText(text);
-        } catch (err) {
-            showImportError(
-                err.message === 'relay_expired'
-                    ? t('contacts.linkExpired')
-                    : t('contacts.parseError')
-            );
+            await navigator.clipboard.writeText(myFingerprint);
+            setFingerprintCopied(true);
+            setTimeout(() => setFingerprintCopied(false), 2000);
+        } catch {
+            // fallback silenzioso
+        }
+    }
+
+    /** Processa il prossimo profilo dalla coda inbox. Chiamato dopo confirm/dismiss. */
+    function processNextInQueue() {
+        if (inboxQueueRef.current.length === 0) return;
+        const [next, ...rest] = inboxQueueRef.current;
+        inboxQueueRef.current = rest;
+        setPendingRelayId(next.id);
+        processOwnvText(next.text);
+    }
+
+    /** Chiude il modal preview e avvia il prossimo item dalla coda inbox se presente. */
+    function dismissPreview() {
+        setPreview(null);
+        processNextInQueue();
+    }
+
+    async function handlePullInbox() {
+        if (isPulling) return;
+        setIsPulling(true);
+        try {
+            const ids = await contactsService.fetchInbox();
+            if (ids.length === 0) {
+                setImportStatus({ type: 'success', message: t('contacts.inboxEmpty') });
+                setTimeout(() => setImportStatus(null), 3000);
+                return;
+            }
+            // Scarica tutti i payload (salta quelli scaduti)
+            const items = [];
+            for (const id of ids) {
+                try {
+                    const text = await contactsService.fetchFromRelay(id);
+                    items.push({ id, text });
+                } catch {
+                    // entry scaduta o rimossa — la ignoriamo
+                }
+            }
+            if (items.length === 0) {
+                setImportStatus({ type: 'success', message: t('contacts.inboxEmpty') });
+                setTimeout(() => setImportStatus(null), 3000);
+                return;
+            }
+            // Processa il primo, metti il resto in coda
+            const [first, ...rest] = items;
+            inboxQueueRef.current = rest;
+            setPendingRelayId(first.id);
+            await processOwnvText(first.text);
+        } catch {
+            showImportError(t('contacts.inboxError'));
+        } finally {
+            setIsPulling(false);
         }
     }
 
@@ -173,7 +236,12 @@ export function ContactsPage() {
                 publicKey: preview.data.pk
             });
             await loadContacts();
+            if (pendingRelayId) {
+                contactsService.deleteFromRelay(pendingRelayId).catch(() => {});
+                setPendingRelayId(null);
+            }
             setPreview(null);
+            processNextInQueue();
             setImportStatus({ type: 'success', message: t('contacts.added') });
             setTimeout(() => setImportStatus(null), 3000);
         } catch {
@@ -228,7 +296,12 @@ export function ContactsPage() {
             }
 
             await refreshHMAC();
+            if (pendingRelayId) {
+                contactsService.deleteFromRelay(pendingRelayId).catch(() => {});
+                setPendingRelayId(null);
+            }
             setPreview(null);
+            processNextInQueue();
             setImportStatus({ type: 'success', message: t('share.imported') });
             setTimeout(() => {
                 setImportStatus(null);
@@ -272,37 +345,40 @@ export function ContactsPage() {
                     <h1 className="text-2xl font-semibold text-white flex-1">
                         {t('contacts.title')}
                     </h1>
-                    {/* Condividi invito */}
                     <button
-                        onClick={handleShareInvite}
-                        disabled={isSharing}
-                        className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition disabled:opacity-50"
+                        onClick={handlePullInbox}
+                        disabled={isPulling}
+                        className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm font-medium transition disabled:opacity-50"
+                        title={t('contacts.pullInboxTitle')}
                     >
-                        {isSharing
+                        {isPulling
                             ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                            : <UserPlus size={16} />
+                            : <Inbox size={16} />
                         }
-                        <span className="hidden sm:inline">{t('contacts.shareInvite')}</span>
+                        <span className="hidden sm:inline">{t('contacts.pullInbox')}</span>
                     </button>
                 </div>
 
-                {/* Import da link relay — workaround per iOS PWA e desktop */}
+                {/* Cerca contatto per fingerprint */}
                 <div className="flex gap-2 mb-4">
                     <input
-                        type="url"
-                        value={linkInput}
-                        onChange={e => setLinkInput(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && linkInput.trim() && handleImportFromLink()}
-                        placeholder={t('contacts.linkPlaceholder')}
-                        className="flex-1 bg-slate-800/60 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-500"
+                        type="text"
+                        value={fingerprintInput}
+                        onChange={e => setFingerprintInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && fingerprintInput.trim() && handleFingerprintLookup()}
+                        placeholder={t('contacts.fingerprintPlaceholder')}
+                        className="flex-1 bg-slate-800/60 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-500 font-mono"
                     />
                     <button
-                        onClick={handleImportFromLink}
-                        disabled={!linkInput.trim()}
-                        className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm disabled:opacity-40 transition"
-                        title={t('contacts.importLink')}
+                        onClick={handleFingerprintLookup}
+                        disabled={!fingerprintInput.trim() || isLookingUp}
+                        className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm disabled:opacity-40 transition"
+                        title={t('contacts.lookupFingerprint')}
                     >
-                        <Link size={16} />
+                        {isLookingUp
+                            ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                            : <Search size={16} />
+                        }
                     </button>
                 </div>
 
@@ -318,9 +394,9 @@ export function ContactsPage() {
                         <h3 className="text-sm font-semibold text-blue-300 mb-3">{t('contacts.guide.title')}</h3>
                         <div className="space-y-3">
                             {[
-                                { icon: <UserPlus size={13} />, title: t('contacts.guide.step1Title'), body: t('contacts.guide.step1') },
-                                { icon: <Link size={13} />,     title: t('contacts.guide.step2Title'), body: t('contacts.guide.step2') },
-                                { icon: <Shield size={13} />,   title: t('contacts.guide.step3Title'), body: t('contacts.guide.step3') }
+                                { icon: <Fingerprint size={13} />, title: t('contacts.guide.step1Title'), body: t('contacts.guide.step1') },
+                                { icon: <Search size={13} />,      title: t('contacts.guide.step2Title'), body: t('contacts.guide.step2') },
+                                { icon: <Shield size={13} />,      title: t('contacts.guide.step3Title'), body: t('contacts.guide.step3') }
                             ].map((s, i) => (
                                 <div key={i} className="flex gap-3">
                                     <div className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center mt-0.5">
@@ -376,7 +452,16 @@ export function ContactsPage() {
                         </div>
                         <div>
                             <p className="text-xs text-gray-500 mb-1">{t('contacts.myFingerprint')}</p>
-                            <p className="text-xs font-mono text-blue-400 tracking-wide">{myFingerprint}</p>
+                            <div className="flex items-center gap-2">
+                                <p className="text-xs font-mono text-blue-400 tracking-wide flex-1">{myFingerprint}</p>
+                                <button
+                                    onClick={handleCopyFingerprint}
+                                    className="p-1 text-gray-500 hover:text-blue-400 transition flex-shrink-0"
+                                    title={t('contacts.copyFingerprint')}
+                                >
+                                    {fingerprintCopied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -433,43 +518,12 @@ export function ContactsPage() {
                 </div>
             </div>
 
-            {/* ---- MODAL: Nome richiesto prima di condividere ---- */}
-            {showNameRequired && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowNameRequired(false)} />
-                    <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                                <Pencil size={18} className="text-amber-400" />
-                            </div>
-                            <h2 className="text-base font-semibold text-white">{t('contacts.nameRequiredTitle')}</h2>
-                        </div>
-                        <p className="text-sm text-gray-400">{t('contacts.nameRequiredBody')}</p>
-                        <button
-                            onClick={() => {
-                                setShowNameRequired(false);
-                                setEditingName(true);
-                            }}
-                            className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition text-sm"
-                        >
-                            {t('contacts.myName')} →
-                        </button>
-                        <button
-                            onClick={() => setShowNameRequired(false)}
-                            className="w-full py-2 text-gray-500 hover:text-gray-400 text-sm transition"
-                        >
-                            {t('common.cancel')}
-                        </button>
-                    </div>
-                </div>
-            )}
-
             {/* ---- MODAL: Anteprima importazione ---- */}
             {preview && (
                 <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
                     <div
                         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                        onClick={() => !isConfirming && setPreview(null)}
+                        onClick={() => !isConfirming && dismissPreview()}
                     />
                     <div className="relative w-full max-w-sm mx-4 mb-6 md:mb-0 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
 
@@ -482,7 +536,7 @@ export function ContactsPage() {
                                 {preview.type === 'error' && t('common.error')}
                             </h2>
                             {!isConfirming && (
-                                <button onClick={() => setPreview(null)} className="text-gray-500 hover:text-white transition">
+                                <button onClick={dismissPreview} className="text-gray-500 hover:text-white transition">
                                     <X size={18} />
                                 </button>
                             )}
@@ -535,7 +589,7 @@ export function ContactsPage() {
                                     </div>
                                     <div className="flex gap-2 pt-1">
                                         <button
-                                            onClick={() => setPreview(null)}
+                                            onClick={dismissPreview}
                                             disabled={isConfirming}
                                             className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm font-medium transition disabled:opacity-50"
                                         >
@@ -588,7 +642,7 @@ export function ContactsPage() {
                                     )}
                                     <div className="flex gap-2 pt-1">
                                         <button
-                                            onClick={() => setPreview(null)}
+                                            onClick={dismissPreview}
                                             disabled={isConfirming}
                                             className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm font-medium transition disabled:opacity-50"
                                         >

@@ -162,7 +162,7 @@ function PendingRelayHandler() {
         import('./services/contactsService').then(({ contactsService }) => {
             contactsService.fetchFromRelay(id)
                 .then(text => {
-                    if (text) sessionStorage.setItem('ov_pending_for_contacts', text);
+                    if (text) sessionStorage.setItem('ov_pending_for_contacts', JSON.stringify({ relayId: id, payload: text }));
                     navigate('/contacts');
                 })
                 .catch(() => navigate('/contacts'));
@@ -184,7 +184,7 @@ function ReceivePage() {
         import('./services/contactsService').then(({ contactsService }) => {
             contactsService.fetchFromRelay(id)
                 .then(text => {
-                    if (text) sessionStorage.setItem('ov_pending_for_contacts', text);
+                    if (text) sessionStorage.setItem('ov_pending_for_contacts', JSON.stringify({ relayId: id, payload: text }));
                 })
                 .catch(() => {})
                 .finally(() => navigate('/contacts', { replace: true }));

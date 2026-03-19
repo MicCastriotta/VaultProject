@@ -12,3 +12,8 @@ pages_build_output_dir = "dist"
 binding = "OV_RELAY"
 id = "f912da344d4142bf80bf883084004996"           # wrangler kv namespace create "ownvault-relay"
 preview_id = "c7848aa7969e49899a8cd8eb05e9374e"     # wrangler kv namespace create "ownvault-relay-preview"
+
+[[kv_namespaces]]
+binding = "OV_IDENTITY"
+id = "b15dac2c558242c0b6f82c5bcd288c54"               # wrangler kv namespace create "ownvault-identity"
+preview_id = "d60b01443f3241039e176c2fcb7ec120" # wrangler kv namespace create "ownvault-identity-preview"

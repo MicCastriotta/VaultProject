@@ -11,8 +11,8 @@
  * Response: { id: string, expiresAt: string }
  */
 
-const RELAY_TTL_SECONDS = 48 * 60 * 60; // 48 ore
-const MAX_PAYLOAD_BYTES = 512 * 1024;    // 512 KB (sufficiente per profili con allegati piccoli)
+const RELAY_TTL_SECONDS = 24 * 60 * 60; // 24 ore
+const MAX_PAYLOAD_BYTES = 10 * 1024 * 1024; // 10 MB (copre allegati fino a ~6 MB effettivi con overhead base64)
 
 const ALLOWED_ORIGINS = [
     'https://ownvault.eu',
@@ -78,6 +78,12 @@ export async function onRequestPost({ request, env }) {
     const id = Array.from(idBytes).map(b => b.toString(16).padStart(2, '0')).join('');
 
     await env.OV_RELAY.put(`relay:${id}`, body, { expirationTtl: RELAY_TTL_SECONDS });
+
+    // Se il payload contiene il fingerprint del destinatario, salva anche il marker inbox.
+    // recipientFp è un dato pubblico (non cifrato) — usato solo per il lookup inbox.
+    if (parsed.recipientFp && /^[0-9a-f]{16}$/.test(parsed.recipientFp)) {
+        await env.OV_RELAY.put(`inbox:${parsed.recipientFp}:${id}`, id, { expirationTtl: RELAY_TTL_SECONDS });
+    }
 
     const expiresAt = new Date(Date.now() + RELAY_TTL_SECONDS * 1000).toISOString();
     return new Response(JSON.stringify({ id, expiresAt }), { status: 201, headers });
