@@ -563,13 +563,12 @@ function ShareContactSheet({ profile, attachmentMeta, onClose }) {
                 }
             }
 
-            const blob = await contactsService.generateProfileFile(
+            const url = await contactsService.shareProfileViaRelay(
                 { title, category, username, password, website, note, secretKey, icon, lastModified,
                   cardNumber, expiration, cvv, cardOwner, pin, attachment },
                 contact.publicKey
             );
-            const safeName = (profile.title || 'profile').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            await contactsService.shareOrDownload(blob, `${safeName}.ownv`);
+            await contactsService.shareUrl(url, profile.title || 'OwnVault');
             onClose();
         } catch {
             // utente ha annullato la condivisione

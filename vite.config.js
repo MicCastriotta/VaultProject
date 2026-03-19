@@ -29,8 +29,55 @@ function cspPlugin() {
       isBuild = config.command === 'build';
     },
 
-    // Dev: header HTTP sul server di sviluppo
+    // Dev: mock in-memory del relay Cloudflare KV (non serve wrangler in locale)
     configureServer(server) {
+      const relayStore = new Map(); // id → { payload, expiresAt }
+      const RELAY_TTL_MS = 48 * 60 * 60 * 1000;
+
+      server.middlewares.use('/api/relay', (req, res, next) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Cache-Control', 'no-store');
+
+        // POST /api/relay — crea entry
+        if (req.method === 'POST' && req.url === '/') {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', () => {
+            try {
+              const parsed = JSON.parse(body);
+              if (!parsed.type || !parsed.v) throw new Error('Invalid');
+              const id = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                .map(b => b.toString(16).padStart(2, '0')).join('');
+              const expiresAt = new Date(Date.now() + RELAY_TTL_MS).toISOString();
+              relayStore.set(id, { payload: body, expiresAt });
+              res.writeHead(201);
+              res.end(JSON.stringify({ id, expiresAt }));
+            } catch {
+              res.writeHead(400);
+              res.end(JSON.stringify({ error: 'Invalid payload' }));
+            }
+          });
+          return;
+        }
+
+        // GET /api/relay/:id — recupera entry
+        if (req.method === 'GET' && req.url.length > 1) {
+          const id = req.url.slice(1);
+          const entry = relayStore.get(id);
+          if (!entry || Date.now() > new Date(entry.expiresAt).getTime()) {
+            relayStore.delete(id);
+            res.writeHead(404);
+            res.end(JSON.stringify({ error: 'Not found or expired' }));
+            return;
+          }
+          res.writeHead(200);
+          res.end(entry.payload);
+          return;
+        }
+
+        next();
+      });
+
       server.middlewares.use((req, res, next) => {
         // COOP: same-origin-allow-popups permette al popup OAuth di Google
         // di comunicare con window.opener (necessario per il flusso OAuth)

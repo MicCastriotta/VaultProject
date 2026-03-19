@@ -4,7 +4,7 @@
  */
 
 import { lazy, Suspense, useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useTranslation } from 'react-i18next';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
@@ -199,6 +199,57 @@ function PendingOwnvHandler() {
 }
 
 /**
+ * Dopo il login, recupera un payload relay pendente (salvato in sessionStorage
+ * prima del login quando l'utente ha aperto un link /receive/:id da non autenticato).
+ */
+function PendingRelayHandler() {
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const id = sessionStorage.getItem('ov_pending_relay_id');
+        if (!id) return;
+        sessionStorage.removeItem('ov_pending_relay_id');
+
+        import('./services/contactsService').then(({ contactsService }) => {
+            contactsService.fetchFromRelay(id)
+                .then(text => {
+                    if (text) sessionStorage.setItem('ov_pending_for_contacts', text);
+                    navigate('/contacts');
+                })
+                .catch(() => navigate('/contacts'));
+        });
+    }, []);
+
+    return null;
+}
+
+/**
+ * Pagina intermedia per link /receive/:id quando il vault è già sbloccato.
+ * Fetcha il payload dal relay e reindirizza a /contacts per la preview modale.
+ */
+function ReceivePage() {
+    const { id } = useParams();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        import('./services/contactsService').then(({ contactsService }) => {
+            contactsService.fetchFromRelay(id)
+                .then(text => {
+                    if (text) sessionStorage.setItem('ov_pending_for_contacts', text);
+                })
+                .catch(() => {})
+                .finally(() => navigate('/contacts', { replace: true }));
+        });
+    }, [id]);
+
+    return (
+        <div className="flex items-center justify-center h-full">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+        </div>
+    );
+}
+
+/**
  * Shell statico per le route autenticate.
  * AppLayout (sidebar + sfondo) rimane montato durante le navigazioni;
  * solo il contenuto interno sospende.
@@ -208,6 +259,7 @@ function AppShell() {
         <AppLayout>
             <SyncLaunchCheck />
             <PendingOwnvHandler />
+            <PendingRelayHandler />
             <Suspense fallback={<PageSpinner />}>
                 <Outlet />
             </Suspense>
@@ -281,7 +333,11 @@ function AppRoutes() {
     }
 
     // Se esiste utente ma non è unlocked -> Login
+    // Salva relay ID pendente se l'utente arriva da un link /receive/:id
     if (!isUnlocked) {
+        const relayMatch = location.pathname.match(/^\/receive\/([0-9a-f]{32})$/);
+        if (relayMatch) sessionStorage.setItem('ov_pending_relay_id', relayMatch[1]);
+
         return (
             <Suspense fallback={<PageLoader />}>
                 <Routes>
@@ -308,6 +364,7 @@ function AppRoutes() {
                     <Route path="/profile/:id" element={<ProfileDetailPage />} />
                     <Route path="/profile/:id/edit" element={<ProfileFormPage />} />
                     <Route path="/contacts" element={<ContactsPage />} />
+                    <Route path="/receive/:id" element={<ReceivePage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>
             </Routes>
