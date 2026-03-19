@@ -11,6 +11,8 @@
  * Response: { id: string, expiresAt: string }
  */
 
+import { checkRateLimit, rateLimitedResponse } from '../_rl.js';
+
 const RELAY_TTL_SECONDS = 24 * 60 * 60; // 24 ore
 const MAX_PAYLOAD_BYTES = 10 * 1024 * 1024; // 10 MB (copre allegati fino a ~6 MB effettivi con overhead base64)
 
@@ -38,6 +40,11 @@ export async function onRequestOptions({ request }) {
 export async function onRequestPost({ request, env }) {
     const origin = request.headers.get('Origin') || '';
     const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    if (!await checkRateLimit(env.OV_RELAY, ip, 'relay:post', 30)) {
+        return rateLimitedResponse(headers);
+    }
 
     // Legge il body con limite di dimensione
     let body;
@@ -69,6 +76,10 @@ export async function onRequestPost({ request, env }) {
         if (!parsed.type || !parsed.v) throw new Error('Missing type/v');
         if (parsed.type === 'invite' && !parsed.pk) throw new Error('Invalid invite');
         if (parsed.type === 'profile' && (!parsed.epk || !parsed.iv || !parsed.ct)) throw new Error('Invalid profile');
+        // _wth (write token hash) è opzionale: stringa hex 64 chars (SHA-256 di un token 32-hex)
+        if (parsed._wth !== undefined && (typeof parsed._wth !== 'string' || !/^[0-9a-f]{64}$/.test(parsed._wth))) {
+            throw new Error('Invalid _wth');
+        }
     } catch {
         return new Response(JSON.stringify({ error: 'Invalid payload format' }), { status: 400, headers });
     }

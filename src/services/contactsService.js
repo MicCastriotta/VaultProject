@@ -147,6 +147,12 @@ class ContactsService {
         await db.contacts.delete(id);
     }
 
+    async updateContactName(id, name) {
+        const contact = await db.contacts.get(id);
+        if (!contact) throw new Error('contact_not_found');
+        await db.contacts.update(id, { name: name.trim() || 'Unknown' });
+    }
+
     // ========================================
     // CONDIVISIONE PROFILO (ECDH + AES-GCM)
     // ========================================
@@ -154,10 +160,12 @@ class ContactsService {
     /**
      * Cifra un profilo per un destinatario.
      * Usa ECDH effimero per forward secrecy.
+     * writeToken (opzionale): se fornito viene incluso nel plaintext come `_wt` —
+     * solo il destinatario (con la sua private key) potrà estrarlo per autorizzare il DELETE.
      *
      * Ritorna un payload JSON serializzabile da includere in un link/file.
      */
-    async encryptProfileForContact(profileData, recipientPublicKeyB64) {
+    async encryptProfileForContact(profileData, recipientPublicKeyB64, writeToken) {
         // Importa la chiave pubblica del destinatario
         const recipientKeyBytes = this._fromBase64url(recipientPublicKeyB64);
         const recipientPublicKey = await crypto.subtle.importKey(
@@ -190,9 +198,12 @@ class ContactsService {
             ['encrypt']
         );
 
-        // Cifra il payload del profilo
+        // Cifra il payload del profilo.
+        // Se writeToken è fornito, lo includiamo nel plaintext come `_wt`:
+        // solo chi può decifrare (il destinatario) potrà estrarlo per autorizzare il DELETE relay.
         const iv = crypto.getRandomValues(new Uint8Array(12));
-        const plaintext = new TextEncoder().encode(JSON.stringify(profileData));
+        const plainData = writeToken ? { ...profileData, _wt: writeToken } : profileData;
+        const plaintext = new TextEncoder().encode(JSON.stringify(plainData));
         const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, wrapKey, plaintext);
 
         // Esporta la chiave pubblica effimera per includerla nel payload
@@ -376,10 +387,22 @@ class ContactsService {
      * recipientFp (opzionale): fingerprint display del destinatario — aggiunge il marker inbox
      * così il destinatario può fare pull senza ricevere il link direttamente.
      * Ritorna { url, id } — l'id serve per il delete-after-confirmation.
+     *
+     * Genera un writeToken casuale (128 bit) che viene:
+     * - incluso nel plaintext cifrato come `_wt` (solo il destinatario può estrarlo)
+     * - inviato al relay come hash `_wth` per autorizzare il DELETE
+     * Questo impedisce a chiunque abbia solo l'ID relay di cancellare il payload.
      */
     async shareProfileViaRelay(profileData, recipientPublicKeyB64, recipientFp) {
-        const payload = await this.encryptProfileForContact(profileData, recipientPublicKeyB64);
-        const data = { type: 'profile', v: 1, ...payload };
+        // Genera writeToken e il suo hash SHA-256
+        const wtBytes = crypto.getRandomValues(new Uint8Array(16));
+        const writeToken = Array.from(wtBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+        const wtHashBuf = await crypto.subtle.digest('SHA-256', wtBytes);
+        const writeTokenHash = Array.from(new Uint8Array(wtHashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+        // Il writeToken viene incluso nel plaintext prima della cifratura ECDH
+        const payload = await this.encryptProfileForContact(profileData, recipientPublicKeyB64, writeToken);
+        const data = { type: 'profile', v: 1, ...payload, _wth: writeTokenHash };
         if (recipientFp) {
             const fp16 = this.normalizeFingerprint(recipientFp);
             if (fp16) data.recipientFp = fp16;
@@ -435,11 +458,17 @@ class ContactsService {
 
     /**
      * Elimina un payload dal relay dopo import confermato.
-     * Fallisce silenziosamente — il TTL 24h è il fallback.
+     * writeToken (opzionale): se il payload aveva _wth, il server richiede il token per autorizzare.
+     * Se writeToken è assente (es. payload inbox vecchio formato), la richiesta viene ignorata silenziosamente.
+     * Fallisce silenziosamente in ogni caso — il TTL 24h è il fallback.
      */
-    async deleteFromRelay(id) {
+    async deleteFromRelay(id, writeToken) {
         try {
-            await fetch(`/api/relay/${encodeURIComponent(id)}`, { method: 'DELETE' });
+            await fetch(`/api/relay/${encodeURIComponent(id)}`, {
+                method: 'DELETE',
+                headers: writeToken ? { 'Content-Type': 'application/json' } : undefined,
+                body: writeToken ? JSON.stringify({ writeToken }) : undefined
+            });
         } catch {
             // silenzioso — TTL gestisce la scadenza
         }

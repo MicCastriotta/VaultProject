@@ -9,6 +9,8 @@
  * (Pages > Settings > Functions > KV namespace bindings)
  */
 
+import { checkRateLimit, rateLimitedResponse } from '../_rl.js';
+
 const IDENTITY_TTL_SECONDS = 180 * 24 * 60 * 60; // 6 mesi
 
 const ALLOWED_ORIGINS = [
@@ -35,6 +37,11 @@ export async function onRequestOptions({ request }) {
 export async function onRequestPost({ request, env }) {
     const origin = request.headers.get('Origin') || '';
     const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    if (!await checkRateLimit(env.OV_IDENTITY, ip, 'identity:post', 5)) {
+        return rateLimitedResponse(headers);
+    }
 
     let parsed;
     try {
