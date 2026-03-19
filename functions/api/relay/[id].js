@@ -16,7 +16,7 @@ function corsHeaders(origin) {
     const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
     return {
         'Access-Control-Allow-Origin': allowed,
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
     };
 }
@@ -24,6 +24,34 @@ function corsHeaders(origin) {
 export async function onRequestOptions({ request }) {
     const origin = request.headers.get('Origin') || '';
     return new Response(null, { status: 204, headers: corsHeaders(origin) });
+}
+
+export async function onRequestDelete({ params, env, request }) {
+    const origin = request.headers.get('Origin') || '';
+    const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+
+    const { id } = params;
+
+    if (!id || !/^[0-9a-f]{32}$/.test(id)) {
+        return new Response(JSON.stringify({ error: 'Invalid ID' }), { status: 400, headers });
+    }
+
+    // Legge il payload prima di eliminarlo per ricavare recipientFp e pulire il marker inbox
+    try {
+        const value = await env.OV_RELAY.get(`relay:${id}`);
+        if (value) {
+            const parsed = JSON.parse(value);
+            if (parsed.recipientFp && /^[0-9a-f]{16}$/.test(parsed.recipientFp)) {
+                await env.OV_RELAY.delete(`inbox:${parsed.recipientFp}:${id}`);
+            }
+        }
+    } catch {
+        // silenzioso — se il parsing fallisce eliminiamo comunque il payload
+    }
+
+    await env.OV_RELAY.delete(`relay:${id}`);
+
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
 }
 
 export async function onRequestGet({ params, env, request }) {

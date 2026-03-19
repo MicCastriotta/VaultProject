@@ -241,6 +241,8 @@ export function SettingsPage() {
     const [isConnecting, setIsConnecting] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [showDonation, setShowDonation] = useState(false);
+    const [isDiscoverable, setIsDiscoverable] = useState(false);
+    const [isDiscoverableLoading, setIsDiscoverableLoading] = useState(false);
 
     function toggleSection(key) {
         setOpenSections(prev => {
@@ -271,6 +273,38 @@ export function SettingsPage() {
         syncService.addListener(handleSyncEvent);
         return () => syncService.removeListener(handleSyncEvent);
     }, []);
+
+    useEffect(() => {
+        import('../services/contactsService').then(({ contactsService }) => {
+            contactsService.isRegisteredInDirectory()
+                .then(registered => setIsDiscoverable(registered))
+                .catch(() => {});
+        });
+    }, []);
+
+    async function handleToggleDiscoverable() {
+        setIsDiscoverableLoading(true);
+        try {
+            const { contactsService } = await import('../services/contactsService');
+            if (isDiscoverable) {
+                await contactsService.unregisterIdentity();
+                setIsDiscoverable(false);
+            } else {
+                await contactsService.registerIdentity();
+                setIsDiscoverable(true);
+            }
+        } catch {
+            setMessage({
+                type: 'error',
+                text: isDiscoverable
+                    ? t('settings.discoverable.disableError')
+                    : t('settings.discoverable.enableError')
+            });
+            setTimeout(() => setMessage(null), 4000);
+        } finally {
+            setIsDiscoverableLoading(false);
+        }
+    }
 
     async function loadSyncStatus() {
         try {
@@ -520,6 +554,35 @@ export function SettingsPage() {
                                 {/* Biometrico */}
                                 <div className="p-4">
                                     <BiometricSettingsSection />
+                                </div>
+
+                                {/* Profilo ricercabile */}
+                                <div className="p-4 space-y-3">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div className="flex-1">
+                                            <p className="text-sm font-medium text-gray-300">{t('settings.discoverable.title')}</p>
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                {isDiscoverable
+                                                    ? t('settings.discoverable.enabled')
+                                                    : t('settings.discoverable.disabled')
+                                                }
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={handleToggleDiscoverable}
+                                            disabled={isDiscoverableLoading}
+                                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+                                                isDiscoverable ? 'bg-blue-600' : 'bg-slate-600'
+                                            }`}
+                                        >
+                                            <span
+                                                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                                                    isDiscoverable ? 'translate-x-5' : 'translate-x-0'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-gray-500">{t('settings.discoverable.description')}</p>
                                 </div>
 
                                 {/* Auto-Lock */}

@@ -23,7 +23,6 @@ import {
     FileText,
     Image,
     Send,
-    Link,
     AlertCircle
 } from 'lucide-react';
 import { OTPDisplay } from '../components/OTPDisplay';
@@ -522,8 +521,7 @@ function ShareContactSheet({ profile, attachmentMeta, onClose }) {
     const { t } = useTranslation();
     const [contacts, setContacts] = useState([]);
     const [generatingId, setGeneratingId] = useState(null);
-    const [shareLink, setShareLink] = useState(null);
-    const [linkCopied, setLinkCopied] = useState(false);
+    const [sentToContact, setSentToContact] = useState(null); // { name } dopo invio riuscito
     const [shareError, setShareError] = useState(null);
 
     useEffect(() => {
@@ -568,21 +566,14 @@ function ShareContactSheet({ profile, attachmentMeta, onClose }) {
                 }
             }
 
-            const url = await contactsService.shareProfileViaRelay(
+            await contactsService.shareProfileViaRelay(
                 { title, category, username, password, website, note, secretKey, icon, lastModified,
                   cardNumber, expiration, cvv, cardOwner, pin, attachment },
-                contact.publicKey
+                contact.publicKey,
+                contact.fingerprint
             );
 
-            // Mobile: Web Share API (user gesture context è ancora valido)
-            // Desktop: mostra il link nel sheet — il click su "Copia" è un nuovo user gesture
-            const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-            if (isMobile && navigator.share) {
-                await navigator.share({ url, title: profile.title || 'OwnVault' });
-                onClose();
-            } else {
-                setShareLink(url);
-            }
+            setSentToContact({ name: contact.name });
         } catch (err) {
             if (err?.name !== 'AbortError') {
                 setShareError(
@@ -594,13 +585,6 @@ function ShareContactSheet({ profile, attachmentMeta, onClose }) {
         } finally {
             setGeneratingId(null);
         }
-    }
-
-    async function handleCopyLink() {
-        if (!shareLink) return;
-        await navigator.clipboard.writeText(shareLink);
-        setLinkCopied(true);
-        setTimeout(() => setLinkCopied(false), 2000);
     }
 
     return (
@@ -621,24 +605,23 @@ function ShareContactSheet({ profile, attachmentMeta, onClose }) {
                             <p className="text-xs text-red-300">{shareError}</p>
                         </div>
                     )}
-                    {shareLink ? (
-                        /* Vista link generato — desktop: copia manuale con nuovo user gesture */
-                        <div className="space-y-3">
-                            <p className="text-xs text-gray-400">{t('share.linkReady')}</p>
-                            <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-800/60 rounded-xl">
-                                <Link size={13} className="text-blue-400 shrink-0" />
-                                <p className="text-xs font-mono text-gray-300 truncate flex-1">{shareLink}</p>
+                    {sentToContact ? (
+                        /* Vista invio riuscito */
+                        <div className="space-y-4 text-center py-4">
+                            <div className="w-14 h-14 rounded-full bg-green-500/15 flex items-center justify-center mx-auto">
+                                <Check size={28} className="text-green-400" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold text-white">
+                                    {t('share.sentTitle')}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    {t('share.sentHint', { name: sentToContact.name })}
+                                </p>
                             </div>
                             <button
-                                onClick={handleCopyLink}
-                                className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition"
-                            >
-                                {linkCopied ? <Check size={15} /> : <Copy size={15} />}
-                                {linkCopied ? t('share.linkCopied') : t('share.copyLink')}
-                            </button>
-                            <button
                                 onClick={onClose}
-                                className="w-full py-2 text-gray-500 hover:text-gray-400 text-sm transition"
+                                className="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm font-medium transition"
                             >
                                 {t('common.close')}
                             </button>
