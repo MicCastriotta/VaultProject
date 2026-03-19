@@ -284,7 +284,7 @@ export function ContactsPage() {
                     <input
                         ref={fileInputRef}
                         type="file"
-                        accept=".ownv,application/x-ownvault"
+                        accept=".ownv,application/octet-stream,application/x-ownvault"
                         className="hidden"
                         onChange={handleImportFile}
                     />

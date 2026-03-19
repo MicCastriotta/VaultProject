@@ -70,6 +70,8 @@ function cspPlugin() {
 
 export default defineConfig({
   build: {    
+    sourcemap: true, // permette di vedere i file originali in DevTools
+    minify: false, 
     modulePreload: { polyfill: false }, // evita lo script inline del polyfill (incompatibile con CSP strict)
     rollupOptions: {
       output: {
@@ -110,7 +112,13 @@ export default defineConfig({
           {
             action: '/',
             accept: {
-              'application/x-ownvault': ['.ownv']
+              // Tipo custom (per completezza e futura compatibilità)
+              'application/x-ownvault': ['.ownv'],
+              // application/octet-stream: necessario per Android, dove i file scaricati
+              // tramite Blob URL vengono salvati con questo MIME type e il sistema
+              // cerca un handler compatibile. Il match avviene solo se MIME + estensione
+              // corrispondono entrambi, quindi non cattura file binari generici.
+              'application/octet-stream': ['.ownv']
             }
           }
         ],
