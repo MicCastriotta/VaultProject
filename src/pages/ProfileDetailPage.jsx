@@ -22,7 +22,8 @@ import {
     Paperclip,
     FileText,
     Image,
-    Send
+    Send,
+    Link
 } from 'lucide-react';
 import { OTPDisplay } from '../components/OTPDisplay';
 import { IconRenderer } from '../components/IconRenderer';
@@ -520,6 +521,8 @@ function ShareContactSheet({ profile, attachmentMeta, onClose }) {
     const { t } = useTranslation();
     const [contacts, setContacts] = useState([]);
     const [generatingId, setGeneratingId] = useState(null);
+    const [shareLink, setShareLink] = useState(null);
+    const [linkCopied, setLinkCopied] = useState(false);
 
     useEffect(() => {
         contactsService.getAllContacts().then(setContacts);
@@ -540,7 +543,7 @@ function ShareContactSheet({ profile, attachmentMeta, onClose }) {
 
                     let full = await databaseService.getAttachmentById(attachmentMeta.id);
                     if (full && !full.encryptedData) {
-                        full = await syncService.ensureAttachmentLocal(full); // usa import statico in cima al file
+                        full = await syncService.ensureAttachmentLocal(full);
                     }
                     if (full?.encryptedData) {
                         const arrayBuffer = await cryptoService.decryptBlob(
@@ -559,7 +562,6 @@ function ShareContactSheet({ profile, attachmentMeta, onClose }) {
                     }
                 } catch (err) {
                     console.error('Failed to include attachment:', err);
-                    // Continua senza allegato
                 }
             }
 
@@ -568,13 +570,28 @@ function ShareContactSheet({ profile, attachmentMeta, onClose }) {
                   cardNumber, expiration, cvv, cardOwner, pin, attachment },
                 contact.publicKey
             );
-            await contactsService.shareUrl(url, profile.title || 'OwnVault');
-            onClose();
+
+            // Mobile: Web Share API (user gesture context è ancora valido)
+            // Desktop: mostra il link nel sheet — il click su "Copia" è un nuovo user gesture
+            const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            if (isMobile && navigator.share) {
+                await navigator.share({ url, title: profile.title || 'OwnVault' });
+                onClose();
+            } else {
+                setShareLink(url);
+            }
         } catch {
-            // utente ha annullato la condivisione
+            // utente ha annullato
         } finally {
             setGeneratingId(null);
         }
+    }
+
+    async function handleCopyLink() {
+        if (!shareLink) return;
+        await navigator.clipboard.writeText(shareLink);
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2000);
     }
 
     return (
@@ -589,41 +606,68 @@ function ShareContactSheet({ profile, attachmentMeta, onClose }) {
                 </div>
 
                 <div className="p-5">
-                    {attachmentMeta && (
-                        <div className="flex items-center gap-2 mb-4 px-3 py-2.5 bg-blue-500/10 border border-blue-500/30 rounded-xl">
-                            <Paperclip size={14} className="text-blue-400 shrink-0" />
-                            <p className="text-xs text-blue-300 truncate">{attachmentMeta.fileName}</p>
-                        </div>
-                    )}
-                    {contacts.length === 0 ? (
-                        <div className="text-center py-8">
-                            <User size={32} className="mx-auto mb-3 text-gray-600" />
-                            <p className="text-gray-400 text-sm">{t('share.noContacts')}</p>
-                            <p className="text-gray-500 text-xs mt-1">{t('share.noContactsHint')}</p>
+                    {shareLink ? (
+                        /* Vista link generato — desktop: copia manuale con nuovo user gesture */
+                        <div className="space-y-3">
+                            <p className="text-xs text-gray-400">{t('share.linkReady')}</p>
+                            <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-800/60 rounded-xl">
+                                <Link size={13} className="text-blue-400 shrink-0" />
+                                <p className="text-xs font-mono text-gray-300 truncate flex-1">{shareLink}</p>
+                            </div>
+                            <button
+                                onClick={handleCopyLink}
+                                className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition"
+                            >
+                                {linkCopied ? <Check size={15} /> : <Copy size={15} />}
+                                {linkCopied ? t('share.linkCopied') : t('share.copyLink')}
+                            </button>
+                            <button
+                                onClick={onClose}
+                                className="w-full py-2 text-gray-500 hover:text-gray-400 text-sm transition"
+                            >
+                                {t('common.close')}
+                            </button>
                         </div>
                     ) : (
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                            {contacts.map(c => (
-                                <button
-                                    key={c.id}
-                                    onClick={() => handleSelectContact(c)}
-                                    disabled={!!generatingId}
-                                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 transition disabled:opacity-50"
-                                >
-                                    <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                                        <User size={16} className="text-blue-400" />
-                                    </div>
-                                    <div className="flex-1 min-w-0 text-left">
-                                        <p className="text-sm font-medium text-white truncate">{c.name}</p>
-                                        <p className="text-xs font-mono text-gray-500 truncate">{c.fingerprint}</p>
-                                    </div>
-                                    {generatingId === c.id
-                                        ? <span className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                                        : <Send size={15} className="text-gray-500 flex-shrink-0" />
-                                    }
-                                </button>
-                            ))}
-                        </div>
+                        /* Vista selezione contatto */
+                        <>
+                            {attachmentMeta && (
+                                <div className="flex items-center gap-2 mb-4 px-3 py-2.5 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                                    <Paperclip size={14} className="text-blue-400 shrink-0" />
+                                    <p className="text-xs text-blue-300 truncate">{attachmentMeta.fileName}</p>
+                                </div>
+                            )}
+                            {contacts.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <User size={32} className="mx-auto mb-3 text-gray-600" />
+                                    <p className="text-gray-400 text-sm">{t('share.noContacts')}</p>
+                                    <p className="text-gray-500 text-xs mt-1">{t('share.noContactsHint')}</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2 max-h-64 overflow-y-auto">
+                                    {contacts.map(c => (
+                                        <button
+                                            key={c.id}
+                                            onClick={() => handleSelectContact(c)}
+                                            disabled={!!generatingId}
+                                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-700/60 transition disabled:opacity-50"
+                                        >
+                                            <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                                                <User size={16} className="text-blue-400" />
+                                            </div>
+                                            <div className="flex-1 min-w-0 text-left">
+                                                <p className="text-sm font-medium text-white truncate">{c.name}</p>
+                                                <p className="text-xs font-mono text-gray-500 truncate">{c.fingerprint}</p>
+                                            </div>
+                                            {generatingId === c.id
+                                                ? <span className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                                                : <Send size={15} className="text-gray-500 flex-shrink-0" />
+                                            }
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>

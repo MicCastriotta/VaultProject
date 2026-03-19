@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-    ArrowLeft, UserPlus, Trash2, User, Pencil, FolderOpen,
+    ArrowLeft, UserPlus, Trash2, User, Pencil,
     X, Check, AlertCircle, CreditCard, Globe, Shield, Fingerprint, Paperclip, Link
 } from 'lucide-react';
 import { contactsService } from '../services/contactsService';
+import { useAuth } from '../contexts/AuthContext';
 
 const GUIDE_KEY = 'contacts_guide_seen';
 
@@ -13,13 +14,13 @@ export function ContactsPage() {
     const navigate = useNavigate();
     const location = useLocation();
     const { t } = useTranslation();
+    const { refreshHMAC } = useAuth();
     const [contacts, setContacts] = useState([]);
     const [myFingerprint, setMyFingerprint] = useState('');
     const [displayName, setDisplayName] = useState('');
     const [editingName, setEditingName] = useState(false);
     const [nameInput, setNameInput] = useState('');
     const nameInputRef = useRef(null);
-    const fileInputRef = useRef(null);
 
     const [showGuide, setShowGuide] = useState(false);
 
@@ -46,9 +47,8 @@ export function ContactsPage() {
         }
     }, []);
 
-    // Processa file .ownv aperto dall'OS (doppio click) dopo il login.
-    // Dipende da location.key così si ri-esegue ad ogni navigazione verso /contacts,
-    // anche se la pagina era già montata (es. apertura file mentre si è già sui contatti).
+    // Processa payload relay o file pendente (da PendingRelayHandler / LaunchQueueConsumer).
+    // Dipende da location.key così si ri-esegue ad ogni navigazione verso /contacts.
     useEffect(() => {
         const pending = sessionStorage.getItem('ov_pending_for_contacts');
         if (!pending) return;
@@ -164,22 +164,6 @@ export function ContactsPage() {
         }
     }
 
-    async function handleImportFile(e) {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        e.target.value = '';
-
-        let text;
-        try {
-            text = await file.text();
-        } catch {
-            showImportError(t('contacts.parseError'));
-            return;
-        }
-
-        await processOwnvText(text);
-    }
-
     async function handleConfirmInvite() {
         if (!preview || isConfirming) return;
         setIsConfirming(true);
@@ -243,6 +227,7 @@ export function ContactsPage() {
                 }
             }
 
+            await refreshHMAC();
             setPreview(null);
             setImportStatus({ type: 'success', message: t('share.imported') });
             setTimeout(() => {
@@ -287,15 +272,6 @@ export function ContactsPage() {
                     <h1 className="text-2xl font-semibold text-white flex-1">
                         {t('contacts.title')}
                     </h1>
-                    {/* Importa .ownv */}
-                    <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm font-medium transition"
-                        title={t('contacts.importFile')}
-                    >
-                        <FolderOpen size={16} />
-                        <span className="hidden sm:inline">{t('contacts.importFile')}</span>
-                    </button>
                     {/* Condividi invito */}
                     <button
                         onClick={handleShareInvite}
@@ -308,13 +284,6 @@ export function ContactsPage() {
                         }
                         <span className="hidden sm:inline">{t('contacts.shareInvite')}</span>
                     </button>
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".ownv,application/octet-stream,application/x-ownvault"
-                        className="hidden"
-                        onChange={handleImportFile}
-                    />
                 </div>
 
                 {/* Import da link relay — workaround per iOS PWA e desktop */}
@@ -349,13 +318,13 @@ export function ContactsPage() {
                         <h3 className="text-sm font-semibold text-blue-300 mb-3">{t('contacts.guide.title')}</h3>
                         <div className="space-y-3">
                             {[
-                                { title: t('contacts.guide.step1Title'), body: t('contacts.guide.step1') },
-                                { title: t('contacts.guide.step2Title'), body: t('contacts.guide.step2') },
-                                { title: t('contacts.guide.step3Title'), body: t('contacts.guide.step3') }
+                                { icon: <UserPlus size={13} />, title: t('contacts.guide.step1Title'), body: t('contacts.guide.step1') },
+                                { icon: <Link size={13} />,     title: t('contacts.guide.step2Title'), body: t('contacts.guide.step2') },
+                                { icon: <Shield size={13} />,   title: t('contacts.guide.step3Title'), body: t('contacts.guide.step3') }
                             ].map((s, i) => (
                                 <div key={i} className="flex gap-3">
-                                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 text-xs flex items-center justify-center font-bold mt-0.5">
-                                        {i + 1}
+                                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center mt-0.5">
+                                        {s.icon}
                                     </div>
                                     <div>
                                         <p className="text-xs font-semibold text-white">{s.title}</p>

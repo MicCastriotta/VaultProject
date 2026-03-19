@@ -148,57 +148,6 @@ function SyncLaunchCheck() {
 
 
 /**
- * Consuma window.launchQueue (File Handling API).
- * Quando la PWA viene aperta con un file .ownv, legge il contenuto
- * e lo salva in sessionStorage per processarlo dopo il login.
- */
-function LaunchQueueConsumer() {
-    useEffect(() => {
-        if (!('launchQueue' in window)) return;
-        window.launchQueue.setConsumer(async (launchParams) => {
-            const files = launchParams.files ?? [];
-            if (files.length === 0) return;
-            try {
-                const file = await files[0].getFile();
-                const text = await file.text();
-                sessionStorage.setItem('ov_pending_ownv', text);
-            } catch {
-                // file non leggibile, ignora
-            }
-        });
-    }, []);
-    return null;
-}
-
-/**
- * Processa un file .ownv pendente salvato in sessionStorage prima del login.
- * Scatta una sola volta dopo che il vault viene sbloccato.
- * Delega sempre a ContactsPage per mostrare la preview modale.
- */
-function PendingOwnvHandler() {
-    const navigate = useNavigate();
-
-    useEffect(() => {
-        const text = sessionStorage.getItem('ov_pending_ownv');
-        if (!text) return;
-        sessionStorage.removeItem('ov_pending_ownv');
-
-        import('./services/contactsService').then(({ contactsService }) => {
-            const data = contactsService.parseOwnvFile(text);
-            if (!data) return;
-
-            if (data.type === 'invite' || data.type === 'profile') {
-                // Lascia che ContactsPage mostri la preview modale
-                sessionStorage.setItem('ov_pending_for_contacts', text);
-                navigate('/contacts');
-            }
-        });
-    }, []);
-
-    return null;
-}
-
-/**
  * Dopo il login, recupera un payload relay pendente (salvato in sessionStorage
  * prima del login quando l'utente ha aperto un link /receive/:id da non autenticato).
  */
@@ -258,7 +207,6 @@ function AppShell() {
     return (
         <AppLayout>
             <SyncLaunchCheck />
-            <PendingOwnvHandler />
             <PendingRelayHandler />
             <Suspense fallback={<PageSpinner />}>
                 <Outlet />
@@ -413,7 +361,6 @@ export function App() {
         <ThemeProvider>
             <AuthProvider>
                 <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                    <LaunchQueueConsumer />
                     {showSplash && <SplashScreen onDone={handleSplashDone} />}
                     <UpdateBanner />
                     <InstallPrompt />

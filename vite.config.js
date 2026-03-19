@@ -155,20 +155,6 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         orientation: 'portrait',
-        file_handlers: [
-          {
-            action: '/',
-            accept: {
-              // Tipo custom (per completezza e futura compatibilità)
-              'application/x-ownvault': ['.ownv'],
-              // application/octet-stream: necessario per Android, dove i file scaricati
-              // tramite Blob URL vengono salvati con questo MIME type e il sistema
-              // cerca un handler compatibile. Il match avviene solo se MIME + estensione
-              // corrispondono entrambi, quindi non cattura file binari generici.
-              'application/octet-stream': ['.ownv']
-            }
-          }
-        ],
         icons: [
           {
             src: '/icons/icon-192x192.png',
