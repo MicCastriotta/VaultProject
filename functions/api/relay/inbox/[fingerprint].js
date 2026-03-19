@@ -7,6 +7,8 @@
  * Zero-knowledge: il server non sa chi ha inviato né il contenuto.
  */
 
+import { checkRateLimit, rateLimitedResponse } from '../../_rl.js';
+
 const ALLOWED_ORIGINS = [
     'https://ownvault.eu',
     'http://localhost:3000',
@@ -30,6 +32,11 @@ export async function onRequestOptions({ request }) {
 export async function onRequestGet({ params, env, request }) {
     const origin = request.headers.get('Origin') || '';
     const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    if (!await checkRateLimit(env.OV_RELAY, ip, 'relay:inbox', 30)) {
+        return rateLimitedResponse(headers);
+    }
 
     const { fingerprint } = params;
 

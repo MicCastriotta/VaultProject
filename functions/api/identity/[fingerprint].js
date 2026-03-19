@@ -6,6 +6,8 @@
  * DELETE è autenticato tramite deleteToken derivato dalla chiave privata del vault.
  */
 
+import { checkRateLimit, rateLimitedResponse } from '../_rl.js';
+
 const ALLOWED_ORIGINS = [
     'https://ownvault.eu',
     'http://localhost:3000',
@@ -29,6 +31,11 @@ export async function onRequestOptions({ request }) {
 export async function onRequestGet({ params, env, request }) {
     const origin = request.headers.get('Origin') || '';
     const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    if (!await checkRateLimit(env.OV_IDENTITY, ip, 'identity:get', 60)) {
+        return rateLimitedResponse(headers);
+    }
 
     const { fingerprint } = params;
 

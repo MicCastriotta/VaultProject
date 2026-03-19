@@ -17,10 +17,11 @@ export function ContactsPage() {
     const { refreshHMAC } = useAuth();
     const [contacts, setContacts] = useState([]);
     const [myFingerprint, setMyFingerprint] = useState('');
-    const [displayName, setDisplayName] = useState('');
-    const [editingName, setEditingName] = useState(false);
-    const [nameInput, setNameInput] = useState('');
-    const nameInputRef = useRef(null);
+
+    // Rename contatto
+    const [editingContactId, setEditingContactId] = useState(null);
+    const [editingContactName, setEditingContactName] = useState('');
+    const editingContactRef = useRef(null);
 
     const [showGuide, setShowGuide] = useState(false);
 
@@ -72,11 +73,11 @@ export function ContactsPage() {
     }, [location.key]);
 
     useEffect(() => {
-        if (editingName && nameInputRef.current) {
-            nameInputRef.current.focus();
-            nameInputRef.current.select();
+        if (editingContactId && editingContactRef.current) {
+            editingContactRef.current.focus();
+            editingContactRef.current.select();
         }
-    }, [editingName]);
+    }, [editingContactId]);
 
     async function loadContacts() {
         const list = await contactsService.getAllContacts();
@@ -87,27 +88,25 @@ export function ContactsPage() {
         try {
             const pk = await contactsService.getPublicKey();
             const fp = await contactsService.getFingerprint(pk);
-            const name = await contactsService.getDisplayName();
             setMyFingerprint(fp);
-            setDisplayName(name);
-            setNameInput(name);
         } catch {
             // vault non ancora sbloccato o primo avvio
         }
     }
 
-    async function handleSaveName() {
-        const trimmed = nameInput.trim();
-        await contactsService.setDisplayName(trimmed);
-        setDisplayName(trimmed);
-        setEditingName(false);
+    async function handleSaveContactName() {
+        if (!editingContactId) return;
+        await contactsService.updateContactName(editingContactId, editingContactName);
+        setEditingContactId(null);
+        setEditingContactName('');
+        loadContacts();
     }
 
-    function handleNameKeyDown(e) {
-        if (e.key === 'Enter') handleSaveName();
+    function handleContactNameKeyDown(e) {
+        if (e.key === 'Enter') handleSaveContactName();
         if (e.key === 'Escape') {
-            setNameInput(displayName);
-            setEditingName(false);
+            setEditingContactId(null);
+            setEditingContactName('');
         }
     }
 
@@ -124,13 +123,15 @@ export function ContactsPage() {
             // Mostra preview "aggiungi contatto" con fingerprint verificato
             setPreview({ type: 'invite', data: { name: '', pk: result.pk }, fingerprint: result.fingerprint });
         } catch (err) {
-            showImportError(
-                err.message === 'fingerprint_invalid'
-                    ? t('contacts.fingerprintInvalid')
-                    : err.message === 'fingerprint_mismatch'
-                        ? t('contacts.fingerprintMismatch')
+            if (err.message === 'fingerprint_mismatch') {
+                showSecurityWarning(t('contacts.fingerprintMismatch'));
+            } else {
+                showImportError(
+                    err.message === 'fingerprint_invalid'
+                        ? t('contacts.fingerprintInvalid')
                         : t('contacts.fingerprintNotFound')
-            );
+                );
+            }
         } finally {
             setFingerprintInput('');
             setIsLookingUp(false);
@@ -259,8 +260,8 @@ export function ContactsPage() {
             const { databaseService } = await import('../services/databaseService');
             const { cryptoService } = await import('../services/cryptoService');
 
-            // Separa l'allegato dai dati del profilo prima di cifrare
-            const { attachment, ...profileDataClean } = preview.profileData;
+            // Separa _wt (write token relay) e attachment dai dati del profilo prima di cifrare
+            const { attachment, _wt: relayWriteToken, ...profileDataClean } = preview.profileData;
 
             const encrypted = await cryptoService.encryptData(profileDataClean);
             const newId = await databaseService.saveProfile({
@@ -297,7 +298,7 @@ export function ContactsPage() {
 
             await refreshHMAC();
             if (pendingRelayId) {
-                contactsService.deleteFromRelay(pendingRelayId).catch(() => {});
+                contactsService.deleteFromRelay(pendingRelayId, relayWriteToken).catch(() => {});
                 setPendingRelayId(null);
             }
             setPreview(null);
@@ -318,6 +319,11 @@ export function ContactsPage() {
     function showImportError(msg) {
         setImportStatus({ type: 'error', message: msg });
         setTimeout(() => setImportStatus(null), 4000);
+    }
+
+    function showSecurityWarning(msg) {
+        // Non auto-dismiss: l'utente deve chiuderlo esplicitamente
+        setImportStatus({ type: 'security', message: msg });
     }
 
     async function handleDelete(id) {
@@ -420,65 +426,49 @@ export function ContactsPage() {
 
                 {/* La mia identità */}
                 {myFingerprint && (
-                    <div className="mb-5 px-4 py-3 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-2">
-                        <div>
-                            <p className="text-xs text-gray-500 mb-1">{t('contacts.myName')}</p>
-                            {editingName ? (
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        ref={nameInputRef}
-                                        value={nameInput}
-                                        onChange={e => setNameInput(e.target.value)}
-                                        onKeyDown={handleNameKeyDown}
-                                        onBlur={handleSaveName}
-                                        maxLength={40}
-                                        placeholder={t('contacts.namePlaceholder')}
-                                        className="flex-1 bg-slate-700 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={() => setEditingName(true)}
-                                    className="flex items-center gap-2 group"
-                                >
-                                    {displayName ? (
-                                        <span className="text-sm font-medium text-white">{displayName}</span>
-                                    ) : (
-                                        <span className="text-sm text-gray-500 italic">{t('contacts.nameNotSet')}</span>
-                                    )}
-                                    <Pencil size={12} className="text-gray-600 group-hover:text-gray-400 transition" />
-                                </button>
-                            )}
-                        </div>
-                        <div>
-                            <p className="text-xs text-gray-500 mb-1">{t('contacts.myFingerprint')}</p>
-                            <div className="flex items-center gap-2">
-                                <p className="text-xs font-mono text-blue-400 tracking-wide flex-1">{myFingerprint}</p>
-                                <button
-                                    onClick={handleCopyFingerprint}
-                                    className="p-1 text-gray-500 hover:text-blue-400 transition flex-shrink-0"
-                                    title={t('contacts.copyFingerprint')}
-                                >
-                                    {fingerprintCopied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
-                                </button>
-                            </div>
+                    <div className="mb-5 px-4 py-3 rounded-xl bg-slate-800/40 border border-slate-700/50">
+                        <p className="text-xs text-gray-500 mb-1">{t('contacts.myFingerprint')}</p>
+                        <div className="flex items-center gap-2">
+                            <p className="text-xs font-mono text-blue-400 tracking-wide flex-1">{myFingerprint}</p>
+                            <button
+                                onClick={handleCopyFingerprint}
+                                className="p-1 text-gray-500 hover:text-blue-400 transition flex-shrink-0"
+                                title={t('contacts.copyFingerprint')}
+                            >
+                                {fingerprintCopied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
+                            </button>
                         </div>
                     </div>
                 )}
 
                 {/* Feedback importazione */}
                 {importStatus && (
-                    <div className={`mb-4 flex items-center gap-2 px-4 py-3 rounded-xl text-sm ${
-                        importStatus.type === 'success'
-                            ? 'bg-green-900/30 border border-green-500/30 text-green-300'
-                            : 'bg-red-900/30 border border-red-500/30 text-red-300'
-                    }`}>
-                        {importStatus.type === 'success'
-                            ? <Check size={16} />
-                            : <AlertCircle size={16} />
-                        }
-                        {importStatus.message}
-                    </div>
+                    importStatus.type === 'security' ? (
+                        <div className="mb-4 px-4 py-3 rounded-xl text-sm bg-amber-900/30 border border-amber-500/50 text-amber-200">
+                            <div className="flex items-start gap-2">
+                                <Shield size={16} className="text-amber-400 mt-0.5 shrink-0" />
+                                <div className="flex-1">
+                                    <p className="font-semibold text-amber-300 mb-0.5">{t('contacts.securityWarning')}</p>
+                                    <p>{importStatus.message}</p>
+                                </div>
+                                <button onClick={() => setImportStatus(null)} className="text-amber-500 hover:text-amber-300 shrink-0">
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className={`mb-4 flex items-center gap-2 px-4 py-3 rounded-xl text-sm ${
+                            importStatus.type === 'success'
+                                ? 'bg-green-900/30 border border-green-500/30 text-green-300'
+                                : 'bg-red-900/30 border border-red-500/30 text-red-300'
+                        }`}>
+                            {importStatus.type === 'success'
+                                ? <Check size={16} />
+                                : <AlertCircle size={16} />
+                            }
+                            {importStatus.message}
+                        </div>
+                    )
                 )}
 
                 {/* Lista contatti */}
@@ -502,12 +492,30 @@ export function ContactsPage() {
                                         <User size={18} className="text-blue-400" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-medium text-white">{c.name}</p>
+                                        {editingContactId === c.id ? (
+                                            <input
+                                                ref={editingContactRef}
+                                                value={editingContactName}
+                                                onChange={e => setEditingContactName(e.target.value)}
+                                                onKeyDown={handleContactNameKeyDown}
+                                                onBlur={handleSaveContactName}
+                                                maxLength={40}
+                                                className="w-full bg-slate-700 text-white text-sm font-medium rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        ) : (
+                                            <button
+                                                onClick={() => { setEditingContactId(c.id); setEditingContactName(c.name); }}
+                                                className="flex items-center gap-1.5 group max-w-full"
+                                            >
+                                                <span className="font-medium text-white truncate">{c.name}</span>
+                                                <Pencil size={11} className="text-gray-600 group-hover:text-gray-400 transition flex-shrink-0" />
+                                            </button>
+                                        )}
                                         <p className="text-xs font-mono text-gray-500 truncate">{c.fingerprint}</p>
                                     </div>
                                     <button
                                         onClick={() => handleDelete(c.id)}
-                                        className="p-2 hover:bg-red-500/10 text-red-400 rounded-lg transition"
+                                        className="p-2 hover:bg-red-500/10 text-red-400 rounded-lg transition flex-shrink-0"
                                     >
                                         <Trash2 size={16} />
                                     </button>

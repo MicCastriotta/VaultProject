@@ -6,6 +6,8 @@
  * (browser in-app, Safari, PWA) in sequenza prima di importare con successo.
  */
 
+import { checkRateLimit, rateLimitedResponse } from '../_rl.js';
+
 const ALLOWED_ORIGINS = [
     'https://ownvault.eu',
     'http://localhost:3000',  // Vite dev server
@@ -30,23 +32,55 @@ export async function onRequestDelete({ params, env, request }) {
     const origin = request.headers.get('Origin') || '';
     const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
 
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    if (!await checkRateLimit(env.OV_RELAY, ip, 'relay:delete', 60)) {
+        return rateLimitedResponse(headers);
+    }
+
     const { id } = params;
 
     if (!id || !/^[0-9a-f]{32}$/.test(id)) {
         return new Response(JSON.stringify({ error: 'Invalid ID' }), { status: 400, headers });
     }
 
-    // Legge il payload prima di eliminarlo per ricavare recipientFp e pulire il marker inbox
-    try {
-        const value = await env.OV_RELAY.get(`relay:${id}`);
-        if (value) {
-            const parsed = JSON.parse(value);
-            if (parsed.recipientFp && /^[0-9a-f]{16}$/.test(parsed.recipientFp)) {
-                await env.OV_RELAY.delete(`inbox:${parsed.recipientFp}:${id}`);
-            }
+    // Legge il payload per: a) verificare writeToken se presente, b) pulire inbox marker
+    const value = await env.OV_RELAY.get(`relay:${id}`);
+    if (!value) {
+        // Entry già assente — risponde OK (idempotente)
+        return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+    }
+
+    let parsed;
+    try { parsed = JSON.parse(value); } catch { parsed = {}; }
+
+    // Se il payload include _wth (write token hash), richiede verifica.
+    // Payload senza _wth (vecchio formato) non richiedono token → backward compat.
+    if (parsed._wth) {
+        let writeToken;
+        try {
+            const body = await request.json();
+            writeToken = body?.writeToken;
+        } catch {
+            // body assente o non JSON
         }
-    } catch {
-        // silenzioso — se il parsing fallisce eliminiamo comunque il payload
+
+        if (!writeToken || typeof writeToken !== 'string' || !/^[0-9a-f]{32}$/.test(writeToken)) {
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
+        }
+
+        // Verifica: SHA-256(hex→bytes(writeToken)) == _wth
+        const wtBytes = new Uint8Array(writeToken.match(/.{2}/g).map(b => parseInt(b, 16)));
+        const hashBuf = await crypto.subtle.digest('SHA-256', wtBytes);
+        const computed = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+        if (computed !== parsed._wth) {
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers });
+        }
+    }
+
+    // Pulizia inbox marker
+    if (parsed.recipientFp && /^[0-9a-f]{16}$/.test(parsed.recipientFp)) {
+        await env.OV_RELAY.delete(`inbox:${parsed.recipientFp}:${id}`);
     }
 
     await env.OV_RELAY.delete(`relay:${id}`);
@@ -57,6 +91,11 @@ export async function onRequestDelete({ params, env, request }) {
 export async function onRequestGet({ params, env, request }) {
     const origin = request.headers.get('Origin') || '';
     const headers = { 'Content-Type': 'application/json', ...corsHeaders(origin) };
+
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    if (!await checkRateLimit(env.OV_RELAY, ip, 'relay:get', 60)) {
+        return rateLimitedResponse(headers);
+    }
 
     const { id } = params;
 
