@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
     ArrowLeft, UserPlus, Trash2, User, Pencil, FolderOpen,
-    X, Check, AlertCircle, CreditCard, Globe, Shield, Fingerprint, Paperclip
+    X, Check, AlertCircle, CreditCard, Globe, Shield, Fingerprint, Paperclip, Link
 } from 'lucide-react';
 import { contactsService } from '../services/contactsService';
 
@@ -34,6 +34,9 @@ export function ContactsPage() {
     // Modal "imposta nome" richiesto prima di condividere invito
     const [showNameRequired, setShowNameRequired] = useState(false);
     const [isSharing, setIsSharing] = useState(false);
+
+    // Import da link relay (workaround iOS PWA + desktop)
+    const [linkInput, setLinkInput] = useState('');
 
     useEffect(() => {
         loadContacts();
@@ -94,19 +97,43 @@ export function ContactsPage() {
     }
 
     async function handleShareInvite() {
-        // Richiede nome prima di condividere
         if (!displayName.trim()) {
             setShowNameRequired(true);
             return;
         }
         setIsSharing(true);
         try {
-            const blob = await contactsService.generateInviteFile();
-            await contactsService.shareOrDownload(blob, 'invite.ownv');
+            const url = await contactsService.shareInviteViaRelay();
+            const result = await contactsService.shareUrl(url, 'OwnVault – Invito');
+            if (result === 'copied') {
+                setImportStatus({ type: 'success', message: t('contacts.linkCopied') });
+                setTimeout(() => setImportStatus(null), 3000);
+            }
         } catch {
-            // utente ha annullato
+            // utente ha annullato o relay non raggiungibile
         } finally {
             setIsSharing(false);
+        }
+    }
+
+    async function handleImportFromLink() {
+        const trimmed = linkInput.trim();
+        // Accetta sia URL completa che solo l'ID (32 hex)
+        const match = trimmed.match(/\/receive\/([0-9a-f]{32})/) || trimmed.match(/^([0-9a-f]{32})$/);
+        if (!match) {
+            showImportError(t('contacts.invalidLink'));
+            return;
+        }
+        setLinkInput('');
+        try {
+            const text = await contactsService.fetchFromRelay(match[1]);
+            await processOwnvText(text);
+        } catch (err) {
+            showImportError(
+                err.message === 'relay_expired'
+                    ? t('contacts.linkExpired')
+                    : t('contacts.parseError')
+            );
         }
     }
 
@@ -288,6 +315,26 @@ export function ContactsPage() {
                         className="hidden"
                         onChange={handleImportFile}
                     />
+                </div>
+
+                {/* Import da link relay — workaround per iOS PWA e desktop */}
+                <div className="flex gap-2 mb-4">
+                    <input
+                        type="url"
+                        value={linkInput}
+                        onChange={e => setLinkInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && linkInput.trim() && handleImportFromLink()}
+                        placeholder={t('contacts.linkPlaceholder')}
+                        className="flex-1 bg-slate-800/60 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-500"
+                    />
+                    <button
+                        onClick={handleImportFromLink}
+                        disabled={!linkInput.trim()}
+                        className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm disabled:opacity-40 transition"
+                        title={t('contacts.importLink')}
+                    >
+                        <Link size={16} />
+                    </button>
                 </div>
 
                 {/* Guida primo accesso */}

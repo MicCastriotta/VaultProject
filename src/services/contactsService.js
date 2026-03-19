@@ -246,6 +246,74 @@ class ContactsService {
     }
 
     // ========================================
+    // RELAY SERVER (Cloudflare KV)
+    // ========================================
+
+    /**
+     * Carica il payload dell'invito cifrato sul relay e ritorna il link di condivisione.
+     * Il link ha la forma: <origin>/receive/<id>
+     */
+    async shareInviteViaRelay() {
+        const identity = await this.getOrCreateIdentity();
+        const data = {
+            type: 'invite',
+            v: 1,
+            pk: identity.publicKey,
+            name: identity.displayName || ''
+        };
+        return await this._uploadToRelay(data);
+    }
+
+    /**
+     * Carica il payload del profilo cifrato per il destinatario sul relay.
+     */
+    async shareProfileViaRelay(profileData, recipientPublicKeyB64) {
+        const payload = await this.encryptProfileForContact(profileData, recipientPublicKeyB64);
+        const data = { type: 'profile', v: 1, ...payload };
+        return await this._uploadToRelay(data);
+    }
+
+    /**
+     * POST il payload al relay, ritorna la URL di condivisione.
+     */
+    async _uploadToRelay(data) {
+        const response = await fetch('/api/relay', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error('relay_upload_failed');
+        const { id } = await response.json();
+        return `${window.location.origin}/receive/${id}`;
+    }
+
+    /**
+     * Recupera un payload dal relay tramite ID.
+     * Ritorna il testo JSON grezzo (compatibile con parseOwnvFile).
+     * Lancia 'relay_expired' se il link non esiste più.
+     */
+    async fetchFromRelay(id) {
+        const response = await fetch(`/api/relay/${encodeURIComponent(id)}`);
+        if (response.status === 404) throw new Error('relay_expired');
+        if (!response.ok) throw new Error('relay_fetch_failed');
+        return await response.text();
+    }
+
+    /**
+     * Condivide una URL via Web Share API (mobile) o copia negli appunti (desktop).
+     * Ritorna 'shared' | 'copied'.
+     */
+    async shareUrl(url, title = 'OwnVault') {
+        const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        if (isMobile && navigator.share) {
+            await navigator.share({ url, title });
+            return 'shared';
+        }
+        await navigator.clipboard.writeText(url);
+        return 'copied';
+    }
+
+    // ========================================
     // FILE .ownv
     // ========================================
 

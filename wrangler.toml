@@ -1,0 +1,14 @@
+# wrangler.toml — configurazione per sviluppo locale con wrangler pages dev
+# In produzione (Cloudflare Pages) i binding KV si configurano nel dashboard:
+#   Pages > OwnVault > Settings > Functions > KV namespace bindings
+#   Variable name: OV_RELAY
+#   KV namespace: (seleziona o crea il namespace "ownvault-relay")
+
+name = "ownvault"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "dist"
+
+[[kv_namespaces]]
+binding = "OV_RELAY"
+id = "f912da344d4142bf80bf883084004996"           # wrangler kv namespace create "ownvault-relay"
+preview_id = "c7848aa7969e49899a8cd8eb05e9374e"     # wrangler kv namespace create "ownvault-relay-preview"
