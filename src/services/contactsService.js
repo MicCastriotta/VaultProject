@@ -261,7 +261,9 @@ class ContactsService {
             pk: identity.publicKey,
             name: identity.displayName || ''
         };
-        return new Blob([JSON.stringify(data)], { type: 'application/x-ownvault' });
+        // application/octet-stream: riconosciuto da Android (Web Share API + file association)
+        // e da iOS (evita il filtro del picker per tipi MIME custom non registrati)
+        return new Blob([JSON.stringify(data)], { type: 'application/octet-stream' });
     }
 
     /**
@@ -270,7 +272,7 @@ class ContactsService {
     async generateProfileFile(profileData, recipientPublicKeyB64) {
         const payload = await this.encryptProfileForContact(profileData, recipientPublicKeyB64);
         const data = { type: 'profile', v: 1, ...payload };
-        return new Blob([JSON.stringify(data)], { type: 'application/x-ownvault' });
+        return new Blob([JSON.stringify(data)], { type: 'application/octet-stream' });
     }
 
     /**
@@ -294,8 +296,11 @@ class ContactsService {
      * oppure lo scarica direttamente.
      */
     async shareOrDownload(blob, fileName) {
+        // Usa application/octet-stream: Android Chrome Web Share API rifiuta tipi MIME custom
+        // (canShare ritorna false per application/x-ownvault).
+        // L'estensione .ownv nel fileName preserva l'associazione corretta sul destinatario.
         const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        const file = new File([blob], fileName, { type: 'application/x-ownvault' });
+        const file = new File([blob], fileName, { type: 'application/octet-stream' });
         if (isMobile && navigator.canShare?.({ files: [file] })) {
             await navigator.share({ files: [file], title: 'OwnVault' });
         } else {
