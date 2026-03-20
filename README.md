@@ -60,10 +60,15 @@ DEK — Data Encryption Key (random, 256-bit)
 - **Content Security Policy** — CSP restrittiva via header HTTP in produzione
 
 ### Contatti e Condivisione profili
-- **Identità crittografica** per ogni vault: keypair ECDH P-256 generata al primo accesso, chiave privata cifrata con la DEK
+- **Identità crittografica** per ogni vault: keypair ECDH P-256 generata al primo accesso, chiave privata cifrata con la DEK; display name opzionale salvato nell'identità
+- **Directory identità globale (opt-in)**: l'utente può registrare il proprio fingerprint su Cloudflare KV (`OV_IDENTITY`) per essere trovabile da altri. TTL 6 mesi, auto-rinnovato. Il server è zero-knowledge: salva solo `{ pk, deleteTokenHash }`, nessun dato personale
+- **Lookup contatto per fingerprint**: barra di ricerca in `ContactsPage` per trovare un contatto nella directory tramite fingerprint (`AA:BB:CC:DD:EE:FF:11:22` o formato compatto). Il client verifica crittograficamente che `SHA256(pk)[:8 byte] == fingerprint` prima di mostrare il preview
 - **Invite via relay link**: l'invito viene caricato sul relay Cloudflare KV e condiviso come URL `/receive/<id>` — il server non ha accesso ai dati (zero-knowledge)
 - **Fingerprint visivo** del contatto: primi 8 byte SHA-256(publicKey) in esadecimale per verifica out-of-band
-- **Condivisione profilo cifrata**: ECDH effimero + HKDF-SHA256 + AES-256-GCM (forward secrecy per ogni share); payload caricato sul relay, condiviso come link
+- **Condivisione profilo cifrata**: ECDH effimero + HKDF-SHA256 + AES-256-GCM (forward secrecy per ogni share); payload caricato sul relay, condiviso come link; include allegati del profilo se presenti
+- **Write token per delete-after-confirm**: al momento del caricamento viene generato un token casuale a 128 bit. Il suo hash SHA-256 (`_wth`) è inviato al relay; il token stesso è cifrato nel payload ECDH — solo il destinatario può estrarlo per autorizzare il `DELETE` dopo l'importazione. Impedisce a terzi con il solo ID relay di cancellare il payload
+- **Inbox pull**: il mittente può indicare il fingerprint del destinatario nel payload relay; il destinatario può fare pull attivo dei profili in attesa dalla `ContactsPage` senza dover ricevere il link direttamente (`GET /api/relay/inbox/:fingerprint`)
+- **Protezione auto-aggiunta**: il sistema impedisce di aggiungere se stessi come contatto (controllo sia a livello service che UI)
 - Flusso pendente: se il vault è bloccato quando si apre un link `/receive/:id`, l'ID viene salvato in `sessionStorage` e il payload viene recuperato dopo l'unlock
 - Export/Import JSON v3: include identità e rubrica contatti
 
@@ -164,28 +169,69 @@ Formato: `OV-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX` (Crockford Base32, 20 byte = 1
 
 Da conservare offline come backup della DSK. Permette di ri-enrollare la biometria su un device dopo reset o se il credenziale WebAuthn viene eliminato.
 
-### Relay server (Cloudflare KV — zero-knowledge)
+### Relay server (Cloudflare KV `OV_RELAY` — zero-knowledge)
 
 I payload di invito e profilo cifrato vengono caricati su un relay Cloudflare KV prima di condividere il link. Il server è **zero-knowledge**: riceve e restituisce solo testo opaco cifrato.
 
 ```
 Mittente
+  → genera writeToken (128 bit random) + writeTokenHash = SHA256(writeToken)
   → cifra payload (invite: pk+name in chiaro | profile: ECDH+AES-GCM ciphertext)
-  → POST /api/relay  → Cloudflare KV  → { id, expiresAt }
+      il writeToken è incluso nel plaintext cifrato come `_wt`
+  → POST /api/relay  { payload, _wth: writeTokenHash, recipientFp? }
+      → Cloudflare KV  → { id, expiresAt }
+      → se recipientFp presente: marker inbox:fp:id salvato nello stesso KV
   → condivide URL: <origin>/receive/<id>
 
-Destinatario
+Destinatario (via link diretto)
   → apre /receive/<id>
   → GET /api/relay/<id>  → Cloudflare KV  → payload JSON
   → valida e mostra preview modale in ContactsPage
-  → conferma → salva profilo/contatto + refreshHMAC
+  → conferma → decifra + estrae writeToken dal plaintext
+             → salva profilo/contatto + refreshHMAC
+             → DELETE /api/relay/<id> { writeToken }  (cancella il payload)
+
+Destinatario (via inbox pull)
+  → ContactsPage: pulsante "Controlla"
+  → GET /api/relay/inbox/<fingerprint>  → { ids: [...] }
+  → per ogni id: GET /api/relay/<id>  → payload
+  → processa in coda con modal preview sequenziale
 ```
 
-- TTL: 48 ore (il relay non espone dati dopo la scadenza)
+- TTL: 24 ore (il relay non espone dati dopo la scadenza; writeToken è il meccanismo di delete anticipato)
 - ID: 128 bit random esadecimale (32 char)
-- Payload max: 512 KB
+- Payload max: 10 MB (copre allegati fino a ~6 MB effettivi con overhead base64)
 - Il relay non ha accesso alle chiavi private — i profili sono leggibili solo dal destinatario
+- `_wth` nel payload relay: hash SHA-256 del write token — impedisce delete da parte di terzi con il solo ID
 - Se il vault è bloccato all'apertura del link, l'ID viene salvato in `sessionStorage` e il fetch avviene dopo l'unlock
+
+### Directory identità (Cloudflare KV `OV_IDENTITY` — opt-in)
+
+Permette agli utenti di registrare il proprio fingerprint per essere trovabili da altri senza scambiare link di invito.
+
+```
+Registrazione (opt-in dalle Impostazioni):
+  → deleteToken = HMAC-SHA256(chiave_privata, "OwnVault-directory-delete-v1")
+  → deleteTokenHash = SHA256(deleteToken)
+  → POST /api/identity  { fingerprint, pk, deleteTokenHash }
+      → il server verifica: SHA256(pk)[:8 byte] == fingerprint
+      → salva { pk, deleteTokenHash } in OV_IDENTITY  (TTL 6 mesi)
+      → deleteTokenHash mai esposto nelle risposte GET
+
+Lookup da parte di un altro utente:
+  → GET /api/identity/<fingerprint>  → { pk }
+  → client verifica: SHA256(pk)[:8 byte] == fingerprint  (controllo crittografico lato client)
+  → se ok: mostra preview "aggiungi contatto"
+
+Cancellazione (utente disabilita discoverability):
+  → DELETE /api/identity/<fingerprint>  { deleteToken }
+      → server verifica: SHA256(deleteToken) == deleteTokenHash salvato
+      → cancella entry
+```
+
+- Il `deleteToken` è deterministico e derivabile su qualsiasi device con il vault sbloccato — non richiede storage aggiuntivo
+- Il server non può derivare il deleteToken (non conosce la chiave privata) — solo il proprietario può cancellarsi
+- Zero metadata: il server non sa chi ha effettuato il lookup né chi ha cercato chi
 
 ### Identità crittografica e condivisione profili (ECDH)
 
@@ -302,6 +348,9 @@ upgrade-insecure-requests
 | Profilo importato senza HMAC update | refreshHMAC() chiamato dopo ogni import da contatto/relay |
 | Share profilo intercettato sul relay | Il relay riceve solo ciphertext AES-256-GCM — illeggibile senza chiave privata destinatario |
 | Share profilo intercettato in transito | HTTPS + payload E2E cifrato con chiave ECDH effimera |
+| Delete payload relay da terzi | writeToken richiesto per DELETE — estratto solo dal destinatario dopo decifratura ECDH |
+| Cancellazione identità da directory da terzi | deleteToken deterministico richiesto per DELETE — derivabile solo da chi ha la chiave privata del vault |
+| Auto-aggiunta come contatto | Controllo fingerprint in `addContact()` (service) e in tutti gli handler UI — errore `cannot_add_self` |
 | Eliminazione silenziosa record | Conteggio profili + allegati nel payload HMAC |
 | Allegati spostati tra profili | AAD con profileId — decifratura fallisce cross-profile |
 | Brute-force locale | Rate limiting persistente + 600k iterazioni KDF |
@@ -415,9 +464,15 @@ src/
 
 functions/
 └── api/
+    ├── _rl.js                     # Rate limiter condiviso (Cloudflare KV sliding window)
     ├── relay/
-    │   ├── index.js               # POST /api/relay — crea entry su Cloudflare KV (48h TTL)
-    │   └── [id].js                # GET /api/relay/:id — recupera payload dal KV
+    │   ├── index.js               # POST /api/relay — crea entry su OV_RELAY (24h TTL)
+    │   ├── [id].js                # GET + DELETE /api/relay/:id — recupera/cancella payload (delete richiede writeToken)
+    │   └── inbox/
+    │       └── [fingerprint].js   # GET /api/relay/inbox/:fp — lista ID payload pendenti per fingerprint
+    └── identity/
+        ├── index.js               # POST /api/identity — registra fingerprint in OV_IDENTITY (6 mesi TTL)
+        └── [fingerprint].js       # GET + DELETE /api/identity/:fp — lookup pk / cancella registrazione
 ```
 
 ---
@@ -572,11 +627,19 @@ VITE_GOOGLE_API_KEY=your-api-key
 
 ### Deploy (Cloudflare Pages)
 
-Il progetto usa **Cloudflare Pages Functions** per il relay:
+Il progetto usa **Cloudflare Pages Functions** per relay e directory:
 
-- `functions/api/relay/index.js` — gestisce `POST /api/relay`
-- `functions/api/relay/[id].js` — gestisce `GET /api/relay/:id`
-- Binding KV richiesto: variabile `OV_RELAY` collegata a un namespace Cloudflare KV
+| Function | Endpoint | Binding KV |
+|---|---|---|
+| `relay/index.js` | `POST /api/relay` | `OV_RELAY` |
+| `relay/[id].js` | `GET + DELETE /api/relay/:id` | `OV_RELAY` |
+| `relay/inbox/[fingerprint].js` | `GET /api/relay/inbox/:fp` | `OV_RELAY` |
+| `identity/index.js` | `POST /api/identity` | `OV_IDENTITY` |
+| `identity/[fingerprint].js` | `GET + DELETE /api/identity/:fp` | `OV_IDENTITY` |
+
+Binding KV richiesti (Pages > Settings > Functions > KV namespace bindings):
+- `OV_RELAY` — payload relay temporanei (24h TTL) + marker inbox
+- `OV_IDENTITY` — directory fingerprint opt-in (6 mesi TTL)
 
 ---
 
@@ -625,10 +688,13 @@ Il progetto usa **Cloudflare Pages Functions** per il relay:
 - [x] Allegati file cifrati per profilo
 - [x] HMAC v2 (integrità su profili + allegati)
 - [x] Content Security Policy (produzione)
-- [x] Identità crittografica ECDH P-256 per vault
+- [x] Identità crittografica ECDH P-256 per vault (con display name)
 - [x] Rubrica contatti con fingerprint visivo
 - [x] Condivisione profili cifrata E2E (ECDH effimero + AES-256-GCM, forward secrecy)
-- [x] Relay server zero-knowledge (Cloudflare KV, 48h TTL) per condivisione via link
+- [x] Relay server zero-knowledge (Cloudflare KV `OV_RELAY`, 24h TTL) per condivisione via link
+- [x] Write token per delete-after-confirm su relay (solo il destinatario può cancellare)
+- [x] Directory identità globale opt-in (Cloudflare KV `OV_IDENTITY`, 6 mesi TTL, lookup per fingerprint)
+- [x] Inbox pull: ricezione profili senza link diretto (`GET /api/relay/inbox/:fp`)
 - [x] Export/Import v3 (include identità + contatti)
 - [x] Setup guidato al primo avvio (nuovo dispositivo o ripristino backup)
 - [x] Device Secret Key (DSK) — chiave locale a 160 bit, secondo fattore crittografico

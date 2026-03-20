@@ -128,6 +128,14 @@ class ContactsService {
     /** Aggiunge un contatto dalla chiave pubblica. Ignora duplicati (stesso fingerprint). */
     async addContact({ name, publicKey }) {
         const fingerprint = await this.getFingerprint(publicKey);
+
+        // Impedisce di aggiungere se stessi come contatto
+        const ownPk = await this.getPublicKey().catch(() => null);
+        if (ownPk) {
+            const ownFingerprint = await this.getFingerprint(ownPk);
+            if (fingerprint === ownFingerprint) throw new Error('cannot_add_self');
+        }
+
         const existing = await db.contacts.where('fingerprint').equals(fingerprint).first();
         if (existing) return existing.id;
         return await db.contacts.add({
