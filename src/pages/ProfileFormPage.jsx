@@ -399,9 +399,6 @@ export function ProfileFormPage() {
                                             if (icon) {
                                                 setFormData(prev => ({ ...prev, icon: icon.slug }));
                                                 setIsIconAutoSet(true);
-                                            } else if (isIconAutoSet) {
-                                                setFormData(prev => ({ ...prev, icon: null }));
-                                                setIsIconAutoSet(false);
                                             }
                                         });
                                     }

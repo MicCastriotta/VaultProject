@@ -21,7 +21,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { QRScanner } from './QRScanner';
 import { deviceSecretService } from '../services/deviceSecretService';
-import { Shield, QrCode, ScanLine, KeyRound, AlertTriangle, CheckCircle, X } from 'lucide-react';
+import { Shield, QrCode, ScanLine, KeyRound, AlertTriangle, CheckCircle, X, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const QR_PREFIX = 'OWNVAULT_APPROVAL:';
@@ -243,6 +243,8 @@ export function DeviceApprovalSender({ onClose }) {
 export function DeviceApprovalReceiver({ onApproved, onClose }) {
     const { t } = useTranslation();
 
+    const MAX_PIN_ATTEMPTS = 5;
+
     const [step, setStep]         = useState('init');  // init | show | scan | pin | done | error
     const [myPubKey, setMyPubKey] = useState('');
     const [myPrivKey, setMyPrivKey] = useState(null);
@@ -250,12 +252,24 @@ export function DeviceApprovalReceiver({ onApproved, onClose }) {
     const [showScanner, setShowScanner] = useState(false);
     const [pin, setPin]           = useState('');
     const [pinError, setPinError] = useState('');
+    const [pinAttempts, setPinAttempts] = useState(0);
+    const [pinLocked, setPinLocked]     = useState(false);
     const [senderPayload, setSenderPayload] = useState(null);
     const [isDecrypting, setIsDecrypting]   = useState(false);
 
     useEffect(() => {
         initKeypair();
     }, []);
+
+    async function restartApproval() {
+        setPinAttempts(0);
+        setPinLocked(false);
+        setPinError('');
+        setPin('');
+        setSenderPayload(null);
+        setStep('init');
+        await initKeypair();
+    }
 
     async function initKeypair() {
         const { privateKey, publicKeyBase64 } = await deviceSecretService.generateEphemeralKeypair();
@@ -304,7 +318,16 @@ export function DeviceApprovalReceiver({ onApproved, onClose }) {
             );
 
             if (!dskBytes) {
-                setPinError(t('deviceApproval.receiver.pinWrong'));
+                const newAttempts = pinAttempts + 1;
+                setPinAttempts(newAttempts);
+                if (newAttempts >= MAX_PIN_ATTEMPTS) {
+                    setPinLocked(true);
+                    setPinError(t('deviceApproval.receiver.pinLockedOut'));
+                } else {
+                    setPinError(t('deviceApproval.receiver.pinWrongWithAttempts', {
+                        remaining: MAX_PIN_ATTEMPTS - newAttempts
+                    }));
+                }
                 setIsDecrypting(false);
                 return;
             }
@@ -377,10 +400,10 @@ export function DeviceApprovalReceiver({ onApproved, onClose }) {
                                     maxLength={6}
                                     value={pin}
                                     onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                    onKeyDown={e => e.key === 'Enter' && handleDecrypt()}
-                                    className="w-full px-4 py-4 bg-slate-900/70 text-gray-200 border border-slate-600 rounded-xl focus:ring-2 focus:ring-blue-500 text-center text-2xl font-mono tracking-[0.4em] placeholder-gray-600"
+                                    onKeyDown={e => e.key === 'Enter' && !pinLocked && handleDecrypt()}
+                                    className="w-full px-4 py-4 bg-slate-900/70 text-gray-200 border border-slate-600 rounded-xl focus:ring-2 focus:ring-blue-500 text-center text-2xl font-mono tracking-[0.4em] placeholder-gray-600 disabled:opacity-50"
                                     placeholder="000000"
-                                    disabled={isDecrypting}
+                                    disabled={isDecrypting || pinLocked}
                                 />
                                 {pinError && (
                                     <p className="text-red-400 text-xs flex items-center gap-1">
@@ -388,17 +411,27 @@ export function DeviceApprovalReceiver({ onApproved, onClose }) {
                                     </p>
                                 )}
                             </div>
-                            <button
-                                onClick={handleDecrypt}
-                                disabled={pin.length !== 6 || isDecrypting}
-                                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
-                            >
-                                {isDecrypting ? (
-                                    <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /><span>{t('deviceApproval.receiver.decrypting')}</span></>
-                                ) : (
-                                    <><KeyRound size={16} /><span>{t('deviceApproval.receiver.confirmPin')}</span></>
-                                )}
-                            </button>
+                            {pinLocked ? (
+                                <button
+                                    onClick={restartApproval}
+                                    className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-gray-200 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <RefreshCw size={16} />
+                                    <span>{t('deviceApproval.receiver.restartProcess')}</span>
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleDecrypt}
+                                    disabled={pin.length !== 6 || isDecrypting}
+                                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                                >
+                                    {isDecrypting ? (
+                                        <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /><span>{t('deviceApproval.receiver.decrypting')}</span></>
+                                    ) : (
+                                        <><KeyRound size={16} /><span>{t('deviceApproval.receiver.confirmPin')}</span></>
+                                    )}
+                                </button>
+                            )}
                         </>
                     )}
 

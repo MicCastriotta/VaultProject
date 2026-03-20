@@ -247,6 +247,7 @@ export function AuthProvider({ children }) {
                 try {
                     const prfResult = await biometricService.authenticateWithPRF(biometricConfig.credentialId, biometricConfig.transports);
                     if (!prfResult.success || !prfResult.prfOutput) {
+                        rateLimiter.current.recordAttempt();
                         cryptoService.lock();
                         return { success: false, error: 'Biometric authentication failed' };
                     }
@@ -254,6 +255,7 @@ export function AuthProvider({ children }) {
                 } catch (bioError) {
                     cryptoService.lock();
                     const isCancelled = bioError.message.includes('cancelled') || bioError.message.includes('denied');
+                    if (!isCancelled) rateLimiter.current.recordAttempt();
                     return { success: false, error: isCancelled ? 'Biometric cancelled' : bioError.message };
                 }
 

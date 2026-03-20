@@ -105,6 +105,7 @@ export function PasswordHealthPage() {
 
     // UI
     const [expandedSection, setExpandedSection] = useState(null);
+    const [hibpError, setHibpError] = useState(false);
 
     useEffect(() => {
         const handleOnline = () => setIsOnline(true);
@@ -220,6 +221,7 @@ export function PasswordHealthPage() {
         if (list.length === 0) return [];
 
         setIsChecking(true);
+        setHibpError(false);
         setProgress({ checked: 0, total: list.length });
 
         try {
@@ -247,6 +249,7 @@ export function PasswordHealthPage() {
 
         } catch (error) {
             console.error('HIBP check error:', error);
+            setHibpError(true);
             return [];
         } finally {
             setIsChecking(false);
@@ -408,6 +411,16 @@ export function PasswordHealthPage() {
                                                     {t('health.offlineMessage')}
                                                 </p>
                                             </div>
+                                        </div>
+                                    )}
+
+                                    {/* HIBP API error warning */}
+                                    {hibpError && !isChecking && isOnline && (
+                                        <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4 flex items-start gap-3">
+                                            <AlertTriangle size={20} className="text-red-400 flex-shrink-0 mt-0.5" />
+                                            <p className="text-sm text-red-300">
+                                                {t('health.hibpCheckError')}
+                                            </p>
                                         </div>
                                     )}
 

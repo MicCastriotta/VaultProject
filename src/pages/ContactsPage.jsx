@@ -120,6 +120,11 @@ export function ContactsPage() {
                 showImportError(t('contacts.fingerprintNotFound'));
                 return;
             }
+            // Blocca se il fingerprint trovato è il proprio
+            if (myFingerprint && result.fingerprint === myFingerprint) {
+                showImportError(t('contacts.cannotAddSelf'));
+                return;
+            }
             // Mostra preview "aggiungi contatto" con fingerprint verificato
             setPreview({ type: 'invite', data: { name: '', pk: result.pk }, fingerprint: result.fingerprint });
         } catch (err) {
@@ -211,6 +216,10 @@ export function ContactsPage() {
         if (data.type === 'invite') {
             try {
                 const fp = await contactsService.getFingerprint(data.pk);
+                if (myFingerprint && fp === myFingerprint) {
+                    showImportError(t('contacts.cannotAddSelf'));
+                    return;
+                }
                 setPreview({ type: 'invite', data, fingerprint: fp });
             } catch {
                 setPreview({ type: 'invite', data, fingerprint: '' });
@@ -245,9 +254,13 @@ export function ContactsPage() {
             processNextInQueue();
             setImportStatus({ type: 'success', message: t('contacts.added') });
             setTimeout(() => setImportStatus(null), 3000);
-        } catch {
+        } catch (err) {
             setPreview(null);
-            showImportError(t('contacts.addError'));
+            showImportError(
+                err.message === 'cannot_add_self'
+                    ? t('contacts.cannotAddSelf')
+                    : t('contacts.addError')
+            );
         } finally {
             setIsConfirming(false);
         }
@@ -266,7 +279,8 @@ export function ContactsPage() {
             const encrypted = await cryptoService.encryptData(profileDataClean);
             const newId = await databaseService.saveProfile({
                 iv: encrypted.iv,
-                data: encrypted.data
+                data: encrypted.data,
+                category: profileDataClean.category || 'WEB'
             });
 
             // Salva l'allegato se incluso nel payload
