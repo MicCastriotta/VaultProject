@@ -6,12 +6,13 @@
 
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Lock, ShieldCheck, UploadCloud, ChevronRight } from 'lucide-react';
+import { Lock, ShieldCheck, UploadCloud, Share2, ChevronRight } from 'lucide-react';
 
 const SLIDES = [
     { icon: Lock, iconColor: 'from-blue-500 to-brand', titleKey: 'tutorial.masterPassword.title', descKey: 'tutorial.masterPassword.description' },
     { icon: ShieldCheck, iconColor: 'from-green-500 to-emerald-400', titleKey: 'tutorial.zeroKnowledge.title', descKey: 'tutorial.zeroKnowledge.description' },
     { icon: UploadCloud, iconColor: 'from-purple-500 to-indigo-400', titleKey: 'tutorial.backupRestore.title', descKey: 'tutorial.backupRestore.description' },
+    { icon: Share2, iconColor: 'from-pink-500 to-rose-400', titleKey: 'tutorial.secureSharing.title', descKey: 'tutorial.secureSharing.description' },
 ];
 
 export function TutorialPage({ onDone }) {

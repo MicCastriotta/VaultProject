@@ -16,7 +16,7 @@ import { QRScanner } from '../components/QRScanner';
 import { IconPicker } from '../components/IconPicker';
 import { validators } from '../services/securityUtils';
 import { getIconBySlug, suggestIconFromTitle } from '../icons/brandIcons';
-import { IconRenderer } from '../components/IconRenderer';
+import { BrandIconBox } from '../components/BrandIconBox';
 import { healthCache } from '../services/healthCacheService';
 
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
@@ -39,7 +39,6 @@ export function ProfileFormPage() {
 
     const [category, setCategory] = useState('WEB');
     const [iconName, setIconName] = useState('');
-    const [iconIsSimple, setIconIsSimple] = useState(false);
     const [formData, setFormData] = useState({
         title: '',
         username: '',
@@ -74,11 +73,8 @@ export function ProfileFormPage() {
     const [removeAttachment, setRemoveAttachment] = useState(false); // Flag rimozione
 
     useEffect(() => {
-        if (!formData.icon) { setIconName(''); setIconIsSimple(false); return; }
-        getIconBySlug(formData.icon).then(icon => {
-            setIconName(icon?.name || formData.icon);
-            setIconIsSimple(!!icon);
-        });
+        if (!formData.icon) { setIconName(''); return; }
+        getIconBySlug(formData.icon).then(icon => setIconName(icon?.name || formData.icon));
     }, [formData.icon]);
 
     useEffect(() => {
@@ -440,9 +436,11 @@ export function ProfileFormPage() {
                                 <div className="flex items-center gap-3">
                                     {formData.icon ? (
                                         <>
-                                            <div className="flex-shrink-0 w-16 h-16 rounded-lg flex items-center justify-center" style={{ backgroundColor: iconIsSimple ? '#ffffff' : 'rgba(59, 130, 246, 0.1)' }}>
-                                                <IconRenderer slug={formData.icon} size={32} useHex />
-                                            </div>
+                                            <BrandIconBox
+                                                slug={formData.icon}
+                                                iconSize={32}
+                                                className="flex-shrink-0 w-16 h-16 rounded-lg flex items-center justify-center"
+                                            />
                                             <div className="flex-1">
                                                 <p className="text-sm text-gray-400">{iconName || formData.icon}</p>
                                                 <button

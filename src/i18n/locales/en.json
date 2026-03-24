@@ -111,6 +111,10 @@
     "backupRestore": {
       "title": "Backup & Restore",
       "description": "Your data is encrypted and saved only on this device. You can back up manually by exporting the database from settings, or enable automatic sync with Google Drive."
+    },
+    "secureSharing": {
+      "title": "Secure Sharing",
+      "description": "Send any profile to a trusted contact with end-to-end encryption. The recipient receives the data only if he uses OwnVault — the server never sees your plaintext."
     }
   },
   "settings": {

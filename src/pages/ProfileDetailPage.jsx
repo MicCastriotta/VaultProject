@@ -31,7 +31,7 @@ import {
     EyeOff
 } from 'lucide-react';
 import { OTPDisplay } from '../components/OTPDisplay';
-import { IconRenderer } from '../components/IconRenderer';
+import { BrandIconBox } from '../components/BrandIconBox';
 import { syncService } from '../services/syncService';
 import { contactsService } from '../services/contactsService';
 
@@ -288,23 +288,21 @@ export function ProfileDetailPage() {
 
                     {/* Profile Title Card */}
                     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 flex items-start gap-3">
-                        <div
-                            className="w-12 h-12 flex items-center justify-center rounded-lg"
-                            style={{ backgroundColor: profile.icon && profile.category !== 'CARD' ? '#ffffff' : 'rgba(59, 130, 246, 0.1)' }}
-                        >
-                            {profile.category === 'CARD' ? (
-                                <CreditCard className="text-blue-400" size={24} />
-                            ) : profile.icon ? (
-                                <IconRenderer
-                                    slug={profile.icon}
-                                    size={24}
-                                    useHex={true}
-                                    fallback="generic"
-                                />
-                            ) : (
-                                <User className="text-blue-400" size={24} />
-                            )}
-                        </div>
+                        {profile.icon && profile.category !== 'CARD' ? (
+                            <BrandIconBox
+                                slug={profile.icon}
+                                iconSize={24}
+                                className="w-12 h-12 flex items-center justify-center rounded-lg flex-shrink-0"
+                            />
+                        ) : (
+                            <div className="w-12 h-12 flex items-center justify-center rounded-lg" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)' }}>
+                                {profile.category === 'CARD' ? (
+                                    <CreditCard className="text-blue-400" size={24} />
+                                ) : (
+                                    <User className="text-blue-400" size={24} />
+                                )}
+                            </div>
+                        )}
                         <div className="flex-1">
                             <h2 className="text-xl font-bold text-white">{profile.title}</h2>
                             <p className="text-sm text-slate-400 mt-1">
