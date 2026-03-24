@@ -31,7 +31,7 @@ DEK — Data Encryption Key (random, 256-bit)
 - Profili **WEB** (credenziali siti) e **CARD** (carte di credito/debito)
 - Cifratura AES-256-GCM per ogni campo, IV random per record
 - **Allegati file** cifrati per profilo — fino a 15 MB, con AAD legato al profileId
-- Icone brand automatiche per oltre 500 servizi web
+- Icone brand automatiche per oltre 3.000 servizi web
 - Ricerca in-memoria su titolo, sito, note (nessun indice plaintext)
 - Ordinamento A-Z, Z-A, più recenti, meno recenti
 - Generatore OTP/TOTP integrato nel profilo
@@ -60,12 +60,13 @@ DEK — Data Encryption Key (random, 256-bit)
 - **Content Security Policy** — CSP restrittiva via header HTTP in produzione
 
 ### Contatti e Condivisione profili
-- **Identità crittografica** per ogni vault: keypair ECDH P-256 generata al primo accesso, chiave privata cifrata con la DEK; display name opzionale salvato nell'identità
+- **Identità crittografica** per ogni vault: keypair ECDH P-256 (condivisione) + keypair Ed25519 (firma) generati al primo accesso, chiavi private cifrate con la DEK; display name opzionale salvato nell'identità
 - **Directory identità globale (opt-in)**: l'utente può registrare il proprio fingerprint su Cloudflare KV (`OV_IDENTITY`) per essere trovabile da altri. TTL 6 mesi, auto-rinnovato. Il server è zero-knowledge: salva solo `{ pk, deleteTokenHash }`, nessun dato personale
 - **Lookup contatto per fingerprint**: barra di ricerca in `ContactsPage` per trovare un contatto nella directory tramite fingerprint (`AA:BB:CC:DD:EE:FF:11:22` o formato compatto). Il client verifica crittograficamente che `SHA256(pk)[:8 byte] == fingerprint` prima di mostrare il preview
 - **Invite via relay link**: l'invito viene caricato sul relay Cloudflare KV e condiviso come URL `/receive/<id>` — il server non ha accesso ai dati (zero-knowledge)
 - **Fingerprint visivo** del contatto: primi 8 byte SHA-256(publicKey) in esadecimale per verifica out-of-band
 - **Condivisione profilo cifrata**: ECDH effimero + HKDF-SHA256 + AES-256-GCM (forward secrecy per ogni share); payload caricato sul relay, condiviso come link; include allegati del profilo se presenti
+- **Autenticazione mittente (Ed25519)**: ogni share include `_senderIdentity` (pk, fingerprint, displayName, signingPk) e `_senderSig` (firma Ed25519 sul commitment SHA-256 del profilo) — tutto dentro il ciphertext, zero-knowledge relay. Il destinatario verifica la firma post-decifratura e vede badge verde/giallo. Il mittente viene auto-aggiunto ai contatti solo se la firma è verificata
 - **Write token per delete-after-confirm**: al momento del caricamento viene generato un token casuale a 128 bit. Il suo hash SHA-256 (`_wth`) è inviato al relay; il token stesso è cifrato nel payload ECDH — solo il destinatario può estrarlo per autorizzare il `DELETE` dopo l'importazione. Impedisce a terzi con il solo ID relay di cancellare il payload
 - **Inbox pull**: il mittente può indicare il fingerprint del destinatario nel payload relay; il destinatario può fare pull attivo dei profili in attesa dalla `ContactsPage` senza dover ricevere il link direttamente (`GET /api/relay/inbox/:fingerprint`)
 - **Protezione auto-aggiunta**: il sistema impedisce di aggiungere se stessi come contatto (controllo sia a livello service che UI)
@@ -233,33 +234,43 @@ Cancellazione (utente disabilita discoverability):
 - Il server non può derivare il deleteToken (non conosce la chiave privata) — solo il proprietario può cancellarsi
 - Zero metadata: il server non sa chi ha effettuato il lookup né chi ha cercato chi
 
-### Identità crittografica e condivisione profili (ECDH)
+### Identità crittografica e condivisione profili (ECDH + Ed25519)
 
 ```
 Vault sbloccato
-   → genera keypair ECDH P-256 (se non esiste)
-   → chiave pubblica → salvata in chiaro in IndexedDB + export backup
-   → chiave privata → cifrata con DEK (JWK → AES-GCM) → IndexedDB
+   → genera keypair ECDH P-256 (se non esiste)     — condivisione profili
+   → genera keypair Ed25519 (se non esiste)          — firma payload
+   → chiavi pubbliche → salvate in chiaro in IndexedDB + export backup
+   → chiavi private → cifrate con DEK (JWK → AES-GCM) → IndexedDB
+   (identità pre-Ed25519: migrazione automatica al primo accesso)
 
 Condivisione profilo verso contatto:
   sender:
     → genera keypair effimero ECDH P-256 (usa-e-getta)
     → ECDH(effimero_priv, destinatario_pub) → sharedBits 256-bit
     → HKDF-SHA256(sharedBits, info="OwnVault-Share-v1") → wrapKey AES-256
-    → AES-256-GCM(wrapKey, profileData) → (ct, iv)
+    → commitment = SHA-256(JSON.stringify(profileData))
+    → _senderSig = Ed25519_sign(signingPrivKey, commitment)
+    → plaintext = { ...profileData, _wt, _senderIdentity: { pk, fp, displayName, signingPk }, _senderSig }
+    → AES-256-GCM(wrapKey, plaintext) → (ct, iv)
     → payload = { v:1, epk, iv, ct } → POST /api/relay → URL /receive/<id>
+      (relay vede solo ciphertext — mittente e firma sono zero-knowledge)
 
   destinatario (vault sbloccato):
     → GET /api/relay/<id> → payload JSON
-    → decifra chiave privata con DEK
+    → decifra chiave privata ECDH con DEK
     → ECDH(priv, epk) → sharedBits → wrapKey
-    → AES-256-GCM-decrypt → profileData
-    → re-cifra con propria DEK → salva in IndexedDB + refreshHMAC
+    → AES-256-GCM-decrypt → { profileData, _senderIdentity, _senderSig, _wt }
+    → verifica: Ed25519_verify(_senderIdentity.signingPk, _senderSig, commitment)
+    → badge verde (firma verificata) o giallo (firma assente/invalida)
+    → se firma verificata: auto-aggiunge mittente ai contatti
+    → re-cifra profileData con propria DEK → salva in IndexedDB + refreshHMAC
+    → DELETE /api/relay/<id> { writeToken }
 ```
 
-La chiave effimera del mittente garantisce **forward secrecy**: compromettere la chiave privata dell'identità non espone share passati. Il relay è zero-knowledge: conosce solo il ciphertext, non le chiavi.
+La chiave effimera del mittente garantisce **forward secrecy**: compromettere la chiave privata dell'identità non espone share passati. Il relay è zero-knowledge: non conosce né le chiavi né l'identità del mittente.
 
-**Limiti noti (v1):** nessuna firma del mittente (chiunque con la chiave pubblica del destinatario può cifrare un payload valido). Previsto in una versione futura con firme Ed25519.
+**Autenticazione mittente:** la firma Ed25519 inside the ciphertext prova che il mittente possiede la chiave privata corrispondente alla `signingPk` dichiarata — senza che il relay veda alcuna informazione sul mittente. L'auto-add del contatto avviene solo se la firma è crittograficamente verificata.
 
 ### Integrità database (HMAC v2 — anti-tampering)
 
@@ -370,9 +381,9 @@ upgrade-insecure-requests
 | Attaccante con DevTools e pazienza | Può cancellare localStorage per bypassare rate limit |
 | Modalità privata del browser | Storage separato — rate limit non persiste tra sessioni private |
 | Brute-force GPU su DB rubato | PBKDF2 non è memory-hard (Argon2id sarebbe più resistente) |
-| Mittente non autenticato nello share | Nessuna firma Ed25519 in v1 — chiunque con la pubkey del destinatario può inviare |
+| Mittente non autenticato nello share | Firma Ed25519 inside ciphertext — badge giallo se firma assente/invalida, auto-add contatto solo su firma verificata |
 | Sostituzione chiave pubblica nell'invito | TOFU — l'utente deve verificare il fingerprint out-of-band |
-| Relay link compromesso prima dell'apertura | ID a 128 bit — forza bruta impraticabile; scade dopo 48h |
+| Relay link compromesso prima dell'apertura | ID a 128 bit — forza bruta impraticabile; scade dopo 24h |
 
 ---
 
@@ -586,10 +597,12 @@ isUnlocked = false
   "identity": {
     "publicKey": "<base64url>",
     "encryptedPrivateKey": { "iv": "...", "data": "..." },
+    "signingPublicKey": "<base64url>",
+    "encryptedSigningKey": { "iv": "...", "data": "..." },
     "displayName": "Mario Rossi"
   },
   "contacts": [
-    { "name": "Alice", "publicKey": "<base64url>", "fingerprint": "AA:BB:CC:DD:EE:FF:11:22" }
+    { "name": "Alice", "publicKey": "<base64url>", "fingerprint": "AA:BB:CC:DD:EE:FF:11:22", "signingPublicKey": "<base64url>" }
   ]
 }
 ```
@@ -701,7 +714,7 @@ Binding KV richiesti (Pages > Settings > Functions > KV namespace bindings):
 - [x] WebAuthn PRF extension — DSK avvolta con output PRF del credenziale biometrico
 - [x] Pairing multi-device via QR (ECDH P-256 + PIN a 6 cifre, senza server)
 - [x] Recovery key DSK in formato Crockford Base32 (`OV-XXXXXXXX-...`)
-- [ ] Firme Ed25519 per autenticazione mittente nello share (v2 protocollo)
+- [x] Firme Ed25519 per autenticazione mittente nello share (v2 protocollo)
 - [ ] Export/Import da altri password manager (Bitwarden, 1Password CSV)
 - [ ] Campi personalizzati nella creazione profilo
 - [ ] Logging centralizzato

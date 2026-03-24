@@ -473,6 +473,10 @@
     "previewDecryptError": "Unable to decrypt this profile. It may not be addressed to you.",
     "confirmAdd": "Add to contacts",
     "confirmImport": "Import into vault",
+    "senderLabel": "From",
+    "autoAddedSender": "Contact {{name}} added automatically",
+    "verifiedSender": "verified signature",
+    "unverifiedSender": "unverified signature",
     "guide": {
       "title": "Welcome to Contacts!",
       "step1Title": "Share your fingerprint",

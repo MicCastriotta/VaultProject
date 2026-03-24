@@ -473,6 +473,10 @@
     "previewDecryptError": "Impossibile decifrare questo profilo. Potrebbe non essere indirizzato a te.",
     "confirmAdd": "Aggiungi ai contatti",
     "confirmImport": "Importa nel vault",
+    "senderLabel": "Da",
+    "autoAddedSender": "Contatto {{name}} aggiunto automaticamente",
+    "verifiedSender": "firma verificata",
+    "unverifiedSender": "firma non verificata",
     "guide": {
       "title": "Benvenuto nei Contatti!",
       "step1Title": "Condividi il tuo fingerprint",
