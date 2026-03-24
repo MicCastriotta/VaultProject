@@ -106,11 +106,15 @@
     },
     "zeroKnowledge": {
       "title": "Zero Knowledge",
-      "description": "Nessun dato viene mai salvato in chiaro. La sicurezza è ulteriormente rafforzata dall'autenticazione biometrica o a due fattori."
+      "description": "Nessun dato viene mai salvato in chiaro. La sicurezza è ulteriormente rafforzata dall'autenticazione biometrica."
     },
     "backupRestore": {
       "title": "Backup & Ripristino",
       "description": "I tuoi dati sono cifrati e salvati solo su questo dispositivo. Puoi eseguire un backup manuale esportando il database dalle impostazioni, oppure abilitare la sincronizzazione automatica con Google Drive."
+    },
+    "secureSharing": {
+      "title": "Condivisione Sicura",
+      "description": "Invia qualsiasi profilo a un contatto fidato con crittografia end-to-end. Il destinatario riceve i dati solo se utilizza OwnVault — il server non vede mai i tuoi dati in chiaro."
     }
   },
   "settings": {
@@ -416,7 +420,13 @@
       "strong": "Forte",
       "veryStrong": "Molto Forte"
     },
-    "chars": "car."
+    "chars": "car.",
+    "cardExpiry": {
+      "title": "Carte in scadenza",
+      "expired": "Scaduta {{date}}",
+      "expiringSoon": "Scade {{date}} · {{days}} giorni",
+      "noExpiring": "Nessuna carta in scadenza"
+    }
   },
   "attachment": {
     "label": "Allegato",
@@ -501,6 +511,11 @@
     "fileReady": "File pronto",
     "shareFile": "Condividi file .ownv",
     "downloadFile": "Scarica file .ownv"
+  },
+  "passwordHistory": {
+    "title": "Storico password",
+    "copy": "Copia vecchia password",
+    "delete": "Elimina voce"
   },
   "storage": {
     "title": "Storage",

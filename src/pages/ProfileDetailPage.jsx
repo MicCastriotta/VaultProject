@@ -23,10 +23,15 @@ import {
     FileText,
     Image,
     Send,
-    AlertCircle
+    AlertCircle,
+    Clock,
+    ChevronDown,
+    ChevronUp,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import { OTPDisplay } from '../components/OTPDisplay';
-import { IconRenderer } from '../components/IconRenderer';
+import { BrandIconBox } from '../components/BrandIconBox';
 import { syncService } from '../services/syncService';
 import { contactsService } from '../services/contactsService';
 
@@ -42,6 +47,8 @@ export function ProfileDetailPage() {
     const [attachmentMeta, setAttachmentMeta] = useState(null);
     const [isOpeningFile, setIsOpeningFile] = useState(false);
     const [showShareSheet, setShowShareSheet] = useState(false);
+    const [showHistory, setShowHistory] = useState(false);
+    const [visibleHistoryEntries, setVisibleHistoryEntries] = useState(new Set());
 
     useEffect(() => {
         loadProfile();
@@ -114,6 +121,34 @@ export function ProfileDetailPage() {
             navigate('/');
         } catch (err) {
             console.error('Delete failed:', err);
+        }
+    }
+
+    function toggleHistoryVisible(i) {
+        setVisibleHistoryEntries(prev => {
+            const next = new Set(prev);
+            next.has(i) ? next.delete(i) : next.add(i);
+            return next;
+        });
+    }
+
+    async function handleDeleteHistoryEntry(index) {
+        const newHistory = profile.passwordHistory.filter((_, i) => i !== index);
+        const updatedProfile = { ...profile, passwordHistory: newHistory };
+        setProfile(updatedProfile);
+        setVisibleHistoryEntries(prev => {
+            const next = new Set();
+            prev.forEach(i => { if (i < index) next.add(i); else if (i > index) next.add(i - 1); });
+            return next;
+        });
+        try {
+            const { id: profileId, updatedAt, ...dataToEncrypt } = updatedProfile;
+            const encrypted = await cryptoService.encryptData(dataToEncrypt);
+            await databaseService.saveProfile({ ...encrypted, category: profile.category, id: profileId });
+            await refreshHMAC();
+            healthCache.clear();
+        } catch (err) {
+            console.error('Failed to delete history entry:', err);
         }
     }
 
@@ -253,20 +288,21 @@ export function ProfileDetailPage() {
 
                     {/* Profile Title Card */}
                     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 flex items-start gap-3">
-                        <div className="w-12 h-12 flex items-center justify-center bg-blue-500/10 rounded-lg">
-                            {profile.category === 'CARD' ? (
-                                <CreditCard className="text-blue-400" size={24} />
-                            ) : profile.icon ? (
-                                <IconRenderer
-                                    slug={profile.icon}
-                                    size={24}
-                                    useHex={true}
-                                    fallback="generic"
-                                />
-                            ) : (
-                                <User className="text-blue-400" size={24} />
-                            )}
-                        </div>
+                        {profile.icon && profile.category !== 'CARD' ? (
+                            <BrandIconBox
+                                slug={profile.icon}
+                                iconSize={24}
+                                className="w-12 h-12 flex items-center justify-center rounded-lg flex-shrink-0"
+                            />
+                        ) : (
+                            <div className="w-12 h-12 flex items-center justify-center rounded-lg" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)' }}>
+                                {profile.category === 'CARD' ? (
+                                    <CreditCard className="text-blue-400" size={24} />
+                                ) : (
+                                    <User className="text-blue-400" size={24} />
+                                )}
+                            </div>
+                        )}
                         <div className="flex-1">
                             <h2 className="text-xl font-bold text-white">{profile.title}</h2>
                             <p className="text-sm text-slate-400 mt-1">
@@ -295,6 +331,63 @@ export function ProfileDetailPage() {
                                     copied={copiedField === 'password'}
                                     masked
                                 />
+                            )}
+
+                            {/* Storico password */}
+                            {profile.passwordHistory?.length > 0 && (
+                                <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
+                                    <button
+                                        onClick={() => setShowHistory(v => !v)}
+                                        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-700/30 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Clock size={14} className="text-gray-400" />
+                                            <span className="text-sm font-medium text-gray-300">
+                                                {t('passwordHistory.title')} ({profile.passwordHistory.length})
+                                            </span>
+                                        </div>
+                                        {showHistory
+                                            ? <ChevronUp size={16} className="text-gray-400" />
+                                            : <ChevronDown size={16} className="text-gray-400" />
+                                        }
+                                    </button>
+                                    {showHistory && (
+                                        <div className="px-4 pb-3 space-y-2">
+                                            {profile.passwordHistory.map((entry, i) => (
+                                                <div key={i} className="flex items-center gap-2 bg-slate-900/60 border border-slate-700 px-3 py-2 rounded-lg">
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-mono text-gray-300 break-all">
+                                                            {visibleHistoryEntries.has(i) ? entry.value : '•'.repeat(Math.min(entry.value.length, 20))}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 mt-0.5">
+                                                            {new Date(entry.changedAt).toLocaleDateString()}
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => toggleHistoryVisible(i)}
+                                                        className="p-2 text-gray-400 hover:bg-slate-700 rounded-lg transition-colors shrink-0"
+                                                    >
+                                                        {visibleHistoryEntries.has(i) ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleCopy(entry.value, `history-${i}`)}
+                                                        className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors shrink-0"
+                                                        title={t('passwordHistory.copy')}
+                                                    >
+                                                        {copiedField === `history-${i}` ? <Check size={16} /> : <Copy size={16} />}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteHistoryEntry(i)}
+                                                        className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
+                                                        title={t('passwordHistory.delete')}
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             )}
 
                             {profile.website && (

@@ -24,7 +24,8 @@ import {
     ExternalLink,
     WifiOff,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    CreditCard
 } from 'lucide-react';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
@@ -71,6 +72,30 @@ function computeHealthScoreValue(allProfiles, pwned, dupes, weak) {
 }
 
 /**
+ * Parsa MM/YY e restituisce la data di scadenza (ultimo istante del mese).
+ */
+function parseCardExpiry(deadline) {
+    if (!deadline || !/^\d{2}\/\d{2}$/.test(deadline)) return null;
+    const [mm, yy] = deadline.split('/');
+    const month = parseInt(mm, 10) - 1;
+    const year = 2000 + parseInt(yy, 10);
+    return new Date(year, month + 1, 0, 23, 59, 59, 999);
+}
+
+/**
+ * Restituisce { status: 'expired'|'expiring', daysUntilExpiry } oppure null se la carta è valida.
+ * Soglia "in scadenza": 60 giorni.
+ */
+function getCardExpiryStatus(deadline) {
+    const expiry = parseCardExpiry(deadline);
+    if (!expiry) return null;
+    const daysUntilExpiry = Math.ceil((expiry - Date.now()) / (1000 * 60 * 60 * 24));
+    if (daysUntilExpiry < 0) return { status: 'expired', daysUntilExpiry };
+    if (daysUntilExpiry <= 60) return { status: 'expiring', daysUntilExpiry };
+    return null;
+}
+
+/**
  * Formatta il timestamp in una stringa relativa leggibile.
  */
 function formatLastChecked(timestamp, t) {
@@ -100,6 +125,7 @@ export function PasswordHealthPage() {
     const [compromised, setCompromised] = useState([]);
     const [duplicates, setDuplicates] = useState([]);
     const [weakPasswords, setWeakPasswords] = useState([]);
+    const [expiringCards, setExpiringCards] = useState([]);
     const [healthScore, setHealthScore] = useState(null);
     const [lastChecked, setLastChecked] = useState(null);
 
@@ -120,6 +146,7 @@ export function PasswordHealthPage() {
             setCompromised(cached.compromised);
             setDuplicates(cached.duplicates);
             setWeakPasswords(cached.weakPasswords);
+            setExpiringCards(cached.expiringCards || []);
             setHealthScore(cached.healthScore);
             setLastChecked(cached.timestamp);
             setIsLoading(false);
@@ -140,9 +167,9 @@ export function PasswordHealthPage() {
     async function loadAndAnalyze() {
         setIsLoading(true);
         try {
-            // 1. Carica e decifra profili
+            // 1. Carica e decifra tutti i profili (una sola passata)
             const encrypted = await databaseService.getAllProfiles();
-            const decrypted = (await Promise.all(
+            const allDecrypted = (await Promise.all(
                 encrypted.map(async (p) => {
                     try {
                         const data = await cryptoService.decryptData({
@@ -154,9 +181,20 @@ export function PasswordHealthPage() {
                         return null;
                     }
                 })
-            )).filter(p => p !== null && p.category === 'WEB' && p.password);
+            )).filter(Boolean);
 
+            const decrypted = allDecrypted.filter(p => p.category === 'WEB' && p.password);
             setProfiles(decrypted);
+
+            // Carte in scadenza o già scadute
+            const expiring = allDecrypted
+                .filter(p => p.category === 'CARD' && p.deadline)
+                .map(p => {
+                    const info = getCardExpiryStatus(p.deadline);
+                    return info ? { ...p, expiryInfo: info } : null;
+                })
+                .filter(Boolean);
+            setExpiringCards(expiring);
 
             // 2. Analisi locale: duplicati
             const passwordMap = new Map();
@@ -192,14 +230,14 @@ export function PasswordHealthPage() {
                 const pwnedProfiles = await runHIBPCheck(decrypted, dupes, weak);
                 const score = computeHealthScoreValue(decrypted, pwnedProfiles, dupes, weak);
                 const now = Date.now();
-                healthCache.set({ profiles: decrypted, compromised: pwnedProfiles, duplicates: dupes, weakPasswords: weak, healthScore: score, timestamp: now });
+                healthCache.set({ profiles: decrypted, compromised: pwnedProfiles, duplicates: dupes, weakPasswords: weak, expiringCards: expiring, healthScore: score, timestamp: now });
                 setLastChecked(now);
             } else {
                 // Offline: salva analisi locale senza dati HIBP
                 const score = computeHealthScoreValue(decrypted, [], dupes, weak);
                 setHealthScore(score);
                 const now = Date.now();
-                healthCache.set({ profiles: decrypted, compromised: [], duplicates: dupes, weakPasswords: weak, healthScore: score, timestamp: now });
+                healthCache.set({ profiles: decrypted, compromised: [], duplicates: dupes, weakPasswords: weak, expiringCards: expiring, healthScore: score, timestamp: now });
                 setLastChecked(now);
             }
 
@@ -512,6 +550,38 @@ export function PasswordHealthPage() {
                                         </div>
                                     )}
 
+                                    {/* ===== CARD EXPIRY ===== */}
+                                    {expiringCards.length > 0 && (
+                                        <IssueSection
+                                            title={t('health.cardExpiry.title')}
+                                            icon={<CreditCard size={20} />}
+                                            count={expiringCards.length}
+                                            color={expiringCards.some(c => c.expiryInfo.status === 'expired') ? 'red' : 'orange'}
+                                            isExpanded={expandedSection === 'cardExpiry'}
+                                            onToggle={() => toggleSection('cardExpiry')}
+                                            emptyText=""
+                                        >
+                                            {expiringCards.map(card => (
+                                                <ProfileIssueCard
+                                                    key={card.id}
+                                                    profile={card}
+                                                    navigate={navigate}
+                                                    badge={
+                                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                                            card.expiryInfo.status === 'expired'
+                                                                ? 'bg-red-900/30 text-red-400'
+                                                                : 'bg-orange-900/30 text-orange-400'
+                                                        }`}>
+                                                            {card.expiryInfo.status === 'expired'
+                                                                ? t('health.cardExpiry.expired', { date: card.deadline })
+                                                                : t('health.cardExpiry.expiringSoon', { days: card.expiryInfo.daysUntilExpiry, date: card.deadline })}
+                                                        </span>
+                                                    }
+                                                />
+                                            ))}
+                                        </IssueSection>
+                                    )}
+
                                     {/* Info */}
                                     <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 flex items-start gap-3">
                                         <Shield size={20} className="text-blue-400 flex-shrink-0 mt-0.5" />
@@ -522,10 +592,11 @@ export function PasswordHealthPage() {
                                 </>
                             )}
 
-                        </div>
-                    </div>
+                        </div>                        
 
+                    </div>
                 </div>
+
             </div>
     );
 }

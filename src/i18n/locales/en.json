@@ -106,11 +106,15 @@
     },
     "zeroKnowledge": {
       "title": "Zero Knowledge",
-      "description": "No plaintext data is ever saved. Security is further strengthened by biometric authentication or two-factor authentication."
+      "description": "No plaintext data is ever saved. Security is further strengthened by biometric authentication."
     },
     "backupRestore": {
       "title": "Backup & Restore",
       "description": "Your data is encrypted and saved only on this device. You can back up manually by exporting the database from settings, or enable automatic sync with Google Drive."
+    },
+    "secureSharing": {
+      "title": "Secure Sharing",
+      "description": "Send any profile to a trusted contact with end-to-end encryption. The recipient receives the data only if he uses OwnVault — the server never sees your plaintext."
     }
   },
   "settings": {
@@ -416,7 +420,13 @@
       "strong": "Strong",
       "veryStrong": "Very Strong"
     },
-    "chars": "chars"
+    "chars": "chars",
+    "cardExpiry": {
+      "title": "Expiring Cards",
+      "expired": "Expired {{date}}",
+      "expiringSoon": "Expires {{date}} · {{days}} days left",
+      "noExpiring": "No expiring cards"
+    }
   },
   "attachment": {
     "label": "Attachment",
@@ -501,6 +511,11 @@
     "fileReady": "File ready",
     "shareFile": "Share .ownv file",
     "downloadFile": "Download .ownv file"
+  },
+  "passwordHistory": {
+    "title": "Password History",
+    "copy": "Copy old password",
+    "delete": "Delete entry"
   },
   "storage": {
     "title": "Storage",

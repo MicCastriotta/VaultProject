@@ -4,10 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
 import { syncService } from '../services/syncService';
-import { Plus, Search, ArrowUpDown, User, CreditCard, LogOut, HardDrive, Paperclip, FileKey } from 'lucide-react';
+import { Plus, Search, ArrowUpDown, User, CreditCard, LogOut, HardDrive, Paperclip, FileKey, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { IconRenderer } from '../components/IconRenderer';
-import { getIconBySlug } from '../icons/brandIcons';
+import { BrandIconBox } from '../components/BrandIconBox';
 
 function formatBytes(bytes) {
     if (!bytes || bytes === 0) return '0 B';
@@ -93,10 +92,9 @@ export function MainPage() {
     const { t } = useTranslation();
     const [decryptedProfiles, setDecryptedProfiles] = useState([]);
     const [attachmentProfileIds, setAttachmentProfileIds] = useState(new Set());
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(() => sessionStorage.getItem('mainSearchTerm') || '');
     const [isLoading, setIsLoading] = useState(true);
     const [showSortMenu, setShowSortMenu] = useState(false);
-    const [iconColors, setIconColors] = useState({});
     const [backToast, setBackToast] = useState(false);
     const lastBackPress = useRef(0);
     const { logout } = useAuth();
@@ -122,21 +120,6 @@ export function MainPage() {
         return () => window.removeEventListener('popstate', handlePopState);
     }, []);
 
-    // Carica i colori hex brand in modo lazy, solo per gli slug presenti
-    useEffect(() => {
-        const slugs = [...new Set(
-            decryptedProfiles.filter(p => p.icon).map(p => p.icon)
-        )];
-        if (slugs.length === 0) return;
-
-        Promise.all(slugs.map(async slug => {
-            const icon = await getIconBySlug(slug);
-            return icon ? [slug, `#${icon.hex}`] : null;
-        })).then(entries => {
-            const colors = Object.fromEntries(entries.filter(Boolean));
-            setIconColors(colors);
-        });
-    }, [decryptedProfiles]);
 
     const storage = useStorageEstimate();
     const [storageOpen, setStorageOpen] = useState(false);
@@ -341,10 +324,24 @@ export function MainPage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={(e) => {
+                            setSearchTerm(e.target.value);
+                            sessionStorage.setItem('mainSearchTerm', e.target.value);
+                        }}
                         placeholder={t('profiles.searchPlaceholder')}
-                        className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-800/70 border border-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        className={`w-full pl-10 py-2 rounded-xl bg-slate-800/70 border border-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none ${searchTerm ? 'pr-9' : 'pr-4'}`}
                     />
+                    {searchTerm && (
+                        <button
+                            onClick={() => {
+                                setSearchTerm('');
+                                sessionStorage.removeItem('mainSearchTerm');
+                            }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition"
+                        >
+                            <X size={16} />
+                        </button>
+                    )}
                 </div>
 
                 {/* Content */}
@@ -370,27 +367,17 @@ export function MainPage() {
                                                         onClick={() => navigate(`/profile/${profile.id}`)}
                                                         className="w-full flex items-center gap-3 px-4 py-[14px] rounded-[14px] bg-slate-800/65 border-slate-600/50 hover:bg-slate-800 active:scale-[0.99] transition-all duration-150"
                                                     >
-                                                        <div
-                                                            className="w-[42px] h-[42px] flex items-center justify-center rounded-[11px] flex-shrink-0"
-                                                            style={{
-                                                                backgroundColor: iconColors[profile.icon]
-                                                                    ? `${iconColors[profile.icon]}20`
-                                                                    : 'rgba(59, 130, 246, 0.1)'
-                                                            }}
-                                                        >
-                                                            {profile.icon && profile.category === 'WEB' ? (
-                                                                <IconRenderer
-                                                                    slug={profile.icon}
-                                                                    size={22}
-                                                                    useHex={true}
-                                                                    fallback="generic"
-                                                                />
-                                                            ) : profile.category === 'CARD' ? (
-                                                                <CreditCard size={22} />
-                                                            ) : (
-                                                                <User size={22} />
-                                                            )}
-                                                        </div>
+                                                        {profile.icon && profile.category === 'WEB' ? (
+                                                            <BrandIconBox
+                                                                slug={profile.icon}
+                                                                iconSize={22}
+                                                                className="w-[42px] h-[42px] flex items-center justify-center rounded-[11px] flex-shrink-0"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-[42px] h-[42px] flex items-center justify-center rounded-[11px] flex-shrink-0" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)' }}>
+                                                                {profile.category === 'CARD' ? <CreditCard size={22} /> : <User size={22} />}
+                                                            </div>
+                                                        )}
 
                                                         <div className="flex-1 min-w-0 text-left">
                                                             <p className="font-semibold text-[15px] text-white">{profile.title}</p>

@@ -16,7 +16,7 @@ import { QRScanner } from '../components/QRScanner';
 import { IconPicker } from '../components/IconPicker';
 import { validators } from '../services/securityUtils';
 import { getIconBySlug, suggestIconFromTitle } from '../icons/brandIcons';
-import { IconRenderer } from '../components/IconRenderer';
+import { BrandIconBox } from '../components/BrandIconBox';
 import { healthCache } from '../services/healthCacheService';
 
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
@@ -63,6 +63,10 @@ export function ProfileFormPage() {
     const [showIconPicker, setShowIconPicker] = useState(false);
     const [isIconAutoSet, setIsIconAutoSet] = useState(false);
 
+    // Storico password
+    const [passwordHistory, setPasswordHistory] = useState([]);
+    const [originalPassword, setOriginalPassword] = useState('');
+
     // Allegato
     const [pendingFile, setPendingFile] = useState(null);           // File da caricare
     const [existingAttachment, setExistingAttachment] = useState(null); // Metadati allegato già salvato
@@ -98,6 +102,8 @@ export function ProfileFormPage() {
 
             setCategory(data.category || 'WEB');
             setFormData(data);
+            setPasswordHistory(data.passwordHistory || []);
+            setOriginalPassword(data.password || '');
 
             // Carica e decifra metadati allegato esistente
             const attRaw = await databaseService.getAttachmentMetaByProfileId(numericId);
@@ -244,6 +250,17 @@ export function ProfileFormPage() {
                 sanitizedData.secretKey = validators.text(formData.secretKey || '', 100);
                 sanitizedData.note = validators.notes(formData.note || '');
                 sanitizedData.icon = formData.icon || null;
+
+                // Storico password: se modifica e password cambiata, salva la vecchia
+                const newPassword = formData.password || '';
+                if (!isNew && originalPassword && newPassword !== originalPassword) {
+                    const entry = { value: originalPassword, changedAt: sanitizedData.lastModified };
+                    sanitizedData.passwordHistory = [entry, ...passwordHistory].slice(0, 5);
+                    sanitizedData.lastPasswordChange = sanitizedData.lastModified;
+                } else {
+                    sanitizedData.passwordHistory = passwordHistory;
+                    sanitizedData.lastPasswordChange = formData.lastPasswordChange || null;
+                }
             }
 
             if (category === 'CARD') {
@@ -295,7 +312,7 @@ export function ProfileFormPage() {
             healthCache.clear();
             await syncService.triggerSync();
 
-            navigate('/');
+            navigate(`/profile/${savedProfileId}`);
         } catch (err) {
             console.error('Error saving profile:', err);
             setError(t('profileForm.failedToSave'));
@@ -419,9 +436,11 @@ export function ProfileFormPage() {
                                 <div className="flex items-center gap-3">
                                     {formData.icon ? (
                                         <>
-                                            <div className="flex-shrink-0 w-16 h-16 bg-gradient-to-br from-blue-500/10 to-blue-500/5 rounded-lg flex items-center justify-center border-2 border-blue-500/20">
-                                                <IconRenderer slug={formData.icon} size={32} useHex />
-                                            </div>
+                                            <BrandIconBox
+                                                slug={formData.icon}
+                                                iconSize={32}
+                                                className="flex-shrink-0 w-16 h-16 rounded-lg flex items-center justify-center"
+                                            />
                                             <div className="flex-1">
                                                 <p className="text-sm text-gray-400">{iconName || formData.icon}</p>
                                                 <button
