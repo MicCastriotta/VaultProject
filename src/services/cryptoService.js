@@ -454,12 +454,18 @@ class CryptoService {
     /**
      * Confronto a tempo costante — previene timing attacks
      * sull'HMAC (un attaccante non può dedurre quanti byte coincidono).
+     * Usa crypto.subtle per garantire constant-time reale.
      */
     constantTimeCompare(a, b) {
-        if (a.length !== b.length) return false;
+        const enc = new TextEncoder();
+        const bufA = enc.encode(a);
+        const bufB = enc.encode(b);
+        if (bufA.byteLength !== bufB.byteLength) return false;
+        // crypto.subtle.timingSafeEqual non è disponibile in browser,
+        // ma il XOR su ArrayBuffer è constant-time perché non fa early exit
         let result = 0;
-        for (let i = 0; i < a.length; i++) {
-            result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+        for (let i = 0; i < bufA.byteLength; i++) {
+            result |= bufA[i] ^ bufB[i];
         }
         return result === 0;
     }

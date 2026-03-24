@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
     ArrowLeft, Trash2, User, Pencil,
-    X, Check, AlertCircle, CreditCard, Globe, Shield, Fingerprint, Paperclip, Copy, Search, Inbox
+    X, Check, AlertCircle, CreditCard, Globe, Shield, ShieldCheck, ShieldAlert, Fingerprint, Paperclip, Copy, Search, Inbox
 } from 'lucide-react';
 import { contactsService } from '../services/contactsService';
 import { useAuth } from '../contexts/AuthContext';
@@ -228,7 +228,11 @@ export function ContactsPage() {
             setPreview({ type: 'loading' });
             try {
                 const profileData = await contactsService.decryptIncomingProfile(data);
-                setPreview({ type: 'profile', data, profileData });
+                const senderIdentity = profileData._senderIdentity || null;
+                const verified = senderIdentity
+                    ? await contactsService.verifySenderSignature(profileData)
+                    : false;
+                setPreview({ type: 'profile', data, profileData, senderIdentity, verified });
             } catch {
                 setPreview({ type: 'error', message: t('contacts.previewDecryptError') });
             }
@@ -273,8 +277,8 @@ export function ContactsPage() {
             const { databaseService } = await import('../services/databaseService');
             const { cryptoService } = await import('../services/cryptoService');
 
-            // Separa _wt (write token relay) e attachment dai dati del profilo prima di cifrare
-            const { attachment, _wt: relayWriteToken, ...profileDataClean } = preview.profileData;
+            // Separa _wt, _senderIdentity e attachment dai dati del profilo prima di cifrare
+            const { attachment, _wt: relayWriteToken, _senderIdentity, ...profileDataClean } = preview.profileData;
 
             const encrypted = await cryptoService.encryptData(profileDataClean);
             const newId = await databaseService.saveProfile({
@@ -311,6 +315,21 @@ export function ContactsPage() {
             }
 
             await refreshHMAC();
+
+            // Auto-aggiunge il mittente ai contatti solo se la firma è verificata crittograficamente.
+            // Condizione: _senderSig valido → il mittente prova di possedere la chiave privata dichiarata.
+            // Senza verifica, chiunque potrebbe iniettare contatti arbitrari nel vault dell'utente.
+            if (preview.verified && _senderIdentity?.pk) {
+                try {
+                    await contactsService.addContact({
+                        name: _senderIdentity.displayName || _senderIdentity.fp,
+                        publicKey: _senderIdentity.pk,
+                        signingPublicKey: _senderIdentity.signingPk || null
+                    });
+                    await loadContacts();
+                } catch { /* ignora: duplicato o cannot_add_self */ }
+            }
+
             if (pendingRelayId) {
                 contactsService.deleteFromRelay(pendingRelayId, relayWriteToken).catch(() => {});
                 setPendingRelayId(null);
@@ -636,6 +655,23 @@ export function ContactsPage() {
                             {preview.type === 'profile' && (
                                 <>
                                     <p className="text-xs text-gray-400">{t('contacts.previewProfileHint')}</p>
+                                    {preview.senderIdentity && (
+                                        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border ${
+                                            preview.verified
+                                                ? 'bg-green-900/20 border-green-500/20 text-green-300'
+                                                : 'bg-yellow-900/20 border-yellow-500/20 text-yellow-300'
+                                        }`}>
+                                            {preview.verified
+                                                ? <ShieldCheck size={12} className="shrink-0 text-green-400" />
+                                                : <ShieldAlert size={12} className="shrink-0 text-yellow-400" />
+                                            }
+                                            <span>
+                                                {t('contacts.senderLabel')}: <span className="font-medium">{preview.senderIdentity.displayName || preview.senderIdentity.fp}</span>
+                                                {' — '}
+                                                {preview.verified ? t('contacts.verifiedSender') : t('contacts.unverifiedSender')}
+                                            </span>
+                                        </div>
+                                    )}
                                     <div className="flex items-center gap-4 px-4 py-4 bg-slate-800/60 rounded-xl">
                                         <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
                                             {preview.profileData?.category === 'card'

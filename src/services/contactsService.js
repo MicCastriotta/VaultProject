@@ -22,33 +22,96 @@ class ContactsService {
 
     /**
      * Restituisce l'identità esistente o ne genera una nuova.
+     * Se l'identità esiste ma manca il keypair Ed25519 (vecchie installazioni),
+     * lo genera e salva in modo trasparente (migrazione automatica).
      * Richiede vault sbloccato (usa cryptoService.encryptData).
      */
     async getOrCreateIdentity() {
         const stored = await db.config.get('identity');
-        if (stored) return stored;
+        if (stored) {
+            // Migrazione: aggiunge signing key Ed25519 se assente
+            if (!stored.signingPublicKey) {
+                return await this._addSigningKeyToIdentity(stored);
+            }
+            return stored;
+        }
 
-        const keypair = await crypto.subtle.generateKey(
+        // Crea keypair ECDH P-256 (condivisione profili)
+        const ecdhKeypair = await crypto.subtle.generateKey(
             { name: 'ECDH', namedCurve: 'P-256' },
             true,
             ['deriveKey', 'deriveBits']
         );
-
-        const publicKeyRaw = await crypto.subtle.exportKey('raw', keypair.publicKey);
+        const publicKeyRaw = await crypto.subtle.exportKey('raw', ecdhKeypair.publicKey);
         const publicKeyB64 = this._toBase64url(publicKeyRaw);
-
-        const privateKeyJwk = await crypto.subtle.exportKey('jwk', keypair.privateKey);
+        const privateKeyJwk = await crypto.subtle.exportKey('jwk', ecdhKeypair.privateKey);
         const encryptedPrivateKey = await cryptoService.encryptData(privateKeyJwk);
+
+        // Crea keypair Ed25519 (firma payload) con fallback se il browser non supporta
+        let signingPublicKey = null;
+        let encryptedSigningKey = null;
+        try {
+            const sigKeypair = await crypto.subtle.generateKey(
+                { name: 'Ed25519' }, true, ['sign', 'verify']
+            );
+            const sigPubRaw = await crypto.subtle.exportKey('raw', sigKeypair.publicKey);
+            signingPublicKey = this._toBase64url(sigPubRaw);
+            const sigPrivJwk = await crypto.subtle.exportKey('jwk', sigKeypair.privateKey);
+            encryptedSigningKey = await cryptoService.encryptData(sigPrivJwk);
+        } catch { /* Ed25519 non supportato — firma disabilitata */ }
 
         const identity = {
             id: 'identity',
             publicKey: publicKeyB64,
             encryptedPrivateKey,
+            signingPublicKey,
+            encryptedSigningKey,
             createdAt: new Date().toISOString()
         };
 
         await db.config.put(identity);
         return identity;
+    }
+
+    /**
+     * Aggiunge il keypair Ed25519 a un'identità esistente (migrazione trasparente).
+     */
+    async _addSigningKeyToIdentity(identity) {
+        let signingPublicKey = null;
+        let encryptedSigningKey = null;
+        try {
+            const sigKeypair = await crypto.subtle.generateKey(
+                { name: 'Ed25519' }, true, ['sign', 'verify']
+            );
+            const sigPubRaw = await crypto.subtle.exportKey('raw', sigKeypair.publicKey);
+            signingPublicKey = this._toBase64url(sigPubRaw);
+            const sigPrivJwk = await crypto.subtle.exportKey('jwk', sigKeypair.privateKey);
+            encryptedSigningKey = await cryptoService.encryptData(sigPrivJwk);
+        } catch { /* Ed25519 non supportato */ }
+
+        const updated = { ...identity, signingPublicKey, encryptedSigningKey };
+        await db.config.put(updated);
+        return updated;
+    }
+
+    /**
+     * Decifra e restituisce la chiave privata Ed25519 per la firma.
+     * Ritorna null se non disponibile (browser senza supporto o identità non migrata).
+     */
+    async _getSigningPrivateKey() {
+        const identity = await db.config.get('identity');
+        if (!identity?.encryptedSigningKey) return null;
+        try {
+            const jwk = await cryptoService.decryptData(identity.encryptedSigningKey);
+            return await crypto.subtle.importKey(
+                'jwk', jwk,
+                { name: 'Ed25519' },
+                false,
+                ['sign']
+            );
+        } catch {
+            return null;
+        }
     }
 
     /** Restituisce la chiave pubblica base64url dell'utente corrente. */
@@ -126,7 +189,7 @@ class ContactsService {
     // ========================================
 
     /** Aggiunge un contatto dalla chiave pubblica. Ignora duplicati (stesso fingerprint). */
-    async addContact({ name, publicKey }) {
+    async addContact({ name, publicKey, signingPublicKey = null }) {
         const fingerprint = await this.getFingerprint(publicKey);
 
         // Impedisce di aggiungere se stessi come contatto
@@ -137,13 +200,46 @@ class ContactsService {
         }
 
         const existing = await db.contacts.where('fingerprint').equals(fingerprint).first();
-        if (existing) return existing.id;
+        if (existing) {
+            // Aggiorna signingPublicKey se ora disponibile e prima era assente
+            if (signingPublicKey && !existing.signingPublicKey) {
+                await db.contacts.update(existing.id, { signingPublicKey });
+            }
+            return existing.id;
+        }
         return await db.contacts.add({
             name: name || 'Unknown',
             publicKey,
             fingerprint,
+            signingPublicKey,
             createdAt: new Date().toISOString()
         });
+    }
+
+    /**
+     * Verifica la firma Ed25519 di un payload profilo decifrato.
+     * Ritorna true se la firma è valida, false altrimenti (firma assente, chiave mancante, errore).
+     * La firma copre il profileData originale, esclusi i metadati interni (_wt, _senderIdentity, _senderSig).
+     */
+    async verifySenderSignature(decryptedData) {
+        const { _senderIdentity, _senderSig, _wt, ...profileForCommitment } = decryptedData;
+        if (!_senderIdentity?.signingPk || !_senderSig) return false;
+
+        try {
+            const keyBytes = this._fromBase64url(_senderIdentity.signingPk);
+            const verifyKey = await crypto.subtle.importKey(
+                'raw', keyBytes,
+                { name: 'Ed25519' },
+                false,
+                ['verify']
+            );
+            const commitment = new TextEncoder().encode(JSON.stringify(profileForCommitment));
+            const commitmentHash = await crypto.subtle.digest('SHA-256', commitment);
+            const sigBytes = this._fromBase64url(_senderSig);
+            return await crypto.subtle.verify('Ed25519', verifyKey, sigBytes, commitmentHash);
+        } catch {
+            return false;
+        }
     }
 
     async getAllContacts() {
@@ -207,10 +303,38 @@ class ContactsService {
         );
 
         // Cifra il payload del profilo.
-        // Se writeToken è fornito, lo includiamo nel plaintext come `_wt`:
-        // solo chi può decifrare (il destinatario) potrà estrarlo per autorizzare il DELETE relay.
+        // _wt: write token relay (autorizza DELETE)
+        // _senderIdentity + _senderSig: identità e firma del mittente, dentro il ciphertext
+        //   → relay zero-knowledge (non vede mittente né firma)
+        //   → il destinatario verifica la firma e può auto-aggiungere il mittente ai contatti
         const iv = crypto.getRandomValues(new Uint8Array(12));
-        const plainData = writeToken ? { ...profileData, _wt: writeToken } : profileData;
+        const plainData = { ...profileData };
+        if (writeToken) plainData._wt = writeToken;
+
+        try {
+            const identity = await db.config.get('identity');
+            if (identity?.publicKey) {
+                plainData._senderIdentity = {
+                    pk: identity.publicKey,
+                    fp: await this.getFingerprint(identity.publicKey),
+                    displayName: identity.displayName || '',
+                    signingPk: identity.signingPublicKey || null
+                };
+
+                // Firma il commitment sul profileData originale (prima di aggiungere metadati interni).
+                // Il destinatario rimuoverà _wt/_senderIdentity/_senderSig per ricostruire lo stesso commitment.
+                if (identity.signingPublicKey) {
+                    const signingKey = await this._getSigningPrivateKey();
+                    if (signingKey) {
+                        const commitment = new TextEncoder().encode(JSON.stringify(profileData));
+                        const commitmentHash = await crypto.subtle.digest('SHA-256', commitment);
+                        const sigBytes = await crypto.subtle.sign('Ed25519', signingKey, commitmentHash);
+                        plainData._senderSig = this._toBase64url(sigBytes);
+                    }
+                }
+            }
+        } catch { /* non bloccante — il profilo viene inviato comunque */ }
+
         const plaintext = new TextEncoder().encode(JSON.stringify(plainData));
         const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, wrapKey, plaintext);
 

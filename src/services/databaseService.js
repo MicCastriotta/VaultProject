@@ -423,8 +423,8 @@ class DatabaseService {
             await db.config.put(localBiometric);
         }
 
-        // Importa identity (keypair ECDH) — presente solo nei backup v3+
-        // La private key è già cifrata con la DEK: sicura da ripristinare così com'è.
+        // Importa identity (keypair ECDH + Ed25519) — presente solo nei backup v3+
+        // Le chiavi private sono già cifrate con la DEK: sicure da ripristinare così com'è.
         if (
             data.identity &&
             typeof data.identity.publicKey === 'string' &&
@@ -436,7 +436,10 @@ class DatabaseService {
                 publicKey: data.identity.publicKey,
                 encryptedPrivateKey: data.identity.encryptedPrivateKey,
                 createdAt: data.identity.createdAt || new Date().toISOString(),
-                ...(data.identity.displayName ? { displayName: data.identity.displayName } : {})
+                ...(data.identity.displayName ? { displayName: data.identity.displayName } : {}),
+                // Keypair Ed25519 per firma payload (opzionale — assente nei backup precedenti alla fase 2)
+                ...(data.identity.signingPublicKey ? { signingPublicKey: data.identity.signingPublicKey } : {}),
+                ...(data.identity.encryptedSigningKey ? { encryptedSigningKey: data.identity.encryptedSigningKey } : {})
             });
         }
 

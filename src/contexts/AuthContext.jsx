@@ -273,8 +273,12 @@ export function AuthProvider({ children }) {
                 }
 
                 // Unlock con DSK
-                const unlocked = await cryptoService.unlockWithDSK(password, cryptoConfig, dskBytes);
-                dskBytes.fill(0); // zero out
+                let unlocked;
+                try {
+                    unlocked = await cryptoService.unlockWithDSK(password, cryptoConfig, dskBytes);
+                } finally {
+                    dskBytes.fill(0); // zero out anche in caso di errore
+                }
 
                 if (!unlocked) {
                     rateLimiter.current.recordAttempt();
