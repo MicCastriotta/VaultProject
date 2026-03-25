@@ -10,6 +10,7 @@ import { cryptoService } from '../services/cryptoService';
 import { databaseService } from '../services/databaseService';
 import { googleDriveService } from '../services/googledriveService';
 import { syncService } from '../services/syncService';
+import { pendingTokenService } from '../services/pendingTokenService';
 import {
     Eye, EyeOff, ShieldCheck, RefreshCw,
     FileText, Cloud, AlertTriangle, ArrowLeft, Loader
@@ -138,7 +139,7 @@ export function SignUpPage() {
         // Il vault non è ancora sbloccato: il refresh token non può essere cifrato
         // con la DEK ora. Lo salviamo in sessionStorage e lo cifreremo al primo login.
         if (signInResult?.refreshToken) {
-            sessionStorage.setItem('ov_pending_drive_token', signInResult.refreshToken);
+            pendingTokenService.store(signInResult.refreshToken);
         }
         setIsConnecting(false);
         setView('restoring');

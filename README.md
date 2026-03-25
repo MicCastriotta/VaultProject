@@ -76,6 +76,7 @@ DEK — Data Encryption Key (random, 256-bit)
 ### Backup e Sync
 - Export/Import JSON cifrato v3 (portabile su qualsiasi device con la stessa password, include allegati, identità e contatti)
 - Sync **Google Drive** opzionale (backup automatico, risoluzione conflitti, allegati lazy-loaded)
+- **Token renewal silenzioso**: OAuth Authorization Code flow con refresh token cifrato (AES-256-GCM, DEK del vault) in IndexedDB — nessun popup richiesto dopo la prima connessione, anche nelle PWA installate
 - Import/restore da Drive: se il backup corrisponde al vault locale (stesso `salt` + `encryptedDEK`), i record `deviceSecret` e `biometric` vengono preservati — nessun re-enroll necessario
 
 ### UX
@@ -119,14 +120,14 @@ L'output PRF è deterministico (stesso credenziale + stesso input = stesso outpu
 
 **Sicurezza**: IndexedDB rubato → inutile senza master password + autenticatore fisico.
 
-#### Architettura biometrica legacy (v2)
+#### Architettura biometrica legacy (v2) — solo vault esistenti
 
-Il vecchio schema (v2) usa WebAuthn solo come gate UI — nessuna chiave derivata. La DEK non è mai derivabile dalla biometria da sola. Un database rubato è inutilizzabile senza la master password.
+Il vecchio schema (v2) usa WebAuthn solo come gate UI — nessuna chiave derivata. Non è più attivabile su nuovi vault: se il dispositivo non supporta PRF la biometria non può essere abilitata. I vault già enrollati in v2 continuano a funzionare al login.
 
 ```
 Master Password → KEK → decifra DEK → DEK in RAM
                                           ↓
-                              Se biometria abilitata (v2):
+                              Se biometria abilitata (v2, legacy):
                               WebAuthn assertion → conferma presenza utente
                                           ↓
                                    isUnlocked = true
@@ -143,9 +144,9 @@ Master Password → KEK → decifra DEK → DEK in RAM
 | Firefox | Non supportato |
 | Safari | Non supportato |
 
-**Nota Android**: la registrazione usa `residentKey: required` per impedire a Google Password Manager di salvare il passkey in cloud (i passkey GPM non supportano PRF). Il flag `prf.enabled` nella risposta di `create()` viene verificato su mobile per rilevare subito i passkey GPM e fare fallback al v2.
+**Nota Android**: la registrazione usa `residentKey: required` per impedire a Google Password Manager di salvare il passkey in cloud (i passkey GPM non supportano PRF). Il flag `prf.enabled` nella risposta di `create()` viene verificato su mobile per rilevare subito i passkey GPM.
 
-Se PRF non è supportato, OwnVault fallisce silenziosamente al 2FA legacy (solo gate UI) — la funzionalità DSK rimane disabilitata.
+Se PRF non è supportato, la biometria non può essere abilitata — la funzionalità DSK rimane disabilitata e il vault funziona con la sola master password.
 
 ### Pairing multi-device via QR (ECDH + PIN, senza server)
 
@@ -513,8 +514,7 @@ Utente sceglie master password
    → wrappedDSK = AES-GCM(wrapKey, DSK) → salvato in IndexedDB
    → encryptedDEK aggiornato: vaultKey = HKDF(PBKDF2(password), salt=DSK)
 
-# Senza PRF (v2 fallback):
-   → DSK non disponibile — WebAuthn usato solo come gate UI 2FA
+# Senza PRF: la biometria non può essere attivata
 ```
 
 La recovery key `OV-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX` viene mostrata all'utente al momento dell'attivazione e deve essere conservata offline.
@@ -631,12 +631,20 @@ npm run preview
 
 Il relay in sviluppo è simulato da un middleware Vite in-memory (vedere `vite.config.js`), senza bisogno di Cloudflare Wrangler.
 
-### Variabili d'ambiente (opzionali — solo per sync Google Drive)
+### Variabili d'ambiente
 
+**Frontend** (prefisso `VITE_`, esposte nel bundle):
 ```env
 VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 VITE_GOOGLE_API_KEY=your-api-key
 ```
+
+**Server-side** (Cloudflare Pages dashboard — mai nel bundle frontend):
+```env
+GOOGLE_CLIENT_SECRET=your-oauth-client-secret
+```
+
+`GOOGLE_CLIENT_SECRET` è richiesto dalla Cloudflare Function `POST /api/gtoken` che gestisce lo scambio OAuth Authorization Code → access + refresh token lato server. Il refresh token viene cifrato con la DEK del vault e salvato in IndexedDB, consentendo il rinnovo silenzioso dei token Drive senza popup (risolve il blocco popup nelle PWA installate).
 
 ### Deploy (Cloudflare Pages)
 
@@ -649,10 +657,15 @@ Il progetto usa **Cloudflare Pages Functions** per relay e directory:
 | `relay/inbox/[fingerprint].js` | `GET /api/relay/inbox/:fp` | `OV_RELAY` |
 | `identity/index.js` | `POST /api/identity` | `OV_IDENTITY` |
 | `identity/[fingerprint].js` | `GET + DELETE /api/identity/:fp` | `OV_IDENTITY` |
+| `gtoken.js` | `POST /api/gtoken` | — (env var) |
 
 Binding KV richiesti (Pages > Settings > Functions > KV namespace bindings):
 - `OV_RELAY` — payload relay temporanei (24h TTL) + marker inbox
 - `OV_IDENTITY` — directory fingerprint opt-in (6 mesi TTL)
+
+Env vars richieste (Pages > Settings > Environment variables):
+- `VITE_GOOGLE_CLIENT_ID` — OAuth client ID
+- `GOOGLE_CLIENT_SECRET` — OAuth client secret (server-side only)
 
 ---
 

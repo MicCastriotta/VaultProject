@@ -13,13 +13,17 @@ npm run lint       # ESLint on src/
 
 No test framework is configured.
 
-The dev server (`vite.config.js`) includes an in-memory mock of the Cloudflare relay API (`/api/relay`, `/api/identity`), so `wrangler` is not needed for local development.
+The dev server (`vite.config.js`) includes an in-memory mock of the Cloudflare relay API (`/api/relay`, `/api/identity`) and the Google token exchange endpoint (`/api/gtoken`), so `wrangler` is not needed for local development. The `/api/gtoken` mock proxies to Google only if `VITE_GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set in `.env.local`; otherwise it returns a 501 with an explanatory hint.
 
 ## Deployment
 
 Cloudflare Pages. The `functions/` directory contains Cloudflare Pages Functions (edge workers). KV namespace bindings required in the dashboard:
 - `OV_RELAY` — temporary encrypted payload storage (TTL 24h)
 - `OV_IDENTITY` — public key directory (TTL 6 months)
+
+Environment variables required in Cloudflare Pages dashboard (Settings → Environment variables):
+- `VITE_GOOGLE_CLIENT_ID` — Google OAuth client ID (same as frontend)
+- `GOOGLE_CLIENT_SECRET` — Google OAuth client secret (**no** `VITE_` prefix; server-side only, never in the frontend bundle)
 
 ## Architecture
 
@@ -73,9 +77,15 @@ Injected by Vite via `define: { __APP_VERSION__: ... }` in `vite.config.js` (val
 
 ### Google Drive sync
 
-Requires two env vars: `VITE_GOOGLE_CLIENT_ID` and `VITE_GOOGLE_API_KEY` (from Google Cloud Console). Without them the sync feature silently fails to initialize.
+Requires three env vars: `VITE_GOOGLE_CLIENT_ID` and `VITE_GOOGLE_API_KEY` (frontend, Google Cloud Console) plus `GOOGLE_CLIENT_SECRET` (server-side only, Cloudflare Pages). Without the client ID / API key the sync feature silently fails to initialize.
 
-`googleDriveService.init()` must be called **before** the user gesture that triggers `requestAccessToken`, otherwise iOS Safari blocks the OAuth popup. `SignUpPage` calls `init()` at mount for this reason — replicate this pattern anywhere Drive is accessed for the first time.
+**OAuth flow: Authorization Code (not implicit).** `googleDriveService` uses `initCodeClient` (GIS) which opens a popup, receives an authorization code, then exchanges it server-side via `POST /api/gtoken` (`functions/api/gtoken.js`) for an `access_token` + `refresh_token`. The refresh token is encrypted with the vault's DEK and stored in IndexedDB `config` table as `googleRefreshToken`. Subsequent token renewals are fully silent (no popup): `restoreSession()` decrypts the refresh token and calls `/api/gtoken` with `{ refresh_token }`.
+
+`googleDriveService.init()` must be called **before** the user gesture that triggers `requestCode()`, otherwise iOS Safari blocks the OAuth popup. `SignUpPage` calls `init()` at mount for this reason — replicate this pattern anywhere Drive is accessed for the first time.
+
+**Onboarding edge case:** during SignUpPage Drive restore the vault DEK is not yet available. The refresh token is held in memory via `pendingTokenService` (in-memory singleton, never written to storage) and encrypted into IndexedDB in `_finalizeLogin()` after the first vault unlock. If the page is reloaded before login completes, the token is lost and the user must redo Drive auth — this is intentional.
+
+**`importData()` preservation:** `googleRefreshToken` in the `config` table must be re-saved after `deleteAllData()` (like `deviceSecret` and `biometric`) so users do not lose their Drive connection after a sync conflict resolution or data import.
 
 Attachment binaries **do not** travel inside `ownvault-sync.json`. They are uploaded as separate Drive files; the sync JSON stores only a `driveFileId` reference. Attachments without a `driveFileId` are excluded from sync. On a new device, attachment content is lazy-downloaded on first open (`syncService.ensureAttachmentLocal`).
 
@@ -104,9 +114,10 @@ Rate limiter: 5 attempts / 5 minutes. Auto-lock timer resets on any user interac
 |---|---|---|
 | `tutorialCompleted` | local | Skip tutorial on subsequent visits |
 | `ownvault_device_id` | local | Stable device ID for sync conflict display |
-| `ownvault_google_token` / `_expires` | local | Cached OAuth2 token (cleared on disconnect) |
+| `ownvault_google_token` / `_expires` | local | Short-lived access token cache (~1h); real long-lived credential is the refresh token in IndexedDB |
 | `_sp_sec_rl` | local | Persisted rate-limiter state (survives page reload) |
 | `ov_splash_shown` | session | Show splash screen once per session |
+| ~~`ov_pending_drive_token`~~ | ~~session~~ | Removed — refresh token is now held in `pendingTokenService` (in-memory only) |
 | `ov_pending_relay_id` | session | Relay ID saved before redirect to login (deep link `/receive/:id`) |
 | `ov_pending_for_contacts` | session | Fetched relay payload pending display in ContactsPage |
 | `mainSearchTerm` | session | Search term persisted across navigations in MainPage |

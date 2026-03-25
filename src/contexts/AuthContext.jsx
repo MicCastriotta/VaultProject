@@ -29,6 +29,7 @@ import { RateLimiter, AutoLockTimer, securityLog } from '../services/securityUti
 import { hibpService } from '../services/hibpService';
 import { healthCache } from '../services/healthCacheService';
 import { googleDriveService } from '../services/googledriveService';
+import { pendingTokenService } from '../services/pendingTokenService';
 
 const AuthContext = createContext();
 
@@ -423,9 +424,8 @@ export function AuthProvider({ children }) {
         // Processo il refresh token Google pendente salvato durante l'onboarding
         // (SignUpPage → ripristino da Drive, prima che il vault fosse sbloccato).
         // Ora la DEK è disponibile → cifro e salvo in IndexedDB.
-        const pendingToken = sessionStorage.getItem('ov_pending_drive_token');
+        const pendingToken = pendingTokenService.consume();
         if (pendingToken) {
-            sessionStorage.removeItem('ov_pending_drive_token');
             try {
                 const encrypted = await cryptoService.encryptData(pendingToken);
                 await databaseService.saveGoogleRefreshToken(encrypted);
@@ -713,6 +713,7 @@ export function AuthProvider({ children }) {
         cryptoService.lock();
         hibpService.clearCache();
         healthCache.clear();
+        pendingTokenService.clear();
         setIsUnlocked(false);
         setIntegrityError(null);
         // Rilegge da IndexedDB: garantisce che loginRequiresRecoveryKey e biometricEnabled
@@ -727,6 +728,7 @@ export function AuthProvider({ children }) {
             cryptoService.lock();
             healthCache.clear();
             hibpService.clearCache();
+            pendingTokenService.clear();
             googleDriveService.signOut();
 
             const keysToRemove = [
