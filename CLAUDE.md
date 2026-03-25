@@ -83,7 +83,7 @@ Requires three env vars: `VITE_GOOGLE_CLIENT_ID` and `VITE_GOOGLE_API_KEY` (fron
 
 `googleDriveService.init()` must be called **before** the user gesture that triggers `requestCode()`, otherwise iOS Safari blocks the OAuth popup. `SignUpPage` calls `init()` at mount for this reason — replicate this pattern anywhere Drive is accessed for the first time.
 
-**Onboarding edge case:** during SignUpPage Drive restore the vault DEK is not yet available. The refresh token is saved temporarily to `sessionStorage` as `ov_pending_drive_token` and encrypted into IndexedDB in `_finalizeLogin()` after the first vault unlock.
+**Onboarding edge case:** during SignUpPage Drive restore the vault DEK is not yet available. The refresh token is held in memory via `pendingTokenService` (in-memory singleton, never written to storage) and encrypted into IndexedDB in `_finalizeLogin()` after the first vault unlock. If the page is reloaded before login completes, the token is lost and the user must redo Drive auth — this is intentional.
 
 **`importData()` preservation:** `googleRefreshToken` in the `config` table must be re-saved after `deleteAllData()` (like `deviceSecret` and `biometric`) so users do not lose their Drive connection after a sync conflict resolution or data import.
 
@@ -117,7 +117,7 @@ Rate limiter: 5 attempts / 5 minutes. Auto-lock timer resets on any user interac
 | `ownvault_google_token` / `_expires` | local | Short-lived access token cache (~1h); real long-lived credential is the refresh token in IndexedDB |
 | `_sp_sec_rl` | local | Persisted rate-limiter state (survives page reload) |
 | `ov_splash_shown` | session | Show splash screen once per session |
-| `ov_pending_drive_token` | session | Refresh token saved during onboarding Drive restore (before vault DEK is available); encrypted into IndexedDB in `_finalizeLogin()` |
+| ~~`ov_pending_drive_token`~~ | ~~session~~ | Removed — refresh token is now held in `pendingTokenService` (in-memory only) |
 | `ov_pending_relay_id` | session | Relay ID saved before redirect to login (deep link `/receive/:id`) |
 | `ov_pending_for_contacts` | session | Fetched relay payload pending display in ContactsPage |
 | `mainSearchTerm` | session | Search term persisted across navigations in MainPage |

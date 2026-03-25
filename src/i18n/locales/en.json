@@ -705,6 +705,7 @@
       "protectionActive": "Cryptographic protection active: master password + device key required for every login.",
       "upgradeHint": "Your device supports Device Secret (WebAuthn PRF). Disable and re-enable biometrics to activate enhanced protection.",
       "prfAvailable": "Your device supports Device Secret. Enable biometrics to protect the vault with a key tied to this device.",
+      "prfNotSupported": "This device does not support WebAuthn PRF, which is required for advanced vault protection (Device Secret). Biometrics cannot be enabled.",
       "approveDeviceBtn": "Approve new device",
       "enableWithDSKBtn": "Enable with Device Secret",
       "disableBtn": "Disable Device Secret",

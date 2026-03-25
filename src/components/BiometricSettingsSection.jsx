@@ -1,13 +1,13 @@
 /**
  * Biometric Settings Section
- * Gestione biometria (legacy 2FA) + Device Secret Key.
+ * Gestione biometria + Device Secret Key (v3 WebAuthn PRF).
  *
  * Se il device supporta WebAuthn PRF:
  *   - Il pulsante "Abilita" avvia il flusso Device Secret (registerWithPRF + DSK)
  *   - La sezione mostra lo stato DSK e il link per l'approvazione dispositivo
  *
  * Se il device NON supporta PRF:
- *   - Il pulsante "Abilita" avvia il flusso legacy (solo 2FA gate)
+ *   - La biometria non può essere attivata (il flusso legacy v2 è stato rimosso)
  */
 
 import { useState, useEffect } from 'react';
@@ -16,7 +16,6 @@ import { Fingerprint, Shield, AlertTriangle, KeyRound, Smartphone } from 'lucide
 import { useAuth } from '../contexts/AuthContext';
 import { biometricService } from '../services/biometricService';
 import { deviceSecretService } from '../services/deviceSecretService';
-import { BiometricSetupDialog } from '../components/BiometricSetupDialog';
 import { DeviceSecretSetupDialog } from '../components/DeviceSecretSetupDialog';
 import { DeviceApprovalSender, DeviceApprovalReceiver } from '../components/DeviceApprovalDialog';
 
@@ -26,7 +25,6 @@ export function BiometricSettingsSection() {
         biometricAvailable,
         deviceSecretEnabled,
         deviceSecretLocallyAvailable,
-        enableBiometric,
         disableBiometric,
         disableDeviceSecret,
         enrollBiometricAfterRecovery
@@ -38,7 +36,6 @@ export function BiometricSettingsSection() {
     const [prfSupported, setPrfSupported]         = useState(null);
     const [message, setMessage]                   = useState(null);
     const [isProcessing, setIsProcessing]       = useState(false);
-    const [showLegacySetup, setShowLegacySetup] = useState(false);
     const [showDSKSetup, setShowDSKSetup]       = useState(false);
     const [showApprovalSender, setShowApprovalSender] = useState(false);
     const [showDisableConfirm, setShowDisableConfirm] = useState(false);
@@ -69,8 +66,9 @@ export function BiometricSettingsSection() {
     function handleEnable() {
         setMessage(null);
         if (prfSupported === false) {
-            // PRF non supportato → legacy 2FA
-            setShowLegacySetup(true);
+            // PRF non supportato → biometria non attivabile (flusso legacy v2 rimosso)
+            setMessage({ type: 'error', text: t('deviceSecret.settings.prfNotSupported') });
+            return;
         } else if (deviceSecretEnabled && !deviceSecretLocallyAvailable) {
             // DSK già presente nel vault ma non registrata localmente (es. dopo login con recovery key)
             // → re-enroll: avvolgi la DSK esistente con la biometria di questo dispositivo
@@ -119,25 +117,6 @@ export function BiometricSettingsSection() {
             const result = await enrollBiometricAfterRecovery(dskBytes);
             if (result.success) {
                 setMessage({ type: 'success', text: t('settings.biometric.enabledOk', { type: biometricType }) });
-            } else {
-                setMessage({ type: 'error', text: result.error || t('settings.biometric.enableError') });
-            }
-        } catch (err) {
-            setMessage({ type: 'error', text: err.message || 'Unexpected error' });
-        } finally {
-            setIsProcessing(false);
-        }
-    }
-
-    // Legacy 2FA (nessun PRF)
-    async function handleLegacyEnable() {
-        setIsProcessing(true);
-        setMessage(null);
-        try {
-            const result = await enableBiometric();
-            if (result.success) {
-                setMessage({ type: 'success', text: t('settings.biometric.enabledOk', { type: biometricType }) });
-                setShowLegacySetup(false);
             } else {
                 setMessage({ type: 'error', text: result.error || t('settings.biometric.enableError') });
             }
@@ -309,29 +288,25 @@ export function BiometricSettingsSection() {
                                 )}
                             </button>
                         </div>
+                    ) : prfSupported === false ? (
+                        <div className="bg-slate-900/60 border border-slate-700 rounded-lg p-4 flex items-start gap-3">
+                            <Shield size={20} className="text-slate-400 flex-shrink-0 mt-0.5" />
+                            <p className="text-sm text-gray-400">{t('deviceSecret.settings.prfNotSupported')}</p>
+                        </div>
                     ) : (
                         <button
                             onClick={handleEnable}
-                            disabled={isProcessing}
+                            disabled={isProcessing || prfSupported === null}
                             className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             <Fingerprint size={20} />
-                            <span>{prfSupported !== false ? t('deviceSecret.settings.enableWithDSKBtn') : t('settings.biometric.enableBtn', { type: biometricType })}</span>
+                            <span>{t('deviceSecret.settings.enableWithDSKBtn')}</span>
                         </button>
                     )}
                 </div>
             </div>
 
             {/* ---- DIALOGS ---- */}
-
-            {/* Legacy 2FA setup */}
-            {showLegacySetup && (
-                <BiometricSetupDialog
-                    onEnable={handleLegacyEnable}
-                    onSkip={() => setShowLegacySetup(false)}
-                    showSkip={true}
-                />
-            )}
 
             {/* Device Secret setup */}
             {showDSKSetup && (
