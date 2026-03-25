@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/icons/appicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
-    <meta name="description" content="Secure password and card manager" />
+    <meta name="description" content="OwnVault is a privacy-first password manager that encrypts all your data locally on your device. Your keys, your control — no server ever sees your passwords." />
+    <meta name="application-name" content="OwnVault" />
     <meta name="theme-color" content="#0f172a" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -19,5 +20,19 @@
 <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <noscript>
+        <style>
+            .noscript-landing { font-family: system-ui, sans-serif; max-width: 640px; margin: 60px auto; padding: 0 24px; color: #1e293b; }
+            .noscript-landing h1 { font-size: 2rem; font-weight: 700; margin-bottom: 12px; }
+            .noscript-landing p { font-size: 1rem; line-height: 1.6; color: #475569; margin-bottom: 24px; }
+            .noscript-landing a { color: #2563eb; }
+        </style>
+        <div class="noscript-landing">
+            <h1>OwnVault</h1>
+            <p>OwnVault is a privacy-first password manager. All your passwords, cards, and notes are encrypted locally on your device using AES-256-GCM. Your master password never leaves your device — no server ever sees your data.</p>
+            <p>Enable JavaScript to use OwnVault.</p>
+            <p><a href="/privacy">Privacy Policy</a></p>
+        </div>
+    </noscript>
 </body>
 </html>
