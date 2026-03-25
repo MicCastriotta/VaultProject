@@ -20,7 +20,7 @@ import { checkRateLimit, rateLimitedResponse } from './_rl.js';
 const ALLOWED_ORIGINS = [
     'https://ownvault.eu',
     'http://localhost:3000',
-    'http://localhost:8788'
+    'http://localhost:8788' // wrangler pages dev (sviluppo locale con Cloudflare runtime)
 ];
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -64,13 +64,21 @@ export async function onRequestPost({ request, env }) {
 
     let body;
     try {
-        body = await request.json();
+        const text = await request.text();
+        if (text.length > 4096) {
+            return new Response(JSON.stringify({ error: 'payload_too_large' }), { status: 413, headers });
+        }
+        body = JSON.parse(text);
     } catch {
         return new Response(JSON.stringify({ error: 'invalid_json' }), { status: 400, headers });
     }
 
     // ── Scambio authorization code ──────────────────────────────────────────
     if (body.code && body.redirect_uri) {
+        // Valida redirect_uri server-side (Google la valida già, ma defense-in-depth)
+        if (!ALLOWED_ORIGINS.includes(body.redirect_uri)) {
+            return new Response(JSON.stringify({ error: 'invalid_redirect_uri' }), { status: 400, headers });
+        }
         const params = new URLSearchParams({
             code:          body.code,
             client_id:     clientId,

@@ -558,6 +558,11 @@ class SyncService {
         const lastLocal = syncConfig.lastLocalModification || 0;
         const needsSync = lastLocal > lastSync;
 
+        // Controlla se il refresh token è disponibile (assente per utenti migrati dal vecchio flow implicito)
+        const hasCachedToken = !!googleDriveService.loadCachedToken();
+        const hasRefreshToken = !!(await databaseService.getGoogleRefreshToken());
+        const needsReauth = !hasCachedToken && !hasRefreshToken;
+
         let status = 'synced';
         if (this.isSyncing) {
             status = 'syncing';
@@ -569,6 +574,7 @@ class SyncService {
 
         return {
             enabled: true,
+            needsReauth,
             status,
             lastSyncTimestamp: lastSync,
             lastLocalModification: lastLocal,

@@ -76,6 +76,7 @@ DEK — Data Encryption Key (random, 256-bit)
 ### Backup e Sync
 - Export/Import JSON cifrato v3 (portabile su qualsiasi device con la stessa password, include allegati, identità e contatti)
 - Sync **Google Drive** opzionale (backup automatico, risoluzione conflitti, allegati lazy-loaded)
+- **Token renewal silenzioso**: OAuth Authorization Code flow con refresh token cifrato (AES-256-GCM, DEK del vault) in IndexedDB — nessun popup richiesto dopo la prima connessione, anche nelle PWA installate
 - Import/restore da Drive: se il backup corrisponde al vault locale (stesso `salt` + `encryptedDEK`), i record `deviceSecret` e `biometric` vengono preservati — nessun re-enroll necessario
 
 ### UX
@@ -631,12 +632,20 @@ npm run preview
 
 Il relay in sviluppo è simulato da un middleware Vite in-memory (vedere `vite.config.js`), senza bisogno di Cloudflare Wrangler.
 
-### Variabili d'ambiente (opzionali — solo per sync Google Drive)
+### Variabili d'ambiente
 
+**Frontend** (prefisso `VITE_`, esposte nel bundle):
 ```env
 VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 VITE_GOOGLE_API_KEY=your-api-key
 ```
+
+**Server-side** (Cloudflare Pages dashboard — mai nel bundle frontend):
+```env
+GOOGLE_CLIENT_SECRET=your-oauth-client-secret
+```
+
+`GOOGLE_CLIENT_SECRET` è richiesto dalla Cloudflare Function `POST /api/gtoken` che gestisce lo scambio OAuth Authorization Code → access + refresh token lato server. Il refresh token viene cifrato con la DEK del vault e salvato in IndexedDB, consentendo il rinnovo silenzioso dei token Drive senza popup (risolve il blocco popup nelle PWA installate).
 
 ### Deploy (Cloudflare Pages)
 
@@ -649,10 +658,15 @@ Il progetto usa **Cloudflare Pages Functions** per relay e directory:
 | `relay/inbox/[fingerprint].js` | `GET /api/relay/inbox/:fp` | `OV_RELAY` |
 | `identity/index.js` | `POST /api/identity` | `OV_IDENTITY` |
 | `identity/[fingerprint].js` | `GET + DELETE /api/identity/:fp` | `OV_IDENTITY` |
+| `gtoken.js` | `POST /api/gtoken` | — (env var) |
 
 Binding KV richiesti (Pages > Settings > Functions > KV namespace bindings):
 - `OV_RELAY` — payload relay temporanei (24h TTL) + marker inbox
 - `OV_IDENTITY` — directory fingerprint opt-in (6 mesi TTL)
+
+Env vars richieste (Pages > Settings > Environment variables):
+- `VITE_GOOGLE_CLIENT_ID` — OAuth client ID
+- `GOOGLE_CLIENT_SECRET` — OAuth client secret (server-side only)
 
 ---
 

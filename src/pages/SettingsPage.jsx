@@ -310,7 +310,7 @@ export function SettingsPage() {
         try {
             const status = await syncService.getSyncStatus();
             setSyncStatus(status);
-            setIsSyncEnabled(status.enabled);
+            setIsSyncEnabled(status.enabled && !status.needsReauth);
             setSyncStatusLoaded(true);
         } catch (error) {
             console.error('Error loading sync status:', error);
@@ -319,7 +319,7 @@ export function SettingsPage() {
                 try {
                     const status = await syncService.getSyncStatus();
                     setSyncStatus(status);
-                    setIsSyncEnabled(status.enabled);
+                    setIsSyncEnabled(status.enabled && !status.needsReauth);
                 } catch (retryErr) {
                     console.error('Sync status retry failed:', retryErr);
                 } finally {
