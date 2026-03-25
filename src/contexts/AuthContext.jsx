@@ -420,6 +420,20 @@ export function AuthProvider({ children }) {
             securityLog('HMAC generated on first run after update');
         }
 
+        // Processo il refresh token Google pendente salvato durante l'onboarding
+        // (SignUpPage → ripristino da Drive, prima che il vault fosse sbloccato).
+        // Ora la DEK è disponibile → cifro e salvo in IndexedDB.
+        const pendingToken = sessionStorage.getItem('ov_pending_drive_token');
+        if (pendingToken) {
+            sessionStorage.removeItem('ov_pending_drive_token');
+            try {
+                const encrypted = await cryptoService.encryptData(pendingToken);
+                await databaseService.saveGoogleRefreshToken(encrypted);
+            } catch (err) {
+                console.warn('Failed to persist pending Google refresh token:', err);
+            }
+        }
+
         setIsUnlocked(true);
         return { success: true, integrityWarning: integrityResult.valid ? null : integrityResult.reason };
     }

@@ -7,7 +7,7 @@ import { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle, AlertTriangle, CloudOff } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { IntegrityWarningBanner } from './components/IntegrityWarningBanner';
@@ -75,9 +75,12 @@ const PageLoader = () => (
  */
 function SyncLaunchCheck() {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [syncConflict, setSyncConflict] = useState(null);
     const [syncToast, setSyncToast] = useState(null);
     const [isSyncing, setIsSyncing] = useState(false);
+    // Banner persistente: rimane visibile finché l'utente non si riconnette
+    const [reauthNeeded, setReauthNeeded] = useState(false);
 
     useEffect(() => {
         const handleSyncEvent = (event, data) => {
@@ -87,13 +90,14 @@ function SyncLaunchCheck() {
                 setIsSyncing(true);
             } else if (event === 'synced') {
                 setIsSyncing(false);
+                setReauthNeeded(false); // sync riuscito → token ok
                 setSyncToast({ type: 'success', text: t('settings.sync.syncedDirection', { direction: data.direction }) });
             } else if (event === 'error') {
                 setIsSyncing(false);
                 setSyncToast({ type: 'error', text: t('settings.sync.syncErrorMsg', { error: data.error }) });
             } else if (event === 'reauth_needed') {
                 setIsSyncing(false);
-                setSyncToast({ type: 'error', text: t('settings.sync.reauthNeeded') });
+                setReauthNeeded(true); // banner persistente, non toast
             }
         };
 
@@ -124,6 +128,21 @@ function SyncLaunchCheck() {
                     localData={syncConflict.localData}
                     onResolve={handleConflictResolution}
                 />
+            )}
+            {/* Banner persistente sessione Google Drive scaduta */}
+            {reauthNeeded && (
+                <div className="fixed top-0 left-0 right-0 z-[9999] bg-amber-600 text-white px-4 py-3 flex items-center justify-between gap-4 shadow-lg">
+                    <span className="flex items-center gap-2 text-sm">
+                        <CloudOff size={16} className="shrink-0" />
+                        {t('settings.sync.reauthBanner')}
+                    </span>
+                    <button
+                        onClick={() => { setReauthNeeded(false); navigate('/settings'); }}
+                        className="bg-white text-amber-700 text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-50 transition-colors flex-shrink-0"
+                    >
+                        {t('settings.sync.reconnectDrive')}
+                    </button>
+                </div>
             )}
             {/* Spinner durante sync — si trasforma nel toast al completamento */}
             {(isSyncing || syncToast) && (

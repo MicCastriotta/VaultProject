@@ -171,6 +171,7 @@
       "syncedDirection": "Synced successfully ({{direction}})",
       "syncErrorMsg": "Sync error: {{error}}",
       "reauthNeeded": "Google Drive Sync: session expired. Go to Settings to reconnect.",
+      "reauthBanner": "Google Drive session expired — reconnect to resume sync.",
       "reauthModalTitle": "Google Drive Session Expired",
       "reauthModalDesc": "Your Google Drive sync session has expired. Would you like to reconnect now?",
       "reconnecting": "Connecting...",

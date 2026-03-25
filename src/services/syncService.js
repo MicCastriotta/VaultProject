@@ -5,6 +5,7 @@
 
 import { googleDriveService } from './googledriveService';
 import { databaseService } from './databaseService';
+import { cryptoService } from './cryptoService';
 
 const SYNC_FILE_NAME = 'ownvault-sync.json';
 const SYNC_DEBOUNCE_MS = 2000; // Aspetta 2s dopo ultima modifica
@@ -164,8 +165,18 @@ class SyncService {
      */
     async enableSync() {
         try {
-            // 1. Login con Google
+            // 1. Login con Google (Authorization Code flow)
             const userInfo = await googleDriveService.signIn();
+
+            // Salva il refresh token cifrato con la DEK (vault già sbloccato qui)
+            if (userInfo.refreshToken) {
+                try {
+                    const encrypted = await cryptoService.encryptData(userInfo.refreshToken);
+                    await databaseService.saveGoogleRefreshToken(encrypted);
+                } catch (err) {
+                    console.warn('Failed to save Google refresh token:', err);
+                }
+            }
 
             // 2. Cerca file esistente
             let file = await googleDriveService.findFile(SYNC_FILE_NAME);
