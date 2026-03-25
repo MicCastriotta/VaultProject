@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="OwnVault is a privacy-first password manager that encrypts all your data locally on your device. Your keys, your control — no server ever sees your passwords." />
+    <meta name="application-name" content="OwnVault" />
+    <title>OwnVault — Privacy-First Password Manager</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 24px;
+        }
+        .card {
+            max-width: 560px;
+            width: 100%;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 24px;
+            padding: 48px 40px;
+            text-align: center;
+        }
+        .logo {
+            width: 72px; height: 72px;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            border-radius: 18px;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 24px;
+        }
+        .logo svg { width: 36px; height: 36px; color: white; }
+        h1 { font-size: 2rem; font-weight: 700; color: #f8fafc; margin-bottom: 8px; }
+        .tagline { font-size: 1rem; color: #94a3b8; margin-bottom: 32px; }
+        .features { list-style: none; text-align: left; margin-bottom: 36px; display: flex; flex-direction: column; gap: 12px; }
+        .features li { display: flex; align-items: flex-start; gap: 10px; font-size: 0.95rem; color: #cbd5e1; line-height: 1.5; }
+        .features li::before { content: "✓"; color: #22c55e; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+        .cta {
+            display: inline-block;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            color: white;
+            font-weight: 600;
+            font-size: 1rem;
+            padding: 14px 32px;
+            border-radius: 14px;
+            text-decoration: none;
+            margin-bottom: 28px;
+            transition: opacity 0.2s;
+        }
+        .cta:hover { opacity: 0.9; }
+        .footer-links { font-size: 0.85rem; color: #64748b; }
+        .footer-links a { color: #64748b; text-decoration: underline; }
+        .footer-links a:hover { color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="logo">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+        </div>
+
+        <h1>OwnVault</h1>
+        <p class="tagline">Your Keys. Your Control.</p>
+
+        <ul class="features">
+            <li>All passwords, cards, and notes encrypted locally on your device using AES-256-GCM.</li>
+            <li>Your master password never leaves your device — no server ever sees your data.</li>
+            <li>Optional Google Drive backup with end-to-end encryption.</li>
+            <li>Secure sharing with other OwnVault users via encrypted relay.</li>
+            <li>Works offline as a Progressive Web App (PWA).</li>
+        </ul>
+
+        <a href="/" class="cta">Open OwnVault</a>
+
+        <div class="footer-links">
+            <a href="/privacy">Privacy Policy</a>
+        </div>
+    </div>
+</body>
+</html>
