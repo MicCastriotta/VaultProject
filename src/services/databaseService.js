@@ -184,6 +184,37 @@ class DatabaseService {
     }
 
     // ========================================
+    // GOOGLE DRIVE REFRESH TOKEN STORAGE
+    // Cifrato con DEK — NON esportato in exportData().
+    // Viene preservato da importData() perché è device-specific
+    // (legato all'account Google dell'utente su questo dispositivo).
+    // ========================================
+
+    /**
+     * Salva il refresh token Google cifrato con la DEK.
+     * @param {{ iv: string, data: string, version: number }} encrypted
+     */
+    async saveGoogleRefreshToken(encrypted) {
+        await db.config.put({ id: 'googleRefreshToken', ...encrypted });
+    }
+
+    /**
+     * Recupera il refresh token Google cifrato.
+     * Ritorna { iv, data, version } oppure null.
+     */
+    async getGoogleRefreshToken() {
+        const record = await db.config.get('googleRefreshToken');
+        if (!record) return null;
+        const { id, ...encrypted } = record;
+        return encrypted;
+    }
+
+    /** Elimina il refresh token Google (al signOut o alla disconnessione sync). */
+    async deleteGoogleRefreshToken() {
+        await db.config.delete('googleRefreshToken');
+    }
+
+    // ========================================
     // PROFILE OPERATIONS
     // ========================================
 
@@ -385,9 +416,10 @@ class DatabaseService {
         // - biometric:    credentialId specifico del device, non funziona altrove
         // - integrity:    HMAC non incluso: se assente, verifyHMAC ritorna firstRun=true
         //                 e lo ricalcola automaticamente al primo login → nessun problema
-        const localDeviceSecret = await db.config.get('deviceSecret');
-        const localBiometric    = await db.config.get('biometric');
-        const localCrypto       = await db.config.get('crypto');
+        const localDeviceSecret      = await db.config.get('deviceSecret');
+        const localBiometric         = await db.config.get('biometric');
+        const localCrypto            = await db.config.get('crypto');
+        const localGoogleRefreshToken = await db.config.get('googleRefreshToken');
 
         // Pulisci DB
         await this.deleteAllData();
@@ -421,6 +453,11 @@ class DatabaseService {
         }
         if (isSameVault && localBiometric) {
             await db.config.put(localBiometric);
+        }
+        // Il refresh token Google è device-specific: si ripristina sempre,
+        // indipendentemente dal vault (l'autenticazione Drive è separata dalla cripto del vault).
+        if (localGoogleRefreshToken) {
+            await db.config.put(localGoogleRefreshToken);
         }
 
         // Importa identity (keypair ECDH + Ed25519) — presente solo nei backup v3+

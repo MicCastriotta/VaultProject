@@ -1,9 +1,9 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // Plugin personalizzato per aggiungere CSP headers
-function cspPlugin() {
+function cspPlugin(env = {}) {
   // CSP per produzione (iniettata come meta tag nel build output)
   // Nota: frame-ancestors non funziona nei meta tag (limitazione spec) — impostarlo via HTTP header lato server
   const PROD_CSP = [
@@ -83,6 +83,64 @@ function cspPlugin() {
         }
 
         next();
+      });
+
+      // Mock /api/gtoken — proxy verso Google se GOOGLE_CLIENT_SECRET è configurato,
+      // altrimenti restituisce errore esplicativo per il developer.
+      server.middlewares.use('/api/gtoken', (req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Cache-Control', 'no-store');
+
+        if (req.method === 'OPTIONS') {
+          res.writeHead(204);
+          res.end();
+          return;
+        }
+
+        if (req.method !== 'POST') {
+          res.writeHead(405);
+          res.end(JSON.stringify({ error: 'method_not_allowed' }));
+          return;
+        }
+
+        const clientId     = env.VITE_GOOGLE_CLIENT_ID;
+        const clientSecret = env.GOOGLE_CLIENT_SECRET;
+
+        if (!clientId || !clientSecret) {
+          res.writeHead(501);
+          res.end(JSON.stringify({
+            error: 'not_configured',
+            hint: 'Aggiungi VITE_GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET in .env.local per testare lo scambio token in dev.'
+          }));
+          return;
+        }
+
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body);
+            const params  = payload.code
+              ? new URLSearchParams({ code: payload.code, client_id: clientId, client_secret: clientSecret, redirect_uri: payload.redirect_uri, grant_type: 'authorization_code' })
+              : new URLSearchParams({ refresh_token: payload.refresh_token, client_id: clientId, client_secret: clientSecret, grant_type: 'refresh_token' });
+
+            const googleResp = await fetch('https://oauth2.googleapis.com/token', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: params,
+            });
+            const data = await googleResp.json();
+            res.writeHead(googleResp.ok ? 200 : (data.error === 'invalid_grant' ? 401 : 400));
+            res.end(JSON.stringify(
+              googleResp.ok
+                ? { access_token: data.access_token, refresh_token: data.refresh_token ?? null, expires_in: data.expires_in ?? 3600 }
+                : { error: data.error }
+            ));
+          } catch (err) {
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        });
       });
 
       // Mock /api/relay
@@ -207,7 +265,12 @@ function cspPlugin() {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Carica TUTTE le env var (prefisso '' = nessun filtro) per renderle
+  // disponibili nei plugin server (es. mock /api/gtoken in dev).
+  const env = loadEnv(mode, process.cwd(), '');
+
+  return {
   build: {    
     modulePreload: { polyfill: false }, // evita lo script inline del polyfill (incompatibile con CSP strict)
     rollupOptions: {
@@ -228,7 +291,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    cspPlugin(), // Aggiunge CSP headers durante lo sviluppo
+    cspPlugin(env), // Aggiunge CSP headers durante lo sviluppo
     VitePWA({
       registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', 'icons/appicon.png', 'icons/landscape.png'],
@@ -298,4 +361,5 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
   }
+  };
 });

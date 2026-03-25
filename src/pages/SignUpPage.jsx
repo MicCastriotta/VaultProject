@@ -125,13 +125,20 @@ export function SignUpPage() {
         // signIn() deve essere chiamata il prima possibile nel contesto user-gesture,
         // senza await intermedi — altrimenti iOS Safari blocca il popup OAuth.
         setIsConnecting(true);
+        let signInResult;
         try {
-            await googleDriveService.signIn();
+            signInResult = await googleDriveService.signIn();
         } catch (err) {
             setIsConnecting(false);
             setRestoreError(err.message || t('signup.restore.driveError'));
             setView('restore_error');
             return;
+        }
+
+        // Il vault non è ancora sbloccato: il refresh token non può essere cifrato
+        // con la DEK ora. Lo salviamo in sessionStorage e lo cifreremo al primo login.
+        if (signInResult?.refreshToken) {
+            sessionStorage.setItem('ov_pending_drive_token', signInResult.refreshToken);
         }
         setIsConnecting(false);
         setView('restoring');

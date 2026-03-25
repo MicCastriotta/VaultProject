@@ -3,6 +3,9 @@
  * Gestisce autenticazione OAuth2 e operazioni su Google Drive
  */
 
+import { cryptoService } from './cryptoService';
+import { databaseService } from './databaseService';
+
 // IMPORTANTE: Sostituisci con il tuo CLIENT_ID da Google Cloud Console
 // https://console.cloud.google.com/apis/credentials
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -17,9 +20,10 @@ class GoogleDriveService {
         this.accessToken = null;
         this.gapiLoaded = false;
         this.gisLoaded = false;
-        this.tokenClient = null;
-        this._initPromise = null; // Guard contro chiamate concorrenti a init()
-        this.folderId = null;     // Cache ID cartella OwnVault
+        this.codeClient = null;
+        this._initPromise = null;      // Guard contro chiamate concorrenti a init()
+        this.folderId = null;          // Cache ID cartella OwnVault
+        this._pendingCodeCallback = null; // Callback per il flusso authorization code
     }
 
     /** Salva il token in localStorage con timestamp di scadenza */
@@ -145,10 +149,22 @@ class GoogleDriveService {
                 });
             }
 
-            this.tokenClient = window.google.accounts.oauth2.initTokenClient({
-                client_id: GOOGLE_CLIENT_ID,
-                scope: SCOPES,
-                callback: '', // Impostato dinamicamente
+            // Authorization Code flow: il popup restituisce un code (non un token),
+            // che viene scambiato server-side tramite /api/gtoken per ottenere
+            // access_token + refresh_token. Il refresh token non scade e consente
+            // rinnovi silenziosi senza popup.
+            // redirect_uri deve essere registrato in Google Cloud Console.
+            this.codeClient = window.google.accounts.oauth2.initCodeClient({
+                client_id:    GOOGLE_CLIENT_ID,
+                scope:        SCOPES,
+                ux_mode:      'popup',
+                redirect_uri: window.location.origin,
+                callback: (response) => {
+                    if (this._pendingCodeCallback) {
+                        this._pendingCodeCallback(response);
+                        this._pendingCodeCallback = null;
+                    }
+                },
             });
 
             this.gisLoaded = true;
@@ -183,101 +199,149 @@ class GoogleDriveService {
     /**
      * Login con Google (richiede popup)
      */
+    /**
+     * Scambia un authorization code con access + refresh token
+     * tramite la Cloudflare Function /api/gtoken.
+     * @returns {{ access_token, refresh_token, expires_in }}
+     */
+    async _exchangeCodeForTokens(code) {
+        const resp = await fetch('/api/gtoken', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ code, redirect_uri: window.location.origin }),
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(`Token exchange failed: ${err.error || resp.status}`);
+        }
+        return resp.json();
+    }
+
+    /**
+     * Ottieni un nuovo access token usando il refresh token.
+     * Chiamata server-side tramite /api/gtoken — nessun popup.
+     * @returns {{ access_token, expires_in }}
+     */
+    async _refreshAccessToken(refreshToken) {
+        const resp = await fetch('/api/gtoken', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(`Token refresh failed: ${err.error || resp.status}`);
+        }
+        return resp.json();
+    }
+
+    /**
+     * Login con Google tramite popup (Authorization Code flow).
+     * Deve essere chiamato in un contesto user-gesture (click).
+     *
+     * Ritorna { accessToken, refreshToken } — il chiamante è responsabile
+     * di salvare il refreshToken nel modo corretto:
+     *   - vault già sbloccato → cifrare con DEK e salvare in IndexedDB
+     *   - onboarding (vault non ancora sbloccato) → sessionStorage temporaneo
+     */
     async signIn() {
         // init() deve essere già completata (pre-caricata al mount della pagina)
-        // in modo che requestAccessToken venga chiamata nel user-gesture context.
-        // Se non è ancora pronta, la carichiamo ora (desktop path di fallback).
+        // in modo che requestCode() venga chiamata nel user-gesture context.
         await this.init();
 
         return new Promise((resolve, reject) => {
-            // Timeout di sicurezza: su iOS standalone il popup non riesce a
-            // fare postMessage back e la callback non arriva mai → freeze.
+            // Timeout di sicurezza per popup bloccati (es. iOS standalone)
             const timeout = setTimeout(() => {
+                this._pendingCodeCallback = null;
                 reject(new Error('Google Sign-In timeout: il popup non ha risposto. Riprova dal browser (non dalla PWA installata) oppure usa un dispositivo desktop.'));
-            }, 120_000); // 2 minuti
+            }, 120_000);
 
-            try {
-                this.tokenClient.callback = async (response) => {
-                    clearTimeout(timeout);
-                    if (response.error !== undefined) {
-                        reject(response);
-                        return;
-                    }
+            this._pendingCodeCallback = async (response) => {
+                clearTimeout(timeout);
 
-                    this.accessToken = response.access_token;
-                    this.isSignedIn = true;
-                    this.cacheToken(response.access_token, response.expires_in || 3600);
+                if (response.error) {
+                    reject(new Error(response.error));
+                    return;
+                }
+
+                try {
+                    const tokens = await this._exchangeCodeForTokens(response.code);
+
+                    this.accessToken = tokens.access_token;
+                    this.isSignedIn  = true;
+                    this.cacheToken(tokens.access_token, tokens.expires_in || 3600);
+                    window.gapi.client.setToken({ access_token: tokens.access_token });
 
                     resolve({
-                        accessToken: this.accessToken
+                        accessToken:  tokens.access_token,
+                        refreshToken: tokens.refresh_token ?? null,
                     });
-                };
-
-                // Richiedi token
-                if (this.accessToken === null) {
-                    // Prompt per consent screen
-                    this.tokenClient.requestAccessToken({ prompt: 'consent' });
-                } else {
-                    // Skip consent se già autorizzato
-                    this.tokenClient.requestAccessToken({ prompt: '' });
+                } catch (err) {
+                    reject(err);
                 }
-            } catch (error) {
-                clearTimeout(timeout);
-                reject(error);
-            }
+            };
+
+            this.codeClient.requestCode();
         });
     }
 
     /**
-     * Logout
+     * Logout: revoca il token in memoria e cancella il refresh token da IndexedDB.
      */
     signOut() {
         if (this.accessToken) {
-            window.google.accounts.oauth2.revoke(this.accessToken, () => {
-                console.log('Access token revoked');
-            });
+            window.google.accounts.oauth2.revoke(this.accessToken, () => {});
         }
 
         this.accessToken = null;
-        this.isSignedIn = false;
-        this.folderId = null;
+        this.isSignedIn  = false;
+        this.folderId    = null;
         this.clearCachedToken();
+        // Rimuovi il refresh token persistente — l'utente dovrà riconnettersi
+        databaseService.deleteGoogleRefreshToken().catch(() => {});
     }
 
+    /**
+     * Ripristina la sessione Drive senza popup.
+     * 1. Prova il token in cache (non scaduto).
+     * 2. Prova il refresh token cifrato in IndexedDB (vault deve essere sbloccato).
+     * 3. Se nessuno dei due è disponibile → lancia errore: l'utente deve riconnettersi.
+     *
+     * Non apre mai popup: questa funzione è chiamata da contesti background
+     * (sync automatico) dove window.open() è bloccato dalle PWA.
+     */
     async restoreSession() {
         await this.init();
 
-        // Usa il token in cache se ancora valido: evita il popup Google ad ogni riavvio
+        // ── 1. Token in cache ancora valido ──────────────────────────────────
         const cached = this.loadCachedToken();
         if (cached) {
             this.accessToken = cached;
-            this.isSignedIn = true;
-            // Sincronizza il token su gapi.client: altrimenti le chiamate
-            // window.gapi.client.drive.* userebbero solo la API key → 403
+            this.isSignedIn  = true;
             window.gapi.client.setToken({ access_token: cached });
             return true;
         }
 
-        // Nessun token valido in cache → chiedi a Google (può mostrare UI se la sessione è scaduta)
-        return new Promise((resolve, reject) => {
-            this.tokenClient.callback = (response) => {
-                if (response.error) {
-                    this.isSignedIn = false;
-                    this.accessToken = null;
-                    // Wrap con messaggio riconoscibile per il syncService
-                    reject(new Error(`Not signed in to Google Drive: ${response.error}`));
-                    return;
-                }
+        // ── 2. Rinnova silenziosamente tramite refresh token in IndexedDB ────
+        try {
+            const encryptedToken = await databaseService.getGoogleRefreshToken();
+            if (encryptedToken) {
+                // decryptData lancia se il vault è bloccato → catturato sotto
+                const refreshToken = await cryptoService.decryptData(encryptedToken);
+                const result = await this._refreshAccessToken(refreshToken);
 
-                this.accessToken = response.access_token;
-                this.isSignedIn = true;
-                this.cacheToken(response.access_token, response.expires_in || 3600);
-                resolve(true);
-            };
+                this.accessToken = result.access_token;
+                this.isSignedIn  = true;
+                this.cacheToken(result.access_token, result.expires_in || 3600);
+                window.gapi.client.setToken({ access_token: result.access_token });
+                return true;
+            }
+        } catch {
+            // Vault bloccato, refresh token revocato o non presente: fall-through
+        }
 
-            // prompt:'' = silenzioso se la sessione Google è attiva nel browser
-            this.tokenClient.requestAccessToken({ prompt: '' });
-        });
+        // ── 3. Nessuna credenziale disponibile ───────────────────────────────
+        throw new Error('Not signed in to Google Drive: no_cached_token');
     }
 
     
@@ -568,10 +632,11 @@ class GoogleDriveService {
     /**
      * Rinnova il token silenziosamente (bypass cache, forza nuova richiesta a Google).
      * Chiamato automaticamente su risposta 401.
+     * Non apre popup: usa direttamente il refresh token in IndexedDB.
      */
     async refreshToken() {
         this.accessToken = null;
-        this.isSignedIn = false;
+        this.isSignedIn  = false;
         this.clearCachedToken();
         window.gapi.client.setToken(null);
         await this.restoreSession();

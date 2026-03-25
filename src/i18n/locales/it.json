@@ -171,6 +171,7 @@
       "syncedDirection": "Sincronizzato con successo ({{direction}})",
       "syncErrorMsg": "Errore di sincronizzazione: {{error}}",
       "reauthNeeded": "Sync Google Drive: sessione scaduta. Vai in Impostazioni per riconnetterti.",
+      "reauthBanner": "Sessione Google Drive scaduta — riconnettiti per riprendere il sync.",
       "reauthModalTitle": "Sessione Google Drive scaduta",
       "reauthModalDesc": "La sessione di sincronizzazione con Google Drive è scaduta. Vuoi riconnetterti ora?",
       "reconnecting": "Connessione in corso...",
