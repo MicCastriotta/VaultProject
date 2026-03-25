@@ -59,8 +59,9 @@ export function TutorialPage({ onDone }) {
             */}
             <div className="flex flex-col justify-between flex-1 w-full max-w-sm md:flex-initial md:glass md:rounded-3xl md:p-8 md:border md:border-slate-800 md:shadow-2xl md:justify-normal md:gap-8">
 
-                {/* Skip button */}
-                <div className="flex justify-end">
+                {/* Brand + Skip */}
+                <div className="flex items-center justify-between">
+                    <h1 className="text-lg font-bold text-white tracking-wide">OwnVault</h1>
                     <button
                         onClick={onDone}
                         className="text-sm text-gray-400 hover:text-gray-200 transition px-2 py-1"
