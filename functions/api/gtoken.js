@@ -15,7 +15,7 @@
  *   { refresh_token }               → rinnova     → { access_token, expires_in }
  */
 
-import { checkRateLimit, rateLimitedResponse } from '../_rl.js';
+import { checkRateLimit, rateLimitedResponse } from './_rl.js';
 
 const ALLOWED_ORIGINS = [
     'https://ownvault.eu',
