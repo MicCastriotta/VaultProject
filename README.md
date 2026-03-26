@@ -55,7 +55,6 @@ DEK — Data Encryption Key (random, 256-bit)
 - **Auto-lock** per inattività (timeout configurabile) con rilevamento background tramite `visibilitychange`
 - **Rate limiting persistente** — lockout sopravvive ai reload della pagina (localStorage)
 - **Integrità database (HMAC v2)** — HMAC-SHA256 ricalcolato ad ogni scrittura, verificato ad ogni unlock; copre config, profili, allegati e conteggi
-- **Clipboard auto-clear** — testo copiato eliminato automaticamente dopo 30 secondi
 - **XSS protection** — tutti gli input sanitizzati con DOMPurify
 - **Content Security Policy** — CSP restrittiva via header HTTP in produzione
 

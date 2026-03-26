@@ -118,6 +118,7 @@ export function ProfileDetailPage() {
             await databaseService.deleteProfile(parseInt(id));
             await refreshHMAC();
             healthCache.clear();
+            await syncService.triggerSync();
             navigate('/');
         } catch (err) {
             console.error('Delete failed:', err);
@@ -520,6 +521,27 @@ export function ProfileDetailPage() {
                                 />
                             )}
                         </>
+                    )}
+
+                    {/* Campi personalizzati */}
+                    {profile.customFields?.length > 0 && (
+                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                            <label className="block text-sm font-medium text-gray-300 mb-3">
+                                {t('profileForm.customFields')}
+                            </label>
+                            <div className="space-y-2">
+                                {profile.customFields.map((field, i) => (
+                                    <DetailField
+                                        key={i}
+                                        label={field.name || `Field ${i + 1}`}
+                                        value={field.value}
+                                        onCopy={() => handleCopy(field.value, `custom-${i}`)}
+                                        copied={copiedField === `custom-${i}`}
+                                        masked={field.type === 'secret'}
+                                    />
+                                ))}
+                            </div>
+                        </div>
                     )}
 
                     {/* Note */}

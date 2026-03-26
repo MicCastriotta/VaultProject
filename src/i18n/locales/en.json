@@ -333,7 +333,14 @@
     "base32Placeholder": "Enter Base32 secret key...",
     "scanQR": "Scan QR Code",
     "secretKey": "Secret Key",
-    "additionalNotes": "Additional notes..."
+    "additionalNotes": "Additional notes...",
+    "customFields": "Custom Fields",
+    "addField": "Add field",
+    "fieldName": "Field name",
+    "fieldValue": "Value",
+    "noCustomFields": "No custom fields yet.",
+    "makeSecret": "Hide value",
+    "makeVisible": "Show value"
   },
   "messages": {
     "copied": "Copied to clipboard!",
