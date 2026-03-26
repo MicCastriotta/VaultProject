@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowLeft, Save, User, CreditCard, RefreshCw, QrCode, Trash2, Image, Paperclip, X, FileText } from 'lucide-react';
+import { ArrowLeft, Save, User, CreditCard, RefreshCw, QrCode, Trash2, Image, Paperclip, X, FileText, Plus, Eye, EyeOff } from 'lucide-react';
 import { syncService } from '../services/syncService';
 import { OTPDisplay } from '../components/OTPDisplay';
 import { QRScanner } from '../components/QRScanner';
@@ -52,7 +52,9 @@ export function ProfileFormPage() {
         owner: '',
         deadline: '',
         cvv: '',
-        pin: ''
+        pin: '',
+        // Campi personalizzati
+        customFields: []
     });
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -221,6 +223,28 @@ export function ProfileFormPage() {
         setFormData(prev => ({ ...prev, secretKey: secret }));
     }
 
+    function addCustomField() {
+        setFormData(prev => ({
+            ...prev,
+            customFields: [...(prev.customFields || []), { name: '', value: '', type: 'text' }]
+        }));
+    }
+
+    function updateCustomField(index, key, value) {
+        setFormData(prev => {
+            const updated = [...(prev.customFields || [])];
+            updated[index] = { ...updated[index], [key]: value };
+            return { ...prev, customFields: updated };
+        });
+    }
+
+    function removeCustomField(index) {
+        setFormData(prev => ({
+            ...prev,
+            customFields: (prev.customFields || []).filter((_, i) => i !== index)
+        }));
+    }
+
     function clearOTPSecret() {
         setFormData(prev => ({ ...prev, secretKey: '' }));
     }
@@ -271,6 +295,14 @@ export function ProfileFormPage() {
                 sanitizedData.pin = validators.text(formData.pin || '', 6);
                 sanitizedData.note = validators.notes(formData.note || '');
             }
+
+            sanitizedData.customFields = (formData.customFields || [])
+                .filter(f => f.name.trim() || f.value.trim())
+                .map(f => ({
+                    name: validators.text(f.name, 100),
+                    value: validators.text(f.value, 500),
+                    type: ['text', 'secret'].includes(f.type) ? f.type : 'text'
+                }));
 
             const encrypted = await cryptoService.encryptData(sanitizedData);
 
@@ -704,6 +736,62 @@ export function ProfileFormPage() {
                                 </div>
                             </>
                         )}
+
+                        {/* Campi personalizzati (common) */}
+                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <label className="text-sm font-medium text-gray-300">
+                                    {t('profileForm.customFields')}
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={addCustomField}
+                                    className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                                >
+                                    <Plus size={14} />
+                                    {t('profileForm.addField')}
+                                </button>
+                            </div>
+                            {(formData.customFields || []).length === 0 ? (
+                                <p className="text-sm text-gray-500">{t('profileForm.noCustomFields')}</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {(formData.customFields || []).map((field, i) => (
+                                        <div key={i} className="flex items-center gap-2">
+                                            <input
+                                                type="text"
+                                                value={field.name}
+                                                onChange={(e) => updateCustomField(i, 'name', e.target.value)}
+                                                placeholder={t('profileForm.fieldName')}
+                                                className="w-1/3 px-3 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-500"
+                                            />
+                                            <input
+                                                type={field.type === 'secret' ? 'password' : 'text'}
+                                                value={field.value}
+                                                onChange={(e) => updateCustomField(i, 'value', e.target.value)}
+                                                placeholder={t('profileForm.fieldValue')}
+                                                className="flex-1 px-3 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-slate-500"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => updateCustomField(i, 'type', field.type === 'secret' ? 'text' : 'secret')}
+                                                className="p-2 text-gray-400 hover:text-gray-200 rounded-lg hover:bg-slate-700 transition-colors shrink-0"
+                                                title={field.type === 'secret' ? t('profileForm.makeVisible') : t('profileForm.makeSecret')}
+                                            >
+                                                {field.type === 'secret' ? <EyeOff size={16} /> : <Eye size={16} />}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeCustomField(i)}
+                                                className="p-2 text-red-400 hover:text-red-300 rounded-lg hover:bg-red-500/10 transition-colors shrink-0"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
 
                         {/* Note (common) */}
                         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">

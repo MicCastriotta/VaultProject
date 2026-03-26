@@ -339,13 +339,14 @@ class SyncService {
             // 4. Compare timestamps
             if (localTimestamp > cloudTimestamp) {
                 // LOCAL PIÙ RECENTE → Upload JSON (allegati già su Drive)
+                const uploadTs = Date.now();
                 await googleDriveService.updateFile(
                     syncConfig.googleDriveFileId,
-                    { version: 2, lastModified: new Date().toISOString(),
+                    { version: 2, lastModified: new Date(uploadTs).toISOString(),
                       deviceId: this.deviceId, deviceName: this.deviceName,
-                      syncTimestamp: Date.now(), ...localData }
+                      syncTimestamp: uploadTs, ...localData }
                 );
-                await databaseService.updateSyncConfig({ lastSyncTimestamp: Date.now() });
+                await databaseService.updateSyncConfig({ lastSyncTimestamp: uploadTs, lastLocalModification: uploadTs });
                 this.notifyListeners('synced', { direction: 'upload' });
 
             } else if (cloudTimestamp > localTimestamp) {
@@ -366,13 +367,14 @@ class SyncService {
                     });
                     this.notifyListeners('synced', { direction: 'download', conflict: true });
                 } else {
+                    const uploadTs = Date.now();
                     await googleDriveService.updateFile(
                         syncConfig.googleDriveFileId,
-                        { version: 2, lastModified: new Date().toISOString(),
+                        { version: 2, lastModified: new Date(uploadTs).toISOString(),
                           deviceId: this.deviceId, deviceName: this.deviceName,
-                          syncTimestamp: Date.now(), ...localData }
+                          syncTimestamp: uploadTs, ...localData }
                     );
-                    await databaseService.updateSyncConfig({ lastSyncTimestamp: Date.now() });
+                    await databaseService.updateSyncConfig({ lastSyncTimestamp: uploadTs, lastLocalModification: uploadTs });
                     this.notifyListeners('synced', { direction: 'upload', conflict: true });
                 }
 
@@ -473,12 +475,13 @@ class SyncService {
                 // Mantieni locale → upload allegati + re-upload JSON
                 await this.syncAttachmentFiles();
                 const freshRefs = buildAttachmentSyncRefs(await databaseService.getAllAttachments());
+                const uploadTs = Date.now();
                 await googleDriveService.updateFile(syncConfig.googleDriveFileId, {
-                    version: 2, lastModified: new Date().toISOString(),
+                    version: 2, lastModified: new Date(uploadTs).toISOString(),
                     deviceId: this.deviceId, deviceName: this.deviceName,
-                    syncTimestamp: Date.now(), ...localData, attachments: freshRefs
+                    syncTimestamp: uploadTs, ...localData, attachments: freshRefs
                 });
-                await databaseService.updateSyncConfig({ lastSyncTimestamp: Date.now() });
+                await databaseService.updateSyncConfig({ lastSyncTimestamp: uploadTs, lastLocalModification: uploadTs });
                 this.notifyListeners('synced', { direction: 'upload', conflict: true });
             }
         } catch (error) {

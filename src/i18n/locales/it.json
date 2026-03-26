@@ -333,7 +333,14 @@
     "base32Placeholder": "Inserisci chiave segreta Base32...",
     "scanQR": "Scansiona QR Code",
     "secretKey": "Chiave Segreta",
-    "additionalNotes": "Note aggiuntive..."
+    "additionalNotes": "Note aggiuntive...",
+    "customFields": "Campi personalizzati",
+    "addField": "Aggiungi campo",
+    "fieldName": "Nome campo",
+    "fieldValue": "Valore",
+    "noCustomFields": "Nessun campo personalizzato.",
+    "makeSecret": "Nascondi valore",
+    "makeVisible": "Mostra valore"
   },
   "messages": {
     "copied": "Copiato negli appunti!",

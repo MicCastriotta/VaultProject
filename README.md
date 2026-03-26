@@ -29,6 +29,7 @@ DEK — Data Encryption Key (random, 256-bit)
 
 ### Vault
 - Profili **WEB** (credenziali siti) e **CARD** (carte di credito/debito)
+- **Campi personalizzati** per ogni profilo — nome + valore + tipo (testo / nascosto), cifrati nella DEK esattamente come gli altri campi
 - Cifratura AES-256-GCM per ogni campo, IV random per record
 - **Allegati file** cifrati per profilo — fino a 15 MB, con AAD legato al profileId
 - Icone brand automatiche per oltre 3.000 servizi web
@@ -55,7 +56,6 @@ DEK — Data Encryption Key (random, 256-bit)
 - **Auto-lock** per inattività (timeout configurabile) con rilevamento background tramite `visibilitychange`
 - **Rate limiting persistente** — lockout sopravvive ai reload della pagina (localStorage)
 - **Integrità database (HMAC v2)** — HMAC-SHA256 ricalcolato ad ogni scrittura, verificato ad ogni unlock; copre config, profili, allegati e conteggi
-- **Clipboard auto-clear** — testo copiato eliminato automaticamente dopo 30 secondi
 - **XSS protection** — tutti gli input sanitizzati con DOMPurify
 - **Content Security Policy** — CSP restrittiva via header HTTP in produzione
 
@@ -367,7 +367,6 @@ upgrade-insecure-requests
 | Allegati spostati tra profili | AAD con profileId — decifratura fallisce cross-profile |
 | Brute-force locale | Rate limiting persistente + 600k iterazioni KDF |
 | XSS nel DOM | DOMPurify su tutti gli input/output + CSP |
-| Dati in clipboard | Auto-clear dopo 30 secondi |
 | Sessione lasciata aperta | Auto-lock per inattività + background timeout (60s) |
 | HIBP check (leakage password) | k-anonymity — solo prefisso hash (5 chars SHA-1) inviato |
 | Health data decifrati in memoria | healthCache svuotato al lock/logout |
@@ -729,5 +728,5 @@ Env vars richieste (Pages > Settings > Environment variables):
 - [x] Recovery key DSK in formato Crockford Base32 (`OV-XXXXXXXX-...`)
 - [x] Firme Ed25519 per autenticazione mittente nello share (v2 protocollo)
 - [ ] Export/Import da altri password manager (Bitwarden, 1Password CSV)
-- [ ] Campi personalizzati nella creazione profilo
+- [x] Campi personalizzati nella creazione profilo
 - [ ] Logging centralizzato
