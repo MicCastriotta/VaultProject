@@ -7,18 +7,22 @@
  * - Calcola SHA-1 della password localmente
  * - Invia solo i primi 5 caratteri dell'hash (k-anonymity)
  * - Confronta il resto dell'hash localmente
- * - Nessuno (nemmeno HIBP) può sapere quale password stai controllando
+ * - Nessuno (nemmeno HIBP) puï¿½ sapere quale password stai controllando
  *
  * API: https://haveibeenpwned.com/API/v3#PwnedPasswords
  */
 
 const HIBP_API_BASE = 'https://api.pwnedpasswords.com/range/';
+const HIBP_BREACHES_API = 'https://haveibeenpwned.com/api/v3/breaches';
 
 class HIBPService {
     constructor() {
         // Cache dei risultati per evitare chiamate ripetute nella stessa sessione
         // Key: SHA-1 hash completo, Value: { pwned: bool, count: number }
         this.cache = new Map();
+        // Cache breach per dominio â€” i breach non spariscono, stabile per tutta la sessione
+        // Key: domain string, Value: breach[]
+        this.domainBreachCache = new Map();
     }
 
     /**
@@ -35,12 +39,12 @@ class HIBPService {
     }
 
     /**
-     * Controlla se una password è stata compromessa
+     * Controlla se una password ï¿½ stata compromessa
      *
      * @param {string} password - La password da verificare
      * @returns {Promise<{ pwned: boolean, count: number }>}
-     *   - pwned: true se la password è stata trovata in data breach
-     *   - count: quante volte è stata trovata (0 se non compromessa)
+     *   - pwned: true se la password ï¿½ stata trovata in data breach
+     *   - count: quante volte ï¿½ stata trovata (0 se non compromessa)
      */
     async checkPassword(password) {
         if (!password) {
@@ -130,10 +134,88 @@ class HIBPService {
     }
 
     /**
+     * Ricava un dominio candidato dal titolo del profilo (solo elaborazione locale, nessuna rete).
+     * Es: "Adobe" â†’ "adobe.com", "Bank of America" â†’ "bankofamerica.com"
+     * Usato per suggerire il dominio all'utente nell'UI quando il campo URL Ã¨ vuoto.
+     * @param {string} title
+     * @returns {string|null}
+     */
+    inferDomainFromTitle(title) {
+        if (!title) return null;
+        const cleaned = title
+            .toLowerCase()
+            .replace(/\b(app|web|online|official|account|login|portal|inc|llc|ltd|s\.p\.a|srl)\b/g, '')
+            .replace(/[^a-z0-9]/g, '')
+            .trim();
+        return cleaned ? `${cleaned}.com` : null;
+    }
+
+    /**
+     * Estrae il dominio dall'URL del profilo.
+     * Es: "https://www.adobe.com/it" â†’ "adobe.com"
+     * Se l'URL Ã¨ assente restituisce null â€” in quel caso l'UI mostra il suggerimento dominio.
+     * @param {string|null} url
+     * @returns {string|null}
+     */
+    extractDomain(url) {
+        if (!url) return null;
+        try {
+            const u = new URL(url.startsWith('http') ? url : `https://${url}`);
+            return u.hostname.replace(/^www\./, '');
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Controlla se un servizio ha subito breach noti, usando l'endpoint pubblico
+     * HIBP /api/v3/breaches?Domain={domain} (nessuna API key richiesta).
+     *
+     * Ritorna solo breach verificati e non fabricati.
+     * I risultati sono cachati per tutta la sessione (i breach non spariscono).
+     *
+     * @param {string} domain - Es: "adobe.com"
+     * @returns {Promise<Array>} Array di oggetti breach (vuoto se nessun breach)
+     *   Campi rilevanti: Title, BreachDate, PwnCount, DataClasses
+     */
+    async checkServiceBreaches(domain) {
+        if (!domain) return [];
+
+        if (this.domainBreachCache.has(domain)) {
+            return this.domainBreachCache.get(domain);
+        }
+
+        try {
+            const response = await fetch(
+                `${HIBP_BREACHES_API}?Domain=${encodeURIComponent(domain)}`
+            );
+
+            if (!response.ok) {
+                // 404 = nessun breach noto per questo dominio
+                this.domainBreachCache.set(domain, []);
+                return [];
+            }
+
+            const breaches = await response.json();
+            // Filtra: solo breach verificati e non fabricati
+            const filtered = Array.isArray(breaches)
+                ? breaches.filter(b => b.IsVerified && !b.IsFabricated)
+                : [];
+
+            this.domainBreachCache.set(domain, filtered);
+            return filtered;
+        } catch (error) {
+            console.error('HIBP service breach check failed:', error);
+            return [];
+        }
+    }
+
+    /**
      * Pulisci la cache (es. al logout)
      */
     clearCache() {
         this.cache.clear();
+        this.domainBreachCache.clear();
     }
 }
 

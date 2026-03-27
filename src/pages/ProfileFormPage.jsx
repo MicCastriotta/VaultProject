@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { databaseService } from '../services/databaseService';
 import { cryptoService } from '../services/cryptoService';
@@ -32,6 +32,7 @@ function formatBytes(bytes) {
 export function ProfileFormPage() {
     const navigate = useNavigate();
     const { id } = useParams();
+    const { state: locationState } = useLocation();
     const { refreshHMAC } = useAuth();
     const isNew = !id || id === 'new' || id === 'undefined';
     const { t } = useTranslation();
@@ -103,7 +104,12 @@ export function ProfileFormPage() {
             });
 
             setCategory(data.category || 'WEB');
-            setFormData(data);
+            // Se il campo website è vuoto e la detail page ha suggerito un dominio, precompila
+            const suggestedWebsite = locationState?.suggestedWebsite;
+            setFormData(suggestedWebsite && !data.website
+                ? { ...data, website: suggestedWebsite }
+                : data
+            );
             setPasswordHistory(data.passwordHistory || []);
             setOriginalPassword(data.password || '');
 
