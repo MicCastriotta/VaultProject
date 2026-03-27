@@ -34,6 +34,8 @@ import { OTPDisplay } from '../components/OTPDisplay';
 import { BrandIconBox } from '../components/BrandIconBox';
 import { syncService } from '../services/syncService';
 import { contactsService } from '../services/contactsService';
+import { hibpService } from '../services/hibpService';
+import { ShieldAlert, AlertTriangle, Globe } from 'lucide-react';
 
 export function ProfileDetailPage() {
     const navigate = useNavigate();
@@ -49,6 +51,7 @@ export function ProfileDetailPage() {
     const [showShareSheet, setShowShareSheet] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [visibleHistoryEntries, setVisibleHistoryEntries] = useState(new Set());
+    const [breachInfo, setBreachInfo] = useState(null); // null = check non ancora eseguito
 
     useEffect(() => {
         loadProfile();
@@ -73,6 +76,11 @@ export function ProfileDetailPage() {
                 ...data,
                 updatedAt: encrypted.updatedAt
             });
+
+            // Check breach per profili WEB con password e URL valorizzato
+            if (data.category === 'WEB' && data.password && data.website) {
+                checkBreaches(data.password, data.website);
+            }
 
             // Carica e decifra metadati allegato (lazy: encryptedData viene letto solo su "Apri")
             const attRaw = await databaseService.getAttachmentMetaByProfileId(parseInt(id));
@@ -101,6 +109,15 @@ export function ProfileDetailPage() {
         } finally {
             setIsLoading(false);
         }
+    }
+
+    async function checkBreaches(password, website) {
+        const domain = hibpService.extractDomain(website);
+        const [passwordResult, serviceBreaches] = await Promise.all([
+            hibpService.checkPassword(password),
+            domain ? hibpService.checkServiceBreaches(domain) : Promise.resolve([])
+        ]);
+        setBreachInfo({ passwordResult, serviceBreaches });
     }
 
     async function handleCopy(text, fieldName) {
@@ -312,6 +329,105 @@ export function ProfileDetailPage() {
                         </div>
                     </div>
 
+                    {/* Breach Banner — visibile solo per profili WEB quando il check è completato */}
+                    {profile.category === 'WEB' && breachInfo && (() => {
+                        const pwned = breachInfo.passwordResult?.pwned;
+                        const pwnCount = breachInfo.passwordResult?.count ?? 0;
+                        const breaches = breachInfo.serviceBreaches;
+                        if (!pwned && breaches.length === 0) return null;
+
+                        // Breach più recente del servizio
+                        const latestBreach = breaches.length > 0
+                            ? [...breaches].sort((a, b) => new Date(b.BreachDate) - new Date(a.BreachDate))[0]
+                            : null;
+
+                        // Il breach ha esposto le password?
+                        const serviceExposedPasswords = latestBreach?.DataClasses?.some(
+                            dc => dc.toLowerCase().includes('password')
+                        ) ?? false;
+
+                        const serviceName = latestBreach?.Title ?? profile.title;
+                        const breachDate = latestBreach
+                            ? new Date(latestBreach.BreachDate).toLocaleDateString()
+                            : '';
+
+                        // Determina scenario e messaggio
+                        let bannerTitle, bannerMessage, isRed;
+
+                        if (pwned && serviceExposedPasswords) {
+                            // CRITICO: password compromessa + servizio ha esposto password
+                            bannerTitle = t('profiles.breach.titleCritical');
+                            bannerMessage = t('profiles.breach.serviceExposedPasswords', {
+                                service: serviceName,
+                                date: breachDate,
+                                pwnCount: latestBreach.PwnCount.toLocaleString()
+                            });
+                            isRed = true;
+                        } else if (pwned && breaches.length > 0) {
+                            // Password compromessa + breach senza esposizione password
+                            bannerTitle = t('profiles.breach.titlePasswordOnly');
+                            bannerMessage = [
+                                t('profiles.breach.passwordPwned', { count: pwnCount.toLocaleString() }),
+                                t(`profiles.breach.serviceBreached`, {
+                                    count: breaches.length,
+                                    service: serviceName,
+                                    date: breachDate,
+                                    classes: latestBreach.DataClasses.join(', ')
+                                })
+                            ].join(' ');
+                            isRed = true;
+                        } else if (pwned) {
+                            // Solo password compromessa, nessun breach noto del servizio
+                            bannerTitle = t('profiles.breach.titlePasswordOnly');
+                            bannerMessage = t('profiles.breach.passwordPwnedNoService', {
+                                count: pwnCount.toLocaleString()
+                            });
+                            isRed = false;
+                        } else if (serviceExposedPasswords) {
+                            // Servizio ha esposto password ma la password attuale non risulta compromessa
+                            bannerTitle = t('profiles.breach.titleServicePasswords');
+                            bannerMessage = t('profiles.breach.serviceBreachedPasswords', {
+                                service: serviceName,
+                                date: breachDate
+                            });
+                            isRed = false;
+                        } else {
+                            // Solo breach di altri dati (email, username, ecc.)
+                            bannerTitle = t('profiles.breach.titleServiceOnly');
+                            bannerMessage = t(`profiles.breach.serviceBreached`, {
+                                count: breaches.length,
+                                service: serviceName,
+                                date: breachDate,
+                                classes: latestBreach.DataClasses.join(', ')
+                            });
+                            isRed = false;
+                        }
+
+                        const colorClass = isRed
+                            ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                            : 'bg-amber-500/10 border-amber-500/30 text-amber-300';
+                        const iconColor = isRed ? 'text-red-400' : 'text-amber-400';
+                        const Icon = isRed ? ShieldAlert : AlertTriangle;
+
+                        return (
+                            <div className={`rounded-xl p-4 border ${colorClass}`}>
+                                <div className="flex items-start gap-3">
+                                    <Icon size={18} className={`${iconColor} shrink-0 mt-0.5`} />
+                                    <div className="flex-1 min-w-0 space-y-1">
+                                        <p className="font-semibold text-sm">{bannerTitle}</p>
+                                        <p className="text-xs opacity-80">{bannerMessage}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => navigate(`/profile/${id}/edit`)}
+                                        className={`text-xs font-semibold shrink-0 underline underline-offset-2 ${iconColor}`}
+                                    >
+                                        {t('profiles.breach.changePassword')}
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })()}
+
                     {/* WEB Fields */}
                     {profile.category === 'WEB' && (
                         <>
@@ -390,6 +506,30 @@ export function ProfileDetailPage() {
                                     )}
                                 </div>
                             )}
+
+                            {/* Suggerimento dominio quando URL non impostato */}
+                            {!profile.website && (() => {
+                                const suggested = hibpService.inferDomainFromTitle(profile.title);
+                                if (!suggested) return null;
+                                return (
+                                    <div className="bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2 text-sm text-gray-400 min-w-0">
+                                            <Globe size={14} className="shrink-0" />
+                                            <span className="truncate">
+                                                {t('profiles.fields.website')}:{' '}
+                                                <span className="text-slate-300 font-medium">{suggested}</span>
+                                                {'?'}
+                                            </span>
+                                        </div>
+                                        <button
+                                            onClick={() => navigate(`/profile/${id}/edit`, { state: { suggestedWebsite: suggested } })}
+                                            className="text-xs text-blue-400 hover:text-blue-300 font-medium shrink-0"
+                                        >
+                                            {t('profiles.edit')}
+                                        </button>
+                                    </div>
+                                );
+                            })()}
 
                             {profile.website && (
                                 <DetailField

@@ -12,7 +12,7 @@ function cspPlugin(env = {}) {
     "style-src 'self' 'unsafe-inline'",           // Tailwind richiede inline styles
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://api.pwnedpasswords.com",
+    "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://api.pwnedpasswords.com https://haveibeenpwned.com",
     "frame-src https://content.googleapis.com https://docs.google.com",  // Google Drive Picker usa iframe da questi domini
     "object-src 'none'",
     "base-uri 'self'",
@@ -241,7 +241,7 @@ function cspPlugin(env = {}) {
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob:",
             "font-src 'self' data:",
-            "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://api.pwnedpasswords.com",
+            "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://api.pwnedpasswords.com https://haveibeenpwned.com",
             "frame-src https://content.googleapis.com https://docs.google.com",  // Google Drive Picker
             "object-src 'none'",
             "base-uri 'self'",
