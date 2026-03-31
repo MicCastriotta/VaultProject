@@ -142,11 +142,13 @@ class HIBPService {
      */
     inferDomainFromTitle(title) {
         if (!title) return null;
+        const stopWords = new Set(['app', 'web', 'online', 'official', 'account', 'login', 'portal', 'inc', 'llc', 'ltd', 'spa', 'srl']);
         const cleaned = title
             .toLowerCase()
-            .replace(/\b(app|web|online|official|account|login|portal|inc|llc|ltd|s\.p\.a|srl)\b/g, '')
-            .replace(/[^a-z0-9]/g, '')
-            .trim();
+            .replace(/[^a-z0-9\s]/g, ' ')
+            .split(/\s+/)
+            .filter(w => w && !stopWords.has(w))
+            .join('');
         return cleaned ? `${cleaned}.com` : null;
     }
 

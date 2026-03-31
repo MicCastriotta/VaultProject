@@ -352,10 +352,11 @@ export default defineConfig(({ mode }) => {
     })
   ],
   server: {
-      port: 3000,
+      host: '127.0.0.1',
+      port: 3101,
       allowedHosts: [
           'ownvault.eu',
-          'localhost'          
+          'localhost'
       ]
   },
   define: {
