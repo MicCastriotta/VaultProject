@@ -1,6 +1,6 @@
 {
   "name": "ownvault",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -28,7 +28,8 @@
   },
   "overrides": {
     "esbuild": "^0.25.0",
-    "serialize-javascript": "^7.0.3"
+    "serialize-javascript": ">=7.0.5",
+    "picomatch": ">=4.0.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.3",
