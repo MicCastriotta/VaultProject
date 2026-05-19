@@ -30,7 +30,8 @@ import {
     Copy,
     Check,
     CreditCard,
-    Coffee
+    Coffee,
+    FileSpreadsheet
 } from 'lucide-react';
 import { syncService } from '../services/syncService';
 import { googleDriveService } from '../services/googledriveService';
@@ -768,6 +769,23 @@ export function SettingsPage() {
                                     >
                                         <Upload size={20} />
                                         <span>{t('import.menuTitle')}</span>
+                                    </button>
+                                </div>
+
+                                {/* Import CSV */}
+                                <div className="p-4 space-y-3">
+                                    <p className="text-sm font-medium text-gray-300 flex items-center gap-2">
+                                        <FileSpreadsheet size={15} className="text-green-400" />
+                                        {t('importCsv.menuTitle')}
+                                        <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">NEW</span>
+                                    </p>
+                                    <p className="text-sm text-gray-400">{t('importCsv.menuDescription')}</p>
+                                    <button
+                                        onClick={() => navigate('/import-csv')}
+                                        className="w-full bg-green-600 hover:bg-green-500 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <FileSpreadsheet size={20} />
+                                        <span>{t('importCsv.menuTitle')}</span>
                                     </button>
                                 </div>
 
