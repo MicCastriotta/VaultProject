@@ -616,6 +616,62 @@
       "importFailed": "Import failed"
     }
   },
+  "importCsv": {
+    "menuTitle": "Import from CSV",
+    "menuDescription": "Bulk import profiles from a manually created CSV file.",
+    "steps": {
+      "guide": "Guide",
+      "file": "File",
+      "preview": "Preview",
+      "complete": "Complete"
+    },
+    "step1": {
+      "title": "How to prepare the CSV",
+      "description": "Create a CSV file (e.g. with Excel, Numbers, Google Sheets or a text editor) following this format.",
+      "formatTitle": "Expected format",
+      "formatIntro": "First row = header. Each subsequent row = one profile. Only the title column is required.",
+      "ruleCategory": "category: WEB (default) or CARD. If empty, WEB is assumed.",
+      "ruleTitle": "title is required. Profiles missing it will be skipped.",
+      "ruleQuotes": "Wrap a value in double quotes if it contains commas or newlines. Double a quote (\"\") to insert a literal quote.",
+      "ruleEncoding": "Save the file as CSV UTF-8 to preserve accented characters.",
+      "downloadTemplate": "Download CSV template"
+    },
+    "step2": {
+      "title": "Select the CSV file",
+      "description": "Upload the file you just prepared.",
+      "selectFile": "Click to select the CSV file",
+      "parsing": "Parsing...",
+      "preview": "Preview"
+    },
+    "step3": {
+      "title": "Preview profiles",
+      "description": "Check the data before final import. Nothing has been saved yet.",
+      "profilesFound": "profiles ready to import",
+      "rowsSkipped": "{{count}} rows skipped (invalid or missing title)",
+      "andMore": "and {{count}} more...",
+      "securityNote": "Data will be encrypted with AES-GCM + DEK before being saved. Never stored in plaintext.",
+      "startImport": "Import profiles",
+      "importing": "Importing..."
+    },
+    "step4": {
+      "title": "Import complete!",
+      "description": "Your profiles have been added to the vault.",
+      "successfullyImported": "profiles imported successfully",
+      "profilesFailed": "{{count}} profiles failed",
+      "cleanupTitle": "Cleanup",
+      "cleanupMessage": "For your security, delete the original CSV file: it contains your passwords in plaintext.",
+      "finish": "Go to vault"
+    },
+    "errors": {
+      "invalidFileType": "Invalid file type. Select a .csv file.",
+      "fileTooLarge": "File too large (max 5 MB).",
+      "noFileSelected": "No file selected.",
+      "emptyFile": "The file is empty or has no header row.",
+      "missingTitleColumn": "Missing 'title' column in the header row.",
+      "allRowsInvalid": "No valid row found. Make sure every row has a title.",
+      "parseFailed": "Could not parse the CSV file."
+    }
+  },
   "integrityWarning": {
     "title": "Database Integrity Warning",
     "body": "The database may have been modified outside of OwnVault. Your data could have been tampered with. If you did not make any external changes, consider exporting your data and resetting the app.",

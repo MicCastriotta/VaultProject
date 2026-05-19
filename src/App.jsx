@@ -55,6 +55,7 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ defa
 const PasswordGeneratorPage = lazy(() => import('./pages/PasswordGeneratorPage').then(m => ({ default: m.PasswordGeneratorPage })));
 const PasswordHealthPage = lazy(() => import('./pages/PasswordHealthPage').then(m => ({ default: m.PasswordHealthPage })));
 const ImportPage = lazy(() => import('./pages/ImportPage'));
+const ImportCsvPage = lazy(() => import('./pages/ImportCsvPage'));
 const ContactsPage = lazy(() => import('./pages/ContactsPage').then(m => ({ default: m.ContactsPage })));
 
 // Spinner piccolo per transizioni interne (non sostituisce tutto lo schermo)
@@ -325,6 +326,7 @@ function AppRoutes() {
                     <Route path="/" element={<MainPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/import" element={<ImportPage />} />
+                    <Route path="/import-csv" element={<ImportCsvPage />} />
                     <Route path="/generator" element={<PasswordGeneratorPage />} />
                     <Route path="/health" element={<PasswordHealthPage />} />
                     <Route path="/profile/new" element={<ProfileFormPage />} />

@@ -616,6 +616,62 @@
       "importFailed": "Importazione fallita"
     }
   },
+  "importCsv": {
+    "menuTitle": "Importa da CSV",
+    "menuDescription": "Importa più profili in blocco da un file CSV creato manualmente.",
+    "steps": {
+      "guide": "Guida",
+      "file": "File",
+      "preview": "Anteprima",
+      "complete": "Completo"
+    },
+    "step1": {
+      "title": "Come preparare il CSV",
+      "description": "Crea un file CSV (ad esempio con Excel, Numbers, Google Sheets o un editor di testo) seguendo questo formato.",
+      "formatTitle": "Formato atteso",
+      "formatIntro": "Prima riga = intestazione. Ogni riga successiva = un profilo. Solo la colonna title è obbligatoria.",
+      "ruleCategory": "category: WEB (default) oppure CARD. Se vuoto viene considerato WEB.",
+      "ruleTitle": "title è obbligatorio. Le righe senza titolo vengono ignorate.",
+      "ruleQuotes": "Racchiudi un valore tra virgolette doppie se contiene virgole o a capo. Raddoppia le virgolette (\"\") per inserirne una letterale.",
+      "ruleEncoding": "Salva il file come CSV UTF-8 per preservare le lettere accentate.",
+      "downloadTemplate": "Scarica template CSV"
+    },
+    "step2": {
+      "title": "Seleziona il file CSV",
+      "description": "Carica il file che hai appena preparato.",
+      "selectFile": "Clicca per selezionare il file CSV",
+      "parsing": "Analisi in corso...",
+      "preview": "Anteprima"
+    },
+    "step3": {
+      "title": "Anteprima profili",
+      "description": "Controlla i dati prima dell'import definitivo. Nulla è ancora stato salvato.",
+      "profilesFound": "profili pronti per l'import",
+      "rowsSkipped": "{{count}} righe ignorate (non valide o senza titolo)",
+      "andMore": "e altri {{count}}...",
+      "securityNote": "I dati saranno cifrati con AES-GCM + DEK prima del salvataggio. Mai memorizzati in chiaro.",
+      "startImport": "Importa profili",
+      "importing": "Importazione in corso..."
+    },
+    "step4": {
+      "title": "Importazione completata!",
+      "description": "I tuoi profili sono stati aggiunti al vault.",
+      "successfullyImported": "profili importati con successo",
+      "profilesFailed": "{{count}} profili non riusciti",
+      "cleanupTitle": "Pulizia",
+      "cleanupMessage": "Per sicurezza, elimina il file CSV originale: contiene le tue password in chiaro.",
+      "finish": "Vai al vault"
+    },
+    "errors": {
+      "invalidFileType": "Tipo file non valido. Seleziona un file .csv.",
+      "fileTooLarge": "File troppo grande (max 5 MB).",
+      "noFileSelected": "Nessun file selezionato.",
+      "emptyFile": "Il file è vuoto o non contiene un'intestazione.",
+      "missingTitleColumn": "Colonna 'title' mancante nell'intestazione.",
+      "allRowsInvalid": "Nessuna riga valida trovata. Verifica che ogni riga abbia un titolo.",
+      "parseFailed": "Impossibile analizzare il file CSV."
+    }
+  },
   "integrityWarning": {
     "title": "Avviso di integrità del database",
     "body": "Il database potrebbe essere stato modificato al di fuori di OwnVault. I tuoi dati potrebbero essere stati manomessi. Se non hai apportato modifiche esterne, considera di esportare i dati e reimpostare l'app.",
