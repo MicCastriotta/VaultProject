@@ -122,6 +122,7 @@ Rate limiter: 5 attempts / 5 minutes. Auto-lock timer resets on any user interac
 | `ov_pending_for_contacts` | session | Fetched relay payload pending display in ContactsPage |
 | `mainSearchTerm` | session | Search term persisted across navigations in MainPage |
 | `profileSortOrder` | local | Last chosen sort order in MainPage |
+| `autoLockTimeout` | local | Auto-lock timeout in ms (0 = never); validated against `AUTO_LOCK_OPTIONS` in `AuthContext.jsx` |
 | `contacts_guide_seen` | local | Suppress first-use guide in ContactsPage |
 
 ### i18n

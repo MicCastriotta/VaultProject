@@ -128,7 +128,7 @@
     "dark": "Dark",
     "light": "Light",
     "autoLock": "Auto-Lock",
-    "autoLockDescription": "Automatically lock the app after a period of inactivity. The app also locks faster when you switch to another tab or app.",
+    "autoLockDescription": "Automatically lock the app after a period of inactivity, including while you are in another tab or app.",
     "autoLockDisabledWarning": "Disabling auto-lock is not recommended. Anyone with access to your device could see your passwords.",
     "autoLockOptions": {
       "1min": "1 minute",

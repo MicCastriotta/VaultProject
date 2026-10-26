@@ -128,7 +128,7 @@
     "dark": "Scuro",
     "light": "Chiaro",
     "autoLock": "Blocco Automatico",
-    "autoLockDescription": "Blocca automaticamente l'app dopo un periodo di inattività. L'app si blocca anche più rapidamente quando passi a un'altra scheda o app.",
+    "autoLockDescription": "Blocca automaticamente l'app dopo un periodo di inattività, anche quando passi a un'altra scheda o app.",
     "autoLockDisabledWarning": "Disabilitare il blocco automatico non è consigliato. Chiunque abbia accesso al tuo dispositivo potrebbe vedere le tue password.",
     "autoLockOptions": {
       "1min": "1 minuto",
