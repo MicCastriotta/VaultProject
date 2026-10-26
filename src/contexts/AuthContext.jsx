@@ -33,6 +33,23 @@ import { pendingTokenService } from '../services/pendingTokenService';
 
 const AuthContext = createContext();
 
+// Auto-lock: valori ammessi (devono coincidere con le option in SettingsPage), 0 = mai
+const AUTO_LOCK_STORAGE_KEY = 'autoLockTimeout';
+const AUTO_LOCK_DEFAULT     = 300000;
+const AUTO_LOCK_OPTIONS     = [60000, 120000, 300000, 600000, 900000, 1800000, 0];
+
+function loadAutoLockTimeout() {
+    try {
+        const saved = localStorage.getItem(AUTO_LOCK_STORAGE_KEY);
+        // Attenzione: Number(null) === 0 ("mai") — controllare null prima della conversione
+        if (saved === null) return AUTO_LOCK_DEFAULT;
+        const value = Number(saved);
+        return AUTO_LOCK_OPTIONS.includes(value) ? value : AUTO_LOCK_DEFAULT;
+    } catch {
+        return AUTO_LOCK_DEFAULT;
+    }
+}
+
 export function useAuth() {
     const context = useContext(AuthContext);
     if (!context) {
@@ -60,9 +77,20 @@ export function AuthProvider({ children }) {
     const [pendingRecoveryKey, setPendingRecoveryKey]                     = useState(null);
 
     // Auto-lock
-    const [autoLockTimeout, setAutoLockTimeout] = useState(300000);
+    const [autoLockTimeout, setAutoLockTimeoutState] = useState(loadAutoLockTimeout);
     const autoLockTimer   = useRef(null);
     const backgroundSince = useRef(null);
+
+    // Persiste la scelta: senza, ogni reload (o kill della PWA in background) tornava a 5 min
+    const setAutoLockTimeout = useCallback((value) => {
+        if (!AUTO_LOCK_OPTIONS.includes(value)) return;
+        setAutoLockTimeoutState(value);
+        try {
+            localStorage.setItem(AUTO_LOCK_STORAGE_KEY, String(value));
+        } catch {
+            // storage non disponibile (es. navigazione privata): resta valido per la sessione
+        }
+    }, []);
 
     const performAutoLock = useCallback(() => {
         securityLog('Auto-lock triggered after inactivity');
@@ -100,9 +128,9 @@ export function AuthProvider({ children }) {
                 autoLockTimer.current?.stop();
             } else {
                 if (backgroundSince.current) {
+                    // Il timer JS è sospeso in background: confronta il tempo reale trascorso
                     const elapsed = Date.now() - backgroundSince.current;
-                    const bgTimeout = Math.min(autoLockTimeout, 60000);
-                    if (elapsed >= bgTimeout) {
+                    if (elapsed >= autoLockTimeout) {
                         securityLog('Auto-lock triggered (app was in background)', { elapsedMs: elapsed });
                         performAutoLock();
                         return;

@@ -332,6 +332,9 @@ export default defineConfig(({ mode }) => {
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MB
+        // simple-icons (~5 MB, caricato lazy) escluso dal precache: vite-plugin-pwa >= 1.0
+        // trasforma in errore di build gli asset oltre il limite invece di saltarli
+        globIgnores: ['**/vendor-simple-icons-*.js'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
